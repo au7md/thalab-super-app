@@ -3,17 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:adhan/adhan.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
 import '../../core/storage_service.dart';
 
-class CityPreset {
+class EgyptGovernorate {
   final String name;
   final double lat;
   final double lng;
-  final CalculationMethod method;
 
-  const CityPreset(this.name, this.lat, this.lng, this.method);
+  const EgyptGovernorate(this.name, this.lat, this.lng);
 }
 
 class PrayerTimesScreen extends StatefulWidget {
@@ -29,24 +29,43 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   Duration _timeRemaining = Duration.zero;
   String _nextPrayerName = '';
   bool _notificationsEnabled = false;
+  bool _isLocating = false;
 
   double _lat = 30.0444;
   double _lng = 31.2357;
-  String _cityName = 'القاهرة، مصر';
+  String _locationTitle = 'القاهرة، مصر';
   String _methodKey = 'egyptian';
   bool _isHanafi = false;
 
-  static const List<CityPreset> _cities = [
-    CityPreset('القاهرة، مصر', 30.0444, 31.2357, CalculationMethod.egyptian),
-    CityPreset('الإسكندرية، مصر', 31.2001, 29.9187, CalculationMethod.egyptian),
-    CityPreset('المنصورة، مصر', 31.0409, 31.3785, CalculationMethod.egyptian),
-    CityPreset('أسوان، مصر', 24.0889, 32.8998, CalculationMethod.egyptian),
-    CityPreset('مكة المكرمة', 21.4225, 39.8262, CalculationMethod.umm_al_qura),
-    CityPreset('المدينة المنورة', 24.4672, 39.6112, CalculationMethod.umm_al_qura),
-    CityPreset('الرياض، السعودية', 24.7136, 46.6753, CalculationMethod.umm_al_qura),
-    CityPreset('دبي، الإمارات', 25.2048, 55.2708, CalculationMethod.dubai),
-    CityPreset('القدس، فلسطين', 31.7683, 35.2137, CalculationMethod.muslim_world_league),
-    CityPreset('عمّان، الأردن', 31.9454, 35.9284, CalculationMethod.muslim_world_league),
+  // جميع محافظات مصر الـ 27 بإحداثياتها الدقيقة
+  static const List<EgyptGovernorate> _egyptGovernorates = [
+    EgyptGovernorate('القاهرة', 30.0444, 31.2357),
+    EgyptGovernorate('الجيزة', 30.0131, 31.2089),
+    EgyptGovernorate('الإسكندرية', 31.2001, 29.9187),
+    EgyptGovernorate('الدقهلية (المنصورة)', 31.0409, 31.3785),
+    EgyptGovernorate('الشرقية (الزقازيق)', 30.5877, 31.5020),
+    EgyptGovernorate('المنوفية (شبين الكوم)', 30.5503, 31.0106),
+    EgyptGovernorate('القليوبية (بنها)', 30.4591, 31.1786),
+    EgyptGovernorate('البحيرة (دمنهور)', 31.0341, 30.4682),
+    EgyptGovernorate('الغربية (طنطا)', 30.7865, 31.0004),
+    EgyptGovernorate('كفر الشيخ', 31.1107, 30.9388),
+    EgyptGovernorate('دمياط', 31.4175, 31.8144),
+    EgyptGovernorate('بورسعيد', 31.2653, 32.3019),
+    EgyptGovernorate('الإسماعيلية', 30.5965, 32.2715),
+    EgyptGovernorate('السويس', 29.9668, 32.5498),
+    EgyptGovernorate('الفيوم', 29.3084, 30.8428),
+    EgyptGovernorate('بني سويف', 29.0661, 31.0994),
+    EgyptGovernorate('المنيا', 28.1099, 30.7503),
+    EgyptGovernorate('أسيوط', 27.1783, 31.1859),
+    EgyptGovernorate('سوهاج', 26.5591, 31.6957),
+    EgyptGovernorate('قنا', 26.1551, 32.7160),
+    EgyptGovernorate('الأقصر', 25.6872, 32.6396),
+    EgyptGovernorate('أسوان', 24.0889, 32.8998),
+    EgyptGovernorate('البحر الأحمر (الغردقة)', 27.2579, 33.8116),
+    EgyptGovernorate('الوادي الجديد (الخارجة)', 25.4390, 30.5586),
+    EgyptGovernorate('مطروح (مرسى مطروح)', 31.3543, 27.2373),
+    EgyptGovernorate('شمال سيناء (العريش)', 31.1321, 33.8033),
+    EgyptGovernorate('جنوب سيناء (الطور)', 28.2417, 33.6222),
   ];
 
   @override
@@ -68,7 +87,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     setState(() {
       _lat = prefs.getDouble('prayer_lat') ?? 30.0444;
       _lng = prefs.getDouble('prayer_lng') ?? 31.2357;
-      _cityName = prefs.getString('prayer_city') ?? 'القاهرة، مصر';
+      _locationTitle = prefs.getString('prayer_city') ?? 'القاهرة، مصر';
       _methodKey = prefs.getString('prayer_method') ?? 'egyptian';
       _isHanafi = prefs.getBool('prayer_hanafi') ?? false;
     });
@@ -79,7 +98,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('prayer_lat', _lat);
     await prefs.setDouble('prayer_lng', _lng);
-    await prefs.setString('prayer_city', _cityName);
+    await prefs.setString('prayer_city', _locationTitle);
     await prefs.setString('prayer_method', _methodKey);
     await prefs.setBool('prayer_hanafi', _isHanafi);
   }
@@ -126,26 +145,91 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     }
   }
 
-  Future<void> _detectGpsLocation() async {
+  String _nearestGovernorateName(double lat, double lng) {
+    EgyptGovernorate nearest = _egyptGovernorates.first;
+    double minDistance = double.infinity;
+    for (final gov in _egyptGovernorates) {
+      final d = Geolocator.distanceBetween(lat, lng, gov.lat, gov.lng);
+      if (d < minDistance) {
+        minDistance = d;
+        nearest = gov;
+      }
+    }
+    return '${nearest.name}، مصر';
+  }
+
+  Future<void> _detectFastAccurateLocation() async {
+    setState(() => _isLocating = true);
     try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('يرجى تفعيل خدمة الموقع (GPS) من إعدادات الهاتف')),
+        );
+        setState(() => _isLocating = false);
+        return;
+      }
+
       LocationPermission perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.whileInUse || perm == LocationPermission.always) {
-        final pos = await Geolocator.getCurrentPosition();
-        setState(() {
+        // 1. استخدام آخر موقع معروف للاستجابة الفورية
+        Position? pos = await Geolocator.getLastKnownPosition();
+        if (pos != null) {
           _lat = pos.latitude;
           _lng = pos.longitude;
-          _cityName = 'موقعي الحالي GPS (${_lat.toStringAsFixed(2)}, ${_lng.toStringAsFixed(2)})';
-        });
+          _locationTitle = _nearestGovernorateName(_lat, _lng);
+          _calculatePrayers();
+        }
+
+        // 2. تحديث الموقع الحالي بدقة متوسطة وسريعة (بحد أقصى 5 ثوانٍ)
+        final currentPos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+
+        _lat = currentPos.latitude;
+        _lng = currentPos.longitude;
+        String resolvedAddress = _nearestGovernorateName(_lat, _lng);
+
+        // 3. تحويل الإحداثيات إلى اسم العنوان الحقيقي بالعربي
+        try {
+          await setLocaleIdentifier('ar');
+          final placemarks = await placemarkFromCoordinates(_lat, _lng);
+          if (placemarks.isNotEmpty) {
+            final p = placemarks.first;
+            final district = p.subAdministrativeArea ?? p.locality ?? '';
+            final gov = p.administrativeArea ?? '';
+            final formatted = [district, gov].where((e) => e.isNotEmpty).join('، ');
+            if (formatted.isNotEmpty) {
+              resolvedAddress = formatted;
+            }
+          }
+        } catch (_) {}
+
+        if (mounted) {
+          setState(() => _locationTitle = resolvedAddress);
+        }
         await _saveLocationSettings();
         _calculatePrayers();
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر تحديد الموقع تلقائياً، يمكنك اختيار المحافظة يدوياً')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
   }
 
   void _openSettingsSheet() {
+    String filter = '';
     showModalBottomSheet(
       context: context,
       backgroundColor: ThalabTheme.cardSurface,
@@ -154,119 +238,147 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'إعدادات الموقع والحساب الفلكي',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ThalabTheme.foxOrange,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await _detectGpsLocation();
-                  },
-                  icon: const Icon(Icons.my_location_rounded),
-                  label: const Text('تحديد موقعي تلقائياً عبر GPS'),
+        builder: (context, setSheetState) {
+          final filteredGovs = _egyptGovernorates
+              .where((g) => g.name.contains(filter.trim()))
+              .toList();
+
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.72,
+            maxChildSize: 0.9,
+            builder: (_, scrollCtrl) => ListView(
+              controller: scrollCtrl,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              children: [
+                const Text(
+                  'تحديد الموقع وإعدادات المواقيت',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text('أو اختر المدينة يدوياً:', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 44,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _cities.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, index) {
-                    final city = _cities[index];
-                    return ActionChip(
-                      label: Text(city.name),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ThalabTheme.foxOrange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await _detectFastAccurateLocation();
+                    },
+                    icon: const Icon(Icons.my_location_rounded),
+                    label: const Text('تحديد موقعي التلقائي الآن (GPS)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text('اختيار المحافظة يدوياً (27 محافظة):', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextField(
+                  onChanged: (val) => setSheetState(() => filter = val),
+                  decoration: InputDecoration(
+                    hintText: 'ابحث باسم المحافظة...',
+                    prefixIcon: const Icon(Icons.search_rounded, color: ThalabTheme.foxOrange),
+                    filled: true,
+                    fillColor: ThalabTheme.creamBackground,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: filteredGovs.map((gov) {
+                    final isSelected = _locationTitle.contains(gov.name);
+                    return ChoiceChip(
+                      label: Text(
+                        gov.name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white : ThalabTheme.darkSlate,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedColor: ThalabTheme.foxOrange,
                       backgroundColor: ThalabTheme.creamBackground,
-                      onPressed: () async {
+                      onSelected: (_) async {
                         setState(() {
-                          _lat = city.lat;
-                          _lng = city.lng;
-                          _cityName = city.name;
+                          _lat = gov.lat;
+                          _lng = gov.lng;
+                          _locationTitle = '${gov.name}، مصر';
                         });
                         await _saveLocationSettings();
                         _calculatePrayers();
                         if (mounted) Navigator.pop(ctx);
                       },
                     );
+                  }).toList(),
+                ),
+                const SizedBox(height: 18),
+                const Text('طريقة الحساب الفلكي:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('الهيئة المصرية العامة'),
+                      selected: _methodKey == 'egyptian',
+                      selectedColor: ThalabTheme.foxOrange,
+                      onSelected: (_) async {
+                        setSheetState(() => _methodKey = 'egyptian');
+                        setState(() => _methodKey = 'egyptian');
+                        await _saveLocationSettings();
+                        _calculatePrayers();
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('أم القرى'),
+                      selected: _methodKey == 'umm_al_qura',
+                      selectedColor: ThalabTheme.foxOrange,
+                      onSelected: (_) async {
+                        setSheetState(() => _methodKey = 'umm_al_qura');
+                        setState(() => _methodKey = 'umm_al_qura');
+                        await _saveLocationSettings();
+                        _calculatePrayers();
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('رابطة العالم الإسلامي'),
+                      selected: _methodKey == 'mwl',
+                      selectedColor: ThalabTheme.foxOrange,
+                      onSelected: (_) async {
+                        setSheetState(() => _methodKey = 'mwl');
+                        setState(() => _methodKey = 'mwl');
+                        await _saveLocationSettings();
+                        _calculatePrayers();
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('المذهب الحنفي (في وقت العصر)'),
+                  activeColor: ThalabTheme.foxOrange,
+                  value: _isHanafi,
+                  onChanged: (val) async {
+                    setSheetState(() => _isHanafi = val);
+                    setState(() => _isHanafi = val);
+                    await _saveLocationSettings();
+                    _calculatePrayers();
                   },
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text('طريقة الحساب:', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                children: [
-                  ChoiceChip(
-                    label: const Text('الهيئة المصرية'),
-                    selected: _methodKey == 'egyptian',
-                    selectedColor: ThalabTheme.foxOrange,
-                    onSelected: (_) async {
-                      setSheetState(() => _methodKey = 'egyptian');
-                      setState(() => _methodKey = 'egyptian');
-                      await _saveLocationSettings();
-                      _calculatePrayers();
-                    },
-                  ),
-                  ChoiceChip(
-                    label: const Text('أم القرى'),
-                    selected: _methodKey == 'umm_al_qura',
-                    selectedColor: ThalabTheme.foxOrange,
-                    onSelected: (_) async {
-                      setSheetState(() => _methodKey = 'umm_al_qura');
-                      setState(() => _methodKey = 'umm_al_qura');
-                      await _saveLocationSettings();
-                      _calculatePrayers();
-                    },
-                  ),
-                  ChoiceChip(
-                    label: const Text('رابطة العالم الإسلامي'),
-                    selected: _methodKey == 'mwl',
-                    selectedColor: ThalabTheme.foxOrange,
-                    onSelected: (_) async {
-                      setSheetState(() => _methodKey = 'mwl');
-                      setState(() => _methodKey = 'mwl');
-                      await _saveLocationSettings();
-                      _calculatePrayers();
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('المذهب الحنفي (في وقت العصر)'),
-                activeColor: ThalabTheme.foxOrange,
-                value: _isHanafi,
-                onChanged: (val) async {
-                  setSheetState(() => _isHanafi = val);
-                  setState(() => _isHanafi = val);
-                  await _saveLocationSettings();
-                  _calculatePrayers();
-                },
-              ),
-            ],
-          ),
-        ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -343,8 +455,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         title: const Text('مواقيت الصلاة'),
         actions: [
           IconButton(
-            tooltip: 'تخصيص الموقع وطريقة الحساب',
-            icon: const Icon(Icons.tune_rounded, color: ThalabTheme.foxOrange),
+            tooltip: 'تحديد المحافظة أو GPS',
+            icon: const Icon(Icons.location_city_rounded, color: ThalabTheme.foxOrange),
             onPressed: _openSettingsSheet,
           ),
           IconButton(
@@ -395,11 +507,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                     letterSpacing: 2,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 GestureDetector(
                   onTap: _openSettingsSheet,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.22),
                       borderRadius: BorderRadius.circular(20),
@@ -407,9 +519,23 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.location_on_rounded, color: Colors.white, size: 15),
-                        const SizedBox(width: 4),
-                        Text(_cityName, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        if (_isLocating)
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        else
+                          const Icon(Icons.location_on_rounded, color: Colors.white, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          _locationTitle,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
