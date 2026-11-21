@@ -1,18 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hijri/hijri_calendar.dart';
+import 'package:adhan/adhan.dart';
 import 'core/theme.dart';
 import 'core/storage_service.dart';
+import 'core/rafiq_notifications_service.dart';
 import 'widgets/floating_nav_bar.dart';
 import 'features/rafiq/tasbih_screen.dart';
 import 'features/rafiq/adhkar_screen.dart';
 import 'features/rafiq/prayer_times_screen.dart';
 import 'features/rafiq/quran_screen.dart';
 import 'features/rafiq/qibla_screen.dart';
+import 'features/rafiq/hijri_events_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
+  final prefs = await SharedPreferences.getInstance();
+  final lat = prefs.getDouble('prayer_lat') ?? 30.0444;
+  final lng = prefs.getDouble('prayer_lng') ?? 31.2357;
+  await RafiqNotificationsService.syncAllScheduledNotifications(
+    lat: lat,
+    lng: lng,
+    params: CalculationMethod.egyptian.getParameters(),
+  );
   runApp(const ThalabApp());
 }
 
@@ -186,15 +198,15 @@ class HomeDashboardTab extends StatelessWidget {
             ),
             _QuickCard(
               title: 'مواقيت الصلاة',
-              subtitle: '27 محافظة + GPS',
+              subtitle: 'المواقيت والسنن الرواتب',
               icon: Icons.access_time_filled_rounded,
               onTap: () => _open(context, const PrayerTimesScreen()),
             ),
             _QuickCard(
-              title: 'اتجاه القبلة',
-              subtitle: 'بوصلة إسلامية مستقرة',
-              icon: Icons.explore_rounded,
-              onTap: () => _open(context, const QiblaScreen()),
+              title: 'التقويم الهجري',
+              subtitle: 'المناسبات والعد التنازلي',
+              icon: Icons.calendar_month_rounded,
+              onTap: () => _open(context, const HijriEventsScreen()),
             ),
           ],
         ),
@@ -243,7 +255,7 @@ class _QuickCard extends StatelessWidget {
   }
 }
 
-// 2. تبويب رفيق (بطاقة الختمة + بطاقة الذكر الوقتي التلقائي الذكي)
+// 2. تبويب رفيق (الواحة الإيمانية المتكاملة)
 class RafiqTab extends StatefulWidget {
   const RafiqTab({super.key});
 
@@ -253,6 +265,22 @@ class RafiqTab extends StatefulWidget {
 
 class _RafiqTabState extends State<RafiqTab> {
   int _khatmahRead = 0;
+  int _hijriOffset = 0;
+
+  static const List<String> _hijriMonthsAr = [
+    'محرم',
+    'صفر',
+    'ربيع الأول',
+    'ربيع الآخر',
+    'جمادى الأولى',
+    'جمادى الآخرة',
+    'رجب',
+    'شعبان',
+    'رمضان',
+    'شوال',
+    'ذو القعدة',
+    'ذو الحجة',
+  ];
 
   @override
   void initState() {
@@ -264,6 +292,7 @@ class _RafiqTabState extends State<RafiqTab> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _khatmahRead = prefs.getInt('khatmah_pages_read') ?? 0;
+      _hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
     });
   }
 
@@ -272,7 +301,6 @@ class _RafiqTabState extends State<RafiqTab> {
     _refreshWidgets();
   }
 
-  // تحديد الذكر المناسب للوقت الحالي بدقة
   (String title, String subtitle, IconData icon, int tabIndex) _getTimelyDhikrInfo() {
     final hour = DateTime.now().hour;
     if (hour >= 4 && hour < 12) {
@@ -286,20 +314,46 @@ class _RafiqTabState extends State<RafiqTab> {
     }
   }
 
+  int _daysUntilRamadan() {
+    final now = DateTime.now().add(Duration(days: _hijriOffset));
+    final todayH = HijriCalendar.fromDate(now);
+    int targetYear = todayH.hYear;
+    if (9 < todayH.hMonth || (9 == todayH.hMonth && 1 < todayH.hDay)) {
+      targetYear++;
+    }
+    final ramadanG = HijriCalendar().hijriToGregorian(targetYear, 9, 1);
+    final todayClean = DateTime(now.year, now.month, now.day);
+    final targetClean = DateTime(ramadanG.year, ramadanG.month, ramadanG.day);
+    return targetClean.difference(todayClean).inDays;
+  }
+
   @override
   Widget build(BuildContext context) {
     final double khatmahPct = (_khatmahRead / 604).clamp(0.0, 1.0);
     final timely = _getTimelyDhikrInfo();
+    final todayH = HijriCalendar.fromDate(DateTime.now().add(Duration(days: _hijriOffset)));
+    final monthName = _hijriMonthsAr[(todayH.hMonth - 1).clamp(0, 11)];
+    final ramadanDays = _daysUntilRamadan();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
       children: [
-        const Text('رفيق — الواحة الإيمانية', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('رفيق — الواحة الإيمانية', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            IconButton(
+              tooltip: 'منظومة الإشعارات الذكية',
+              icon: const Icon(Icons.notifications_active_rounded, color: ThalabTheme.foxOrange),
+              onPressed: () => _open(const HijriEventsScreen(initialTab: 2)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
 
+        // الصف الأول: ويدجت الختمة + ويدجت الذكر الوقتي
         Row(
           children: [
-            // ويدجت تقدم الختمة
             Expanded(
               child: GestureDetector(
                 onTap: () => _open(const QuranScreen()),
@@ -336,8 +390,6 @@ class _RafiqTabState extends State<RafiqTab> {
               ),
             ),
             const SizedBox(width: 12),
-
-            // ويدجت الذكر الوقتي المخصص تلقائياً حسب الساعة
             Expanded(
               child: GestureDetector(
                 onTap: () => _open(AdhkarScreen(initialTabIndex: timely.$4)),
@@ -383,12 +435,89 @@ class _RafiqTabState extends State<RafiqTab> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
+        // الصف الثاني: بطاقة التقويم الهجري + بطاقة العد التنازلي للمناسبات ورمضان
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _open(const HijriEventsScreen(initialTab: 1)),
+                child: Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.cardSurface,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Icon(Icons.calendar_month_rounded, color: ThalabTheme.foxOrange, size: 22),
+                          Text('الهجري', style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '${todayH.hDay} $monthName',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        '${todayH.hYear} هـ • الأيام البيض',
+                        style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _open(const HijriEventsScreen(initialTab: 0)),
+                child: Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.cardSurface,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Icon(Icons.nights_stay_rounded, color: ThalabTheme.foxOrange, size: 22),
+                          Text('المناسبات', style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        ramadanDays == 0 ? 'رمضان كريم!' : 'رمضان: $ramadanDays يوم',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      const Text(
+                        'اضغط لعرض كل المناسبات',
+                        style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // بطاقة مواقيت الصلاة والسنن والنوافل
         GestureDetector(
           onTap: () => _open(const PrayerTimesScreen()),
           child: Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: ThalabTheme.cardSurface,
               borderRadius: BorderRadius.circular(24),
@@ -409,10 +538,10 @@ class _RafiqTabState extends State<RafiqTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('مواقيت الصلاة والأذان', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text('مواقيت الصلاة والسنن والنوافل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
                       Text(
-                        'جميع محافظات مصر + تحديد العنوان التلقائي',
-                        style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 12),
+                        'الرواتب، الضحى، الثلث الأخير + 27 محافظة',
+                        style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11.5),
                       ),
                     ],
                   ),
@@ -422,8 +551,9 @@ class _RafiqTabState extends State<RafiqTab> {
             ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
 
+        // البطاقات الأربع الأساسية
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
