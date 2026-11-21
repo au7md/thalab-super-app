@@ -32,8 +32,8 @@ class ThalabFloatingNavBar extends StatelessWidget {
     ),
     NavItemData(
       label: 'رفيق',
-      icon: Icons.auto_awesome_outlined,
-      activeIcon: Icons.auto_awesome_rounded,
+      icon: Icons.people_alt_outlined,
+      activeIcon: Icons.people_alt_rounded,
     ),
     NavItemData(
       label: 'الميديا',
@@ -47,120 +47,98 @@ class ThalabFloatingNavBar extends StatelessWidget {
     ),
     NavItemData(
       label: 'المزيد',
-      icon: Icons.grid_view_outlined,
+      icon: Icons.more_horiz_rounded,
       activeIcon: Icons.grid_view_rounded,
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-      height: 74,
-      decoration: BoxDecoration(
-        color: ThalabTheme.cardSurface,
-        borderRadius: BorderRadius.circular(38),
-        border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: ThalabTheme.foxOrange.withOpacity(0.14),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final double itemWidth = constraints.maxWidth / items.length;
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              // الخلفية البرتقالية المنزلقة للتبويب النشط
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 320),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(items.length, (index) {
+          final bool isSelected = currentIndex == index;
+          final item = items[index];
+
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                if (!isSelected) {
+                  HapticFeedback.lightImpact();
+                  onTap(index);
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
-                right: currentIndex * itemWidth + 4,
-                top: 4,
-                bottom: 4,
-                width: itemWidth - 8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [ThalabTheme.foxOrangeLight, ThalabTheme.foxOrange],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                    borderRadius: BorderRadius.circular(34),
-                    boxShadow: [
-                      BoxShadow(
-                        color: ThalabTheme.foxOrange.withOpacity(0.35),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                height: isSelected ? 78 : 68,
+                decoration: BoxDecoration(
+                  gradient: isSelected
+                      ? const LinearGradient(
+                          colors: [ThalabTheme.foxOrangeLight, ThalabTheme.foxOrange],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : null,
+                  color: isSelected ? null : ThalabTheme.cardSurface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isSelected
+                        ? ThalabTheme.foxOrange
+                        : ThalabTheme.softBorder,
+                    width: 1.5,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isSelected
+                          ? ThalabTheme.foxOrange.withOpacity(0.32)
+                          : ThalabTheme.foxOrange.withOpacity(0.08),
+                      blurRadius: isSelected ? 16 : 8,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isSelected ? item.activeIcon : item.icon,
+                      color: isSelected ? Colors.white : ThalabTheme.darkSlate,
+                      size: isSelected ? 26 : 22,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.w600,
+                        color:
+                            isSelected ? Colors.white : ThalabTheme.darkSlate,
+                      ),
+                    ),
+                    if (isSelected)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        width: 18,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              // أيقونات وعناوين التبويبات
-              Row(
-                children: List.generate(items.length, (index) {
-                  final bool isSelected = currentIndex == index;
-                  final item = items[index];
-                  return Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        if (!isSelected) {
-                          HapticFeedback.lightImpact();
-                          onTap(index);
-                        }
-                      },
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          AnimatedScale(
-                            scale: isSelected ? 1.12 : 1.0,
-                            duration: const Duration(milliseconds: 250),
-                            child: Icon(
-                              isSelected ? item.activeIcon : item.icon,
-                              color: isSelected
-                                  ? Colors.white
-                                  : ThalabTheme.darkSlate,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            item.label,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.w600,
-                              color: isSelected
-                                  ? Colors.white
-                                  : ThalabTheme.darkSlate,
-                            ),
-                          ),
-                          if (isSelected)
-                            Container(
-                              margin: const EdgeInsets.only(top: 3),
-                              width: 16,
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ],
+            ),
           );
-        },
+        }),
       ),
     );
   }
