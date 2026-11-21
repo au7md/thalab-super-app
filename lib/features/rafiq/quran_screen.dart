@@ -514,7 +514,8 @@ class QuranGlobalSearchDelegate extends SearchDelegate {
     }
 
     // البحث في نصوص الآيات
-    final verseMatches = quran.searchWords(q);
+    final words = q.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final verseMatches = quran.searchWords(words);
     final List<dynamic> list = verseMatches['result'] ?? [];
     for (final item in list.take(40)) {
       final int s = item['surah'];
