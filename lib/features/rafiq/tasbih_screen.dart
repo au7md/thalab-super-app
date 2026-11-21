@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme.dart';
@@ -16,7 +17,7 @@ class _TasbihScreenState extends State<TasbihScreen>
   int _totalCount = 0;
   int _target = 33;
   String _selectedDhikr = 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ';
-  late AnimationController _pulseController;
+  late AnimationController _beadAnimController;
 
   final List<String> _presets = [
     'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',
@@ -32,23 +33,20 @@ class _TasbihScreenState extends State<TasbihScreen>
     _count = StorageService.getCurrentTasbih();
     _totalCount = StorageService.getTotalTasbih();
     _selectedDhikr = StorageService.getSelectedDhikr();
-    _pulseController = AnimationController(
+    _beadAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 120),
-      lowerBound: 0.94,
-      upperBound: 1.0,
-      value: 1.0,
+      duration: const Duration(milliseconds: 180),
     );
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
+    _beadAnimController.dispose();
     super.dispose();
   }
 
   void _increment() {
-    _pulseController.reverse().then((_) => _pulseController.forward());
+    _beadAnimController.forward(from: 0.0);
     setState(() {
       _count++;
       _totalCount++;
@@ -74,7 +72,7 @@ class _TasbihScreenState extends State<TasbihScreen>
       if (_target == 33) {
         _target = 100;
       } else if (_target == 100) {
-        _target = 0; // مفتوح
+        _target = 0;
       } else {
         _target = 33;
       }
@@ -110,7 +108,6 @@ class _TasbihScreenState extends State<TasbihScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: ThalabTheme.foxOrange,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             onPressed: () {
               if (controller.text.trim().isNotEmpty) {
@@ -132,9 +129,6 @@ class _TasbihScreenState extends State<TasbihScreen>
 
   @override
   Widget build(BuildContext context) {
-    final double progress =
-        _target == 0 ? 1.0 : ((_count % _target) / _target).clamp(0.0, 1.0);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('السبحة الإلكترونية'),
@@ -147,10 +141,9 @@ class _TasbihScreenState extends State<TasbihScreen>
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 22),
         child: Column(
           children: [
-            // شريط الإحصائيات والتحكم بالهدف
             Row(
               children: [
                 Expanded(
@@ -172,11 +165,9 @@ class _TasbihScreenState extends State<TasbihScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-
-            // اختيار الذكر من القائمة الأفقية
+            const SizedBox(height: 14),
             SizedBox(
-              height: 44,
+              height: 42,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _presets.length,
@@ -196,10 +187,6 @@ class _TasbihScreenState extends State<TasbihScreen>
                     selected: isSelected,
                     selectedColor: ThalabTheme.foxOrange,
                     backgroundColor: ThalabTheme.cardSurface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: const BorderSide(color: ThalabTheme.softBorder),
-                    ),
                     onSelected: (_) {
                       setState(() {
                         _selectedDhikr = text;
@@ -212,93 +199,80 @@ class _TasbihScreenState extends State<TasbihScreen>
                 },
               ),
             ),
-            const SizedBox(height: 20),
-
-            // بطاقة الذكر النشط
+            const SizedBox(height: 16),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               decoration: BoxDecoration(
                 color: ThalabTheme.cardSurface,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
               ),
               child: Text(
                 _selectedDhikr,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  height: 1.6,
-                ),
+                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, height: 1.6),
               ),
             ),
-
             const Spacer(),
 
-            // زر السبحة الدائري التفاعلي
-            ScaleTransition(
-              scale: _pulseController,
-              child: GestureDetector(
-                onTap: _increment,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      width: 230,
-                      height: 230,
-                      child: CircularProgressIndicator(
-                        value: _target == 0 ? 1 : (progress == 0 && _count > 0 ? 1 : progress),
-                        strokeWidth: 10,
-                        backgroundColor: ThalabTheme.softBorder,
-                        valueColor: const AlwaysStoppedAnimation<Color>(ThalabTheme.foxOrange),
-                        strokeCap: StrokeCap.round,
+            // حلقة السبحة ثلاثية الأبعاد بحبات متحركة
+            GestureDetector(
+              onTap: _increment,
+              child: AnimatedBuilder(
+                animation: _beadAnimController,
+                builder: (context, _) {
+                  return SizedBox(
+                    width: 270,
+                    height: 270,
+                    child: CustomPaint(
+                      painter: _RosaryBeadsPainter(
+                        count: _count,
+                        target: _target == 0 ? 33 : _target,
+                        stepFraction: _beadAnimController.value,
                       ),
-                    ),
-                    Container(
-                      width: 196,
-                      height: 196,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [ThalabTheme.foxOrangeLight, ThalabTheme.foxOrange],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                      child: Center(
+                        child: Container(
+                          width: 155,
+                          height: 155,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: ThalabTheme.cardSurface,
+                            border: Border.all(color: ThalabTheme.softBorder, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: ThalabTheme.foxOrange.withOpacity(0.18),
+                                blurRadius: 20,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '$_count',
+                                style: const TextStyle(
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.bold,
+                                  color: ThalabTheme.foxOrange,
+                                ),
+                              ),
+                              const Text(
+                                'المس للتسبيح',
+                                style: TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                              ),
+                            ],
+                          ),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: ThalabTheme.foxOrange.withOpacity(0.35),
-                            blurRadius: 24,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '$_count',
-                            style: const TextStyle(
-                              fontSize: 52,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const Text(
-                            'اضغط للتسبيح',
-                            style: TextStyle(color: Colors.white70, fontSize: 13),
-                          ),
-                        ],
                       ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
 
             const Spacer(),
-
-            // زر تصفير العداد الحالي
             TextButton.icon(
               onPressed: _resetCurrent,
               icon: const Icon(Icons.refresh_rounded, color: ThalabTheme.mutedSlate),
@@ -312,6 +286,69 @@ class _TasbihScreenState extends State<TasbihScreen>
       ),
     );
   }
+}
+
+class _RosaryBeadsPainter extends CustomPainter {
+  final int count;
+  final int target;
+  final double stepFraction;
+
+  _RosaryBeadsPainter({
+    required this.count,
+    required this.target,
+    required this.stepFraction,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 22;
+    const int totalBeads = 33;
+
+    // رسم خيط السبحة الدائري
+    final stringPaint = Paint()
+      ..color = ThalabTheme.softBorder
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+    canvas.drawCircle(center, radius, stringPaint);
+
+    // حساب زاوية دوران الحبات مع كل تسبيحة
+    final double baseAngle = ((count - 1 + stepFraction) / totalBeads) * 2 * math.pi;
+
+    for (int i = 0; i < totalBeads; i++) {
+      final double angle = -math.pi / 2 + (i / totalBeads) * 2 * math.pi + baseAngle;
+      final offset = Offset(
+        center.dx + radius * math.cos(angle),
+        center.dy + radius * math.sin(angle),
+      );
+
+      final bool isHeadBead = i == 0;
+      final double beadRadius = isHeadBead ? 11.5 : 8.5;
+
+      // ظل الحبة
+      canvas.drawCircle(
+        offset + const Offset(0, 2.5),
+        beadRadius,
+        Paint()..color = Colors.black.withOpacity(0.12),
+      );
+
+      // تدرج لوني يعطي مجسّم ثلاثي الأبعاد للحبة
+      final rect = Rect.fromCircle(center: offset, radius: beadRadius);
+      final beadPaint = Paint()
+        ..shader = RadialGradient(
+          colors: isHeadBead
+              ? [const Color(0xFF545861), ThalabTheme.darkSlate]
+              : [const Color(0xFFFFB870), ThalabTheme.foxOrange],
+          center: const Alignment(-0.35, -0.35),
+        ).createShader(rect);
+
+      canvas.drawCircle(offset, beadRadius, beadPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RosaryBeadsPainter oldDelegate) =>
+      oldDelegate.count != count || oldDelegate.stepFraction != stepFraction;
 }
 
 class _StatPill extends StatelessWidget {
