@@ -6,7 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
-import '../../core/storage_service.dart';
+import '../../core/rafiq_notifications_service.dart';
 
 class EgyptGovernorate {
   final String name;
@@ -28,7 +28,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   late Timer _timer;
   Duration _timeRemaining = Duration.zero;
   String _nextPrayerName = '';
-  bool _notificationsEnabled = false;
   bool _isLocating = false;
 
   double _lat = 30.0444;
@@ -37,7 +36,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   String _methodKey = 'egyptian';
   bool _isHanafi = false;
 
-  // جميع محافظات مصر الـ 27 بإحداثياتها الدقيقة
   static const List<EgyptGovernorate> _egyptGovernorates = [
     EgyptGovernorate('القاهرة', 30.0444, 31.2357),
     EgyptGovernorate('الجيزة', 30.0131, 31.2089),
@@ -101,6 +99,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     await prefs.setString('prayer_city', _locationTitle);
     await prefs.setString('prayer_method', _methodKey);
     await prefs.setBool('prayer_hanafi', _isHanafi);
+
+    await RafiqNotificationsService.syncAllScheduledNotifications(
+      lat: _lat,
+      lng: _lng,
+      params: _getParams(),
+    );
   }
 
   CalculationParameters _getParams() {
@@ -175,7 +179,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.whileInUse || perm == LocationPermission.always) {
-        // 1. استخدام آخر موقع معروف للاستجابة الفورية
         Position? pos = await Geolocator.getLastKnownPosition();
         if (pos != null) {
           _lat = pos.latitude;
@@ -184,7 +187,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
           _calculatePrayers();
         }
 
-        // 2. تحديث الموقع الحالي بدقة متوسطة وسريعة (بحد أقصى 5 ثوانٍ)
         final currentPos = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.medium,
@@ -196,7 +198,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         _lng = currentPos.longitude;
         String resolvedAddress = _nearestGovernorateName(_lat, _lng);
 
-        // 3. تحويل الإحداثيات إلى اسم العنوان الحقيقي بالعربي
         try {
           await setLocaleIdentifier('ar');
           final placemarks = await placemarkFromCoordinates(_lat, _lng);
@@ -410,70 +411,40 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     return '$hours:$minutes:$seconds';
   }
 
-  Future<void> _activateDailyAlerts() async {
-    await StorageService.scheduleDailyReminder(
-      id: 101,
-      title: 'أذكار الصباح — رفيق',
-      body: 'ابدأ يومك بذكر الله وطمأنينة القلب.',
-      hour: 6,
-      minute: 30,
-    );
-    await StorageService.scheduleDailyReminder(
-      id: 102,
-      title: 'أذكار المساء — رفيق',
-      body: 'حان وقت أذكار المساء وحفظ النفس.',
-      hour: 17,
-      minute: 30,
-    );
-    setState(() => _notificationsEnabled = true);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم تفعيل تنبيهات الأذكار اليومية ✓'),
-          backgroundColor: ThalabTheme.foxOrange,
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final formatter = DateFormat('hh:mm a', 'ar');
     final currentPrayer = _prayerTimes.currentPrayer();
 
+    // حساب أوقات النوافل بدقة فلكية
+    final duhaStart = _prayerTimes.sunrise.add(const Duration(minutes: 15));
+    final duhaEnd = _prayerTimes.dhuhr.subtract(const Duration(minutes: 10));
+    final sunnahTimes = SunnahTimes(_prayerTimes);
+
     final list = [
-      ('الفجر', _prayerTimes.fajr, Prayer.fajr, Icons.wb_twilight_rounded),
-      ('الشروق', _prayerTimes.sunrise, Prayer.sunrise, Icons.wb_sunny_outlined),
-      ('الظهر', _prayerTimes.dhuhr, Prayer.dhuhr, Icons.wb_sunny_rounded),
-      ('العصر', _prayerTimes.asr, Prayer.asr, Icons.sunny_snowing),
-      ('المغرب', _prayerTimes.maghrib, Prayer.maghrib, Icons.nights_stay_outlined),
-      ('العشاء', _prayerTimes.isha, Prayer.isha, Icons.bedtime_rounded),
+      ('الفجر', _prayerTimes.fajr, Prayer.fajr, Icons.wb_twilight_rounded, 'سنة قبلية: ٢ ركعة'),
+      ('الشروق', _prayerTimes.sunrise, Prayer.sunrise, Icons.wb_sunny_outlined, 'بداية وقت الضحى بعد ١٥ د'),
+      ('الظهر', _prayerTimes.dhuhr, Prayer.dhuhr, Icons.wb_sunny_rounded, 'قبلية: ٤ ركعات • بعدية: ٢'),
+      ('العصر', _prayerTimes.asr, Prayer.asr, Icons.sunny_snowing, 'نافلة قبلية: ٤ ركعات'),
+      ('المغرب', _prayerTimes.maghrib, Prayer.maghrib, Icons.nights_stay_outlined, 'سنة بعدية: ٢ ركعة'),
+      ('العشاء', _prayerTimes.isha, Prayer.isha, Icons.bedtime_rounded, 'بعدية: ٢ • الوتر: ١ - ٣'),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('مواقيت الصلاة'),
+        title: const Text('مواقيت الصلاة والسنن'),
         actions: [
           IconButton(
             tooltip: 'تحديد المحافظة أو GPS',
             icon: const Icon(Icons.location_city_rounded, color: ThalabTheme.foxOrange),
             onPressed: _openSettingsSheet,
           ),
-          IconButton(
-            tooltip: 'تنبيهات الأذكار',
-            icon: Icon(
-              _notificationsEnabled
-                  ? Icons.notifications_active_rounded
-                  : Icons.notifications_none_rounded,
-              color: ThalabTheme.foxOrange,
-            ),
-            onPressed: _activateDailyAlerts,
-          ),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 34),
         children: [
+          // بطاقة العد التنازلي
           Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
@@ -543,12 +514,14 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+
+          // قائمة المواقيت مع شارة السنن الرواتب النظيفة بدون ازدحام
           ...list.map((item) {
             final isCurrent = item.$3 == currentPrayer;
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
               decoration: BoxDecoration(
                 color: isCurrent
                     ? ThalabTheme.foxOrange.withOpacity(0.12)
@@ -562,15 +535,28 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               child: Row(
                 children: [
                   Icon(item.$4, color: ThalabTheme.foxOrange, size: 24),
-                  const SizedBox(width: 14),
-                  Text(
-                    item.$1,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.$1,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          item.$5,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: ThalabTheme.mutedSlate,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
                   Text(
                     formatter.format(item.$2),
                     style: TextStyle(
@@ -583,8 +569,97 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
               ),
             );
           }),
+
+          const SizedBox(height: 14),
+          const Text(
+            'أوقات النوافل وقيام الليل',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+
+          // بطاقة النوافل اليومية (الضحى + منتصف الليل + الثلث الأخير)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: ThalabTheme.cardSurface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
+            ),
+            child: Column(
+              children: [
+                _NafilahRow(
+                  icon: Icons.wb_sunny_rounded,
+                  title: 'صلاة الضحى (الأوابين)',
+                  subtitle: '٢ إلى ٨ ركعات',
+                  timeText: '${formatter.format(duhaStart)} - ${formatter.format(duhaEnd)}',
+                ),
+                const Divider(height: 20, color: ThalabTheme.softBorder),
+                _NafilahRow(
+                  icon: Icons.dark_mode_outlined,
+                  title: 'منتصف الليل الشرعي',
+                  subtitle: 'نهاية وقت العشاء المختار',
+                  timeText: formatter.format(sunnahTimes.middleOfTheNight),
+                ),
+                const Divider(height: 20, color: ThalabTheme.softBorder),
+                _NafilahRow(
+                  icon: Icons.auto_awesome_rounded,
+                  title: 'الثلث الأخير من الليل',
+                  subtitle: 'وقت النزول الإلهي والسحر',
+                  timeText: formatter.format(sunnahTimes.lastThirdOfTheNight),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _NafilahRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String timeText;
+
+  const _NafilahRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.timeText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: ThalabTheme.foxOrange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: ThalabTheme.foxOrange, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+              Text(subtitle, style: const TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
+            ],
+          ),
+        ),
+        Text(
+          timeText,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12.5,
+            color: ThalabTheme.foxOrange,
+          ),
+        ),
+      ],
     );
   }
 }
