@@ -180,19 +180,19 @@ class HomeDashboardTab extends StatelessWidget {
             ),
             _QuickCard(
               title: 'السبحة الذكية',
-              subtitle: 'حبات تفاعلية متحركة',
+              subtitle: 'تصفير تلقائي للهدف',
               icon: Icons.adjust_rounded,
               onTap: () => _open(context, const TasbihScreen()),
             ),
             _QuickCard(
               title: 'مواقيت الصلاة',
-              subtitle: 'تحديد الموقع والحساب',
+              subtitle: '27 محافظة + GPS',
               icon: Icons.access_time_filled_rounded,
               onTap: () => _open(context, const PrayerTimesScreen()),
             ),
             _QuickCard(
               title: 'اتجاه القبلة',
-              subtitle: 'بوصلة حية للكعبة',
+              subtitle: 'بوصلة إسلامية مستقرة',
               icon: Icons.explore_rounded,
               onTap: () => _open(context, const QiblaScreen()),
             ),
@@ -243,7 +243,7 @@ class _QuickCard extends StatelessWidget {
   }
 }
 
-// 2. تبويب رفيق (لوحة ويدجت إبداعية حيّة)
+// 2. تبويب رفيق (بطاقة الختمة + بطاقة الذكر الوقتي التلقائي الذكي)
 class RafiqTab extends StatefulWidget {
   const RafiqTab({super.key});
 
@@ -253,7 +253,6 @@ class RafiqTab extends StatefulWidget {
 
 class _RafiqTabState extends State<RafiqTab> {
   int _khatmahRead = 0;
-  int _totalTasbih = 0;
 
   @override
   void initState() {
@@ -265,7 +264,6 @@ class _RafiqTabState extends State<RafiqTab> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _khatmahRead = prefs.getInt('khatmah_pages_read') ?? 0;
-      _totalTasbih = StorageService.getTotalTasbih();
     });
   }
 
@@ -274,9 +272,24 @@ class _RafiqTabState extends State<RafiqTab> {
     _refreshWidgets();
   }
 
+  // تحديد الذكر المناسب للوقت الحالي بدقة
+  (String title, String subtitle, IconData icon, int tabIndex) _getTimelyDhikrInfo() {
+    final hour = DateTime.now().hour;
+    if (hour >= 4 && hour < 12) {
+      return ('أذكار الصباح', 'وقت الصباح المبارك الآن', Icons.wb_sunny_rounded, 0);
+    } else if (hour >= 15 && hour < 21) {
+      return ('أذكار المساء', 'وقت المساء وحفظ النفس', Icons.nights_stay_rounded, 1);
+    } else if (hour >= 21 || hour < 4) {
+      return ('أذكار النوم', 'حصّن نفسك قبل المنام', Icons.bedtime_rounded, 3);
+    } else {
+      return ('حصن المسلم', 'أذكار اليوم والليلة', Icons.auto_stories_rounded, 5);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final double khatmahPct = (_khatmahRead / 604).clamp(0.0, 1.0);
+    final timely = _getTimelyDhikrInfo();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
@@ -284,9 +297,9 @@ class _RafiqTabState extends State<RafiqTab> {
         const Text('رفيق — الواحة الإيمانية', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
 
-        // صف الويدجت التفاعلية (تقدم الختمة + مجموع التسبيح)
         Row(
           children: [
+            // ويدجت تقدم الختمة
             Expanded(
               child: GestureDetector(
                 onTap: () => _open(const QuranScreen()),
@@ -311,7 +324,7 @@ class _RafiqTabState extends State<RafiqTab> {
                       const SizedBox(height: 12),
                       Text(
                         '${(khatmahPct * 100).toStringAsFixed(0)}%',
-                        style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                       ),
                       Text(
                         '$_khatmahRead / 604 صفحة',
@@ -323,38 +336,45 @@ class _RafiqTabState extends State<RafiqTab> {
               ),
             ),
             const SizedBox(width: 12),
+
+            // ويدجت الذكر الوقتي المخصص تلقائياً حسب الساعة
             Expanded(
               child: GestureDetector(
-                onTap: () => _open(const TasbihScreen()),
+                onTap: () => _open(AdhkarScreen(initialTabIndex: timely.$4)),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: ThalabTheme.cardSurface,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
+                    border: Border.all(color: ThalabTheme.foxOrange.withOpacity(0.5), width: 1.5),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(Icons.adjust_rounded, color: ThalabTheme.foxOrange),
-                          Text('التسبيح', style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 12)),
+                          Icon(timely.$3, color: ThalabTheme.foxOrange),
+                          const Text('الآن', style: TextStyle(color: ThalabTheme.foxOrange, fontSize: 12, fontWeight: FontWeight.bold)),
                         ],
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        '$_totalTasbih',
+                        timely.$1,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: ThalabTheme.darkSlate,
-                          fontSize: 26,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const Text(
-                        'إجمالي التسبيحات',
-                        style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                      const SizedBox(height: 4),
+                      Text(
+                        timely.$2,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
                       ),
                     ],
                   ),
@@ -365,7 +385,6 @@ class _RafiqTabState extends State<RafiqTab> {
         ),
         const SizedBox(height: 16),
 
-        // بطاقة ويدجت المواقيت
         GestureDetector(
           onTap: () => _open(const PrayerTimesScreen()),
           child: Container(
@@ -392,7 +411,7 @@ class _RafiqTabState extends State<RafiqTab> {
                     children: [
                       Text('مواقيت الصلاة والأذان', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                       Text(
-                        'عرض المواقيت والعد التنازلي وتخصيص الموقع',
+                        'جميع محافظات مصر + تحديد العنوان التلقائي',
                         style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 12),
                       ),
                     ],
@@ -405,7 +424,6 @@ class _RafiqTabState extends State<RafiqTab> {
         ),
         const SizedBox(height: 18),
 
-        // شبكة الأقسام الأساسية (بدون قسم الأدعية المنفصل)
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -416,25 +434,25 @@ class _RafiqTabState extends State<RafiqTab> {
           children: [
             _RafiqServiceCard(
               title: 'المصحف الشريف',
-              subtitle: '114 سورة + بحث + ختمة',
+              subtitle: 'مصور ونصي + ختمة ومشاركة',
               icon: Icons.menu_book_rounded,
               onTap: () => _open(const QuranScreen()),
             ),
             _RafiqServiceCard(
               title: 'الأذكار الكاملة',
-              subtitle: 'حصن المسلم بالتشكيل',
+              subtitle: 'انتقال تلقائي + حصن المسلم',
               icon: Icons.auto_stories_rounded,
               onTap: () => _open(const AdhkarScreen()),
             ),
             _RafiqServiceCard(
               title: 'السبحة الذكية',
-              subtitle: 'حبات سبحة ثلاثية الأبعاد',
+              subtitle: '33 / 100 تصفير تلقائي',
               icon: Icons.radio_button_checked_rounded,
               onTap: () => _open(const TasbihScreen()),
             ),
             _RafiqServiceCard(
               title: 'اتجاه القبلة',
-              subtitle: 'بوصلة الكعبة المشرفة',
+              subtitle: 'بوصلة هندسية إسلامية',
               icon: Icons.explore_rounded,
               onTap: () => _open(const QiblaScreen()),
             ),
