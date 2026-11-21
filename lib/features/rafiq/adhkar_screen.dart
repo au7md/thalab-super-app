@@ -11,6 +11,7 @@ class DhikrEntry {
   final String description;
   final int targetCount;
   int remainingCount;
+  final GlobalKey cardKey = GlobalKey();
 
   DhikrEntry({
     required this.category,
@@ -31,42 +32,53 @@ class DhikrEntry {
 }
 
 class AdhkarScreen extends StatefulWidget {
-  const AdhkarScreen({super.key});
+  final int? initialTabIndex;
+  const AdhkarScreen({super.key, this.initialTabIndex});
 
   @override
   State<AdhkarScreen> createState() => _AdhkarScreenState();
 }
 
 class _AdhkarScreenState extends State<AdhkarScreen> {
-  final List<String> _tabs = [
-    'أذكار الصباح',
-    'أذكار المساء',
-    'أذكار بعد السلام من الصلاة المفروضة',
-    'أذكار النوم',
-    'أذكار الاستيقاظ',
-  ];
-
   final List<String> _tabLabels = [
     'الصباح',
     'المساء',
     'بعد الصلاة',
     'النوم',
     'الاستيقاظ',
+    'حصن المسلم',
   ];
 
-  int _selectedTabIndex = 0;
+  late int _selectedTabIndex;
   List<DhikrEntry> _allAdhkar = [];
   bool _isLoading = true;
   String? _errorMessage;
+  String _searchQuery = '';
+  final ScrollController _scrollController = ScrollController();
 
-  static const String _cacheKey = 'cached_full_adhkar_json_v1';
+  static const String _cacheKey = 'cached_full_adhkar_json_v2';
   static const String _remoteSource =
       'https://raw.githubusercontent.com/nawafalqari/azkar-api/56df51279ab6eb86dc2f6202c7de26c8948331c1/azkar.json';
 
   @override
   void initState() {
     super.initState();
+    _selectedTabIndex = widget.initialTabIndex ?? _detectSmartTabByTime();
     _initAdhkar();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  int _detectSmartTabByTime() {
+    final hour = DateTime.now().hour;
+    if (hour >= 4 && hour < 12) return 0; // الصباح
+    if (hour >= 15 && hour < 21) return 1; // المساء
+    if (hour >= 21 || hour < 4) return 3; // النوم
+    return 5; // حصن المسلم المتنوع
   }
 
   Future<void> _initAdhkar() async {
@@ -119,21 +131,81 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
         });
       } else {
         setState(() {
-          _errorMessage = 'يرجى الاتصال بالإنترنت مرة واحدة لتحميل موسوعة الأذكار الكاملة وحفظها على هاتفك.';
+          _errorMessage = 'يرجى الاتصال بالإنترنت مرة واحدة لتحميل موسوعة الأذكار الكاملة وحفظها.';
           _isLoading = false;
         });
       }
     } catch (_) {
       setState(() {
-        _errorMessage = 'تعذر جلب البيانات، تأكد من الاتصال بالإنترنت واضغط إعادة المحاولة.';
+        _errorMessage = 'تعذر الاتصال، تأكد من الإنترنت واضغط إعادة المحاولة.';
         _isLoading = false;
       });
     }
   }
 
+  bool _isMainCategory(String cat) {
+    return cat.contains('الصباح') ||
+        cat.contains('المساء') ||
+        cat.contains('الصلاة') ||
+        cat.contains('النوم') ||
+        cat.contains('الاستيقاظ');
+  }
+
   List<DhikrEntry> get _currentList {
-    final targetCat = _tabs[_selectedTabIndex];
-    return _allAdhkar.where((e) => e.category.contains(targetCat) || targetCat.contains(e.category)).toList();
+    List<DhikrEntry> list;
+    switch (_selectedTabIndex) {
+      case 0:
+        list = _allAdhkar.where((e) => e.category.contains('الصباح')).toList();
+        break;
+      case 1:
+        list = _allAdhkar.where((e) => e.category.contains('المساء')).toList();
+        break;
+      case 2:
+        list = _allAdhkar.where((e) => e.category.contains('الصلاة')).toList();
+        break;
+      case 3:
+        list = _allAdhkar.where((e) => e.category.contains('النوم')).toList();
+        break;
+      case 4:
+        list = _allAdhkar.where((e) => e.category.contains('الاستيقاظ')).toList();
+        break;
+      default:
+        // جميع أذكار حصن المسلم المتنوعة (لبس الثوب، الخلاء، المنزل، الركوب، إلخ)
+        list = _allAdhkar.where((e) => !_isMainCategory(e.category)).toList();
+    }
+
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.trim();
+      list = list.where((e) => e.text.contains(q) || e.category.contains(q)).toList();
+    }
+    return list;
+  }
+
+  void _onDhikrTap(List<DhikrEntry> items, int index) {
+    final item = items[index];
+    if (item.remainingCount <= 0) return;
+
+    setState(() => item.remainingCount--);
+
+    if (item.remainingCount == 0) {
+      HapticFeedback.heavyImpact();
+      // الانتقال التلقائي السلس للبطاقة التالية بعد إتمام الذكر
+      if (index + 1 < items.length) {
+        Future.delayed(const Duration(milliseconds: 280), () {
+          final nextCtx = items[index + 1].cardKey.currentContext;
+          if (nextCtx != null && mounted) {
+            Scrollable.ensureVisible(
+              nextCtx,
+              duration: const Duration(milliseconds: 420),
+              curve: Curves.easeOutCubic,
+              alignment: 0.12,
+            );
+          }
+        });
+      }
+    } else {
+      HapticFeedback.selectionClick();
+    }
   }
 
   void _resetCategory() {
@@ -143,6 +215,9 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
         item.remainingCount = item.targetCount;
       }
     });
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+    }
   }
 
   @override
@@ -164,7 +239,6 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
       ),
       body: Column(
         children: [
-          // شريط التصنيفات
           SizedBox(
             height: 46,
             child: ListView.separated(
@@ -189,18 +263,44 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                     borderRadius: BorderRadius.circular(20),
                     side: const BorderSide(color: ThalabTheme.softBorder),
                   ),
-                  onSelected: (_) => setState(() => _selectedTabIndex = index),
+                  onSelected: (_) => setState(() {
+                    _selectedTabIndex = index;
+                    _searchQuery = '';
+                  }),
                 );
               },
             ),
           ),
 
-          // شريط الإنجاز الكلي للقسم
+          // شريط بحث سريع داخل قسم حصن المسلم المتنوع
+          if (_selectedTabIndex == 5)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: TextField(
+                onChanged: (val) => setState(() => _searchQuery = val),
+                decoration: InputDecoration(
+                  hintText: 'ابحث (لبس الثوب، الخلاء، الخروج، الكرب...)',
+                  prefixIcon: const Icon(Icons.search_rounded, color: ThalabTheme.foxOrange),
+                  filled: true,
+                  fillColor: ThalabTheme.cardSurface,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                  ),
+                ),
+              ),
+            ),
+
           if (!_isLoading && items.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: ThalabTheme.cardSurface,
                   borderRadius: BorderRadius.circular(18),
@@ -212,11 +312,11 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'إنجاز ${_tabLabels[_selectedTabIndex]}',
+                          'تقدم ${_tabLabels[_selectedTabIndex]}',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         Text(
-                          '$completedCount من ${items.length} ذِكر',
+                          '$completedCount / ${items.length}',
                           style: const TextStyle(
                             color: ThalabTheme.foxOrange,
                             fontWeight: FontWeight.bold,
@@ -225,7 +325,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: LinearProgressIndicator(
@@ -240,9 +340,8 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
               ),
             ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
-          // المحتوى
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: ThalabTheme.foxOrange))
@@ -270,37 +369,29 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                         ),
                       )
                     : ListView.separated(
+                        controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(20, 4, 20, 34),
                         itemCount: items.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 14),
                         itemBuilder: (context, index) {
                           final item = items[index];
                           final bool isDone = item.remainingCount == 0;
-                          final double itemRatio =
-                              1.0 - (item.remainingCount / item.targetCount);
+                          final double itemRatio = 1.0 - (item.remainingCount / item.targetCount);
 
                           return GestureDetector(
-                            onTap: () {
-                              if (!isDone) {
-                                setState(() => item.remainingCount--);
-                                if (item.remainingCount == 0) {
-                                  HapticFeedback.heavyImpact();
-                                } else {
-                                  HapticFeedback.lightImpact();
-                                }
-                              }
-                            },
+                            key: item.cardKey,
+                            onTap: () => _onDhikrTap(items, index),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 240),
                               padding: const EdgeInsets.all(18),
                               decoration: BoxDecoration(
                                 color: isDone
-                                    ? ThalabTheme.foxOrange.withOpacity(0.07)
+                                    ? Colors.green.withOpacity(0.06)
                                     : ThalabTheme.cardSurface,
                                 borderRadius: BorderRadius.circular(24),
                                 border: Border.all(
                                   color: isDone
-                                      ? ThalabTheme.foxOrange.withOpacity(0.6)
+                                      ? Colors.green.withOpacity(0.5)
                                       : ThalabTheme.softBorder,
                                   width: 1.5,
                                 ),
@@ -308,7 +399,28 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  // نص الذكر بالتشكيل الواضح
+                                  if (_selectedTabIndex == 5)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Align(
+                                        alignment: Alignment.centerRight,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: ThalabTheme.foxOrange.withOpacity(0.12),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: Text(
+                                            item.category,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: ThalabTheme.foxOrange,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   Text(
                                     item.text,
                                     textAlign: TextAlign.justify,
@@ -316,9 +428,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                       fontSize: 18.5,
                                       fontWeight: FontWeight.w700,
                                       height: 1.95,
-                                      color: isDone
-                                          ? ThalabTheme.mutedSlate
-                                          : ThalabTheme.darkSlate,
+                                      color: isDone ? ThalabTheme.mutedSlate : ThalabTheme.darkSlate,
                                     ),
                                   ),
                                   if (item.description.isNotEmpty) ...[
@@ -342,14 +452,9 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                   const SizedBox(height: 14),
                                   Row(
                                     children: [
-                                      // زر نسخ الذكر
                                       IconButton(
                                         tooltip: 'نسخ الذكر',
-                                        icon: const Icon(
-                                          Icons.copy_rounded,
-                                          size: 20,
-                                          color: ThalabTheme.mutedSlate,
-                                        ),
+                                        icon: const Icon(Icons.copy_rounded, size: 20, color: ThalabTheme.mutedSlate),
                                         onPressed: () {
                                           Clipboard.setData(ClipboardData(text: item.text));
                                           ScaffoldMessenger.of(context).showSnackBar(
@@ -361,7 +466,6 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                         },
                                       ),
                                       const Spacer(),
-                                      // العداد الدائري التفاعلي
                                       Stack(
                                         alignment: Alignment.center,
                                         children: [
@@ -383,9 +487,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                             alignment: Alignment.center,
                                             decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: isDone
-                                                  ? Colors.green
-                                                  : ThalabTheme.foxOrange,
+                                              color: isDone ? Colors.green : ThalabTheme.foxOrange,
                                             ),
                                             child: isDone
                                                 ? const Icon(Icons.check_rounded, color: Colors.white, size: 22)
