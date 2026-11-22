@@ -12,27 +12,30 @@ class RafiqNotificationsService {
 
   Future<void> init() async {
     if (_initialized) return;
+    try {
+      tz.initializeTimeZones();
+      _configureLocalTimeZone();
 
-    tz.initializeTimeZones();
-    _configureLocalTimeZone();
+      const AndroidInitializationSettings androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
 
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+      const InitializationSettings initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
 
-    const InitializationSettings initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    await _plugin.initialize(initSettings);
-    await _requestPermissions();
-    _initialized = true;
+      await _plugin.initialize(initSettings);
+      await _requestPermissions();
+      _initialized = true;
+    } catch (e) {
+      debugPrint('RafiqNotificationsService init error: $e');
+    }
   }
 
   void _configureLocalTimeZone() {
@@ -56,10 +59,13 @@ class RafiqNotificationsService {
   }
 
   Future<void> _requestPermissions() async {
-    final androidImplementation = _plugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await androidImplementation?.requestNotificationsPermission();
-    await androidImplementation?.requestExactAlarmsPermission();
+    try {
+      final androidImplementation = _plugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      await androidImplementation?.requestNotificationsPermission();
+    } catch (e) {
+      debugPrint('Permission request error: $e');
+    }
   }
 
   Future<void> schedulePrayerNotification({
@@ -67,35 +73,38 @@ class RafiqNotificationsService {
     required String prayerName,
     required DateTime scheduledTime,
   }) async {
-    if (scheduledTime.isBefore(DateTime.now())) return;
+    if (!_initialized || scheduledTime.isBefore(DateTime.now())) return;
+    try {
+      final tz.TZDateTime tzScheduled = tz.TZDateTime.from(scheduledTime, tz.local);
 
-    final tz.TZDateTime tzScheduled = tz.TZDateTime.from(scheduledTime, tz.local);
+      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        'rafiq_prayers_channel',
+        'مواقيت الصلاة - رفيق',
+        channelDescription: 'تنبيهات الأذان ومواقيت الصلوات الخمس',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+      );
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'rafiq_prayers_channel',
-      'مواقيت الصلاة - رفيق',
-      channelDescription: 'تنبيهات الأذان ومواقيت الصلوات الخمس',
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
-    );
+      const NotificationDetails details = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
+      );
 
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
-      iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true),
-    );
-
-    await _plugin.zonedSchedule(
-      id,
-      'حان الآن موعد صلاة $prayerName',
-      'أقم صلاتك تنعم بحياتك — واحة رفيق الإيمانية',
-      tzScheduled,
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+      await _plugin.zonedSchedule(
+        id,
+        'حان الآن موعد صلاة $prayerName',
+        'أقم صلاتك تنعم بحياتك — واحة رفيق الإيمانية',
+        tzScheduled,
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      debugPrint('Schedule prayer error: $e');
+    }
   }
 
   Future<void> scheduleDailyAzkar({
@@ -105,44 +114,46 @@ class RafiqNotificationsService {
     required int hour,
     required int minute,
   }) async {
-    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-    tz.TZDateTime scheduled = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      hour,
-      minute,
-    );
-    if (scheduled.isBefore(now)) {
-      scheduled = scheduled.add(const Duration(days: 1));
+    if (!_initialized) return;
+    try {
+      final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+      tz.TZDateTime scheduled = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month,
+        now.day,
+        hour,
+        minute,
+      );
+      if (scheduled.isBefore(now)) {
+        scheduled = scheduled.add(const Duration(days: 1));
+      }
+
+      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        'rafiq_azkar_channel',
+        'الأذكار اليومية - رفيق',
+        channelDescription: 'تذكير بأذكار الصباح والمساء',
+        importance: Importance.high,
+        priority: Priority.defaultPriority,
+      );
+
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduled,
+        const NotificationDetails(android: androidDetails),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (e) {
+      debugPrint('Schedule azkar error: $e');
     }
-
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'rafiq_azkar_channel',
-      'الأذكار اليومية - رفيق',
-      channelDescription: 'تذكير بأذكار الصباح والمساء',
-      importance: Importance.high,
-      priority: Priority.defaultPriority,
-    );
-
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduled,
-      const NotificationDetails(android: androidDetails),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
   }
 
   Future<void> cancelAll() async {
     await _plugin.cancelAll();
-    if (kDebugMode) {
-      debugPrint('تم إلغاء جميع إشعارات رفيق المجدولة.');
-    }
   }
 }
