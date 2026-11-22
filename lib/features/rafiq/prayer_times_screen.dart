@@ -5,7 +5,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
-import '../../core/notification_service.dart';
 import '../../core/rafiq_notifications_service.dart';
 
 class OfflineCityPreset {
