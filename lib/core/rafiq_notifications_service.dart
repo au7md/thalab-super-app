@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -15,8 +14,7 @@ class RafiqNotificationsService {
     if (_initialized) return;
 
     tz.initializeTimeZones();
-    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    _configureLocalTimeZone();
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -35,6 +33,26 @@ class RafiqNotificationsService {
     await _plugin.initialize(initSettings);
     await _requestPermissions();
     _initialized = true;
+  }
+
+  void _configureLocalTimeZone() {
+    final offset = DateTime.now().timeZoneOffset;
+    if (offset.inHours == 2) {
+      tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
+      return;
+    }
+    if (offset.inHours == 3) {
+      tz.setLocalLocation(tz.getLocation('Asia/Riyadh'));
+      return;
+    }
+    final matching = tz.timeZoneDatabase.locations.values.where(
+      (loc) => loc.currentTimeZone.offset == offset.inMilliseconds,
+    );
+    if (matching.isNotEmpty) {
+      tz.setLocalLocation(matching.first);
+    } else {
+      tz.setLocalLocation(tz.UTC);
+    }
   }
 
   Future<void> _requestPermissions() async {
