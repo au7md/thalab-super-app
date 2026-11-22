@@ -165,13 +165,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     _calculatePrayerTimes();
 
     if (_prayerTimes != null) {
-      await NotificationService.scheduleDailyPrayerNotifications(
-        fajr: _prayerTimes!.fajr,
-        dhuhr: _prayerTimes!.dhuhr,
-        asr: _prayerTimes!.asr,
-        maghrib: _prayerTimes!.maghrib,
-        isha: _prayerTimes!.isha,
-      );
       await RafiqNotificationsService.syncAllScheduledNotifications(
         lat: lat,
         lng: lng,
