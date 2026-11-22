@@ -4,7 +4,7 @@ import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
-import '../../core/notification_service.dart';
+import '../../core/rafiq_notifications_service.dart';
 
 class PrayerTimesScreen extends StatefulWidget {
   const PrayerTimesScreen({super.key});
@@ -93,6 +93,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('saved_lat', pos.latitude);
       await prefs.setDouble('saved_lng', pos.longitude);
+      await prefs.setDouble('prayer_lat', pos.latitude);
+      await prefs.setDouble('prayer_lng', pos.longitude);
       await prefs.setString(
         'saved_loc_name',
         'موقعك الحالي (${pos.latitude.toStringAsFixed(2)}, ${pos.longitude.toStringAsFixed(2)})',
@@ -105,15 +107,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
       });
       _calculatePrayerTimes();
 
-      if (_prayerTimes != null) {
-        await NotificationService.scheduleDailyPrayerNotifications(
-          fajr: _prayerTimes!.fajr,
-          dhuhr: _prayerTimes!.dhuhr,
-          asr: _prayerTimes!.asr,
-          maghrib: _prayerTimes!.maghrib,
-          isha: _prayerTimes!.isha,
-        );
-      }
+      await RafiqNotificationsService.syncAllScheduledNotifications(
+        lat: pos.latitude,
+        lng: pos.longitude,
+        params: CalculationMethod.egyptian.getParameters(),
+      );
     } catch (_) {
     } finally {
       if (mounted) setState(() => _isLoadingLocation = false);
