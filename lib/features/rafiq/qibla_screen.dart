@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:adhan/adhan.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
 
@@ -21,10 +20,53 @@ class _QiblaScreenState extends State<QiblaScreen> {
   bool _vibratedOnAlign = false;
   double? _smoothedHeading;
 
+  static const List<(String, double, double)> _govs = [
+    ('القاهرة', 30.0444, 31.2357),
+    ('الجيزة', 30.0131, 31.2089),
+    ('الإسكندرية', 31.2001, 29.9187),
+    ('الدقهلية', 31.0409, 31.3785),
+    ('الشرقية', 30.5877, 31.5020),
+    ('المنوفية', 30.5503, 31.0106),
+    ('القليوبية', 30.4591, 31.1786),
+    ('البحيرة', 31.0341, 30.4682),
+    ('الغربية', 30.7865, 31.0004),
+    ('كفر الشيخ', 31.1107, 30.9388),
+    ('دمياط', 31.4175, 31.8144),
+    ('بورسعيد', 31.2653, 32.3019),
+    ('الإسماعيلية', 30.5965, 32.2715),
+    ('السويس', 29.9668, 32.5498),
+    ('الفيوم', 29.3084, 30.8428),
+    ('بني سويف', 29.0661, 31.0994),
+    ('المنيا', 28.1099, 30.7503),
+    ('أسيوط', 27.1783, 31.1859),
+    ('سوهاج', 26.5591, 31.6957),
+    ('قنا', 26.1551, 32.7160),
+    ('الأقصر', 25.6872, 32.6396),
+    ('أسوان', 24.0889, 32.8998),
+    ('البحر الأحمر', 27.2579, 33.8116),
+    ('الوادي الجديد', 25.4390, 30.5586),
+    ('مطروح', 31.3543, 27.2373),
+    ('شمال سيناء', 31.1321, 33.8033),
+    ('جنوب سيناء', 28.2417, 33.6222),
+  ];
+
   @override
   void initState() {
     super.initState();
     _loadSavedOrDetect();
+  }
+
+  String _resolveGovName(double lat, double lng) {
+    String nearest = 'القاهرة';
+    double minDist = double.infinity;
+    for (final g in _govs) {
+      final d = Geolocator.distanceBetween(lat, lng, g.$2, g.$3);
+      if (d < minDist) {
+        minDist = d;
+        nearest = g.$1;
+      }
+    }
+    return '$nearest، مصر';
   }
 
   Future<void> _loadSavedOrDetect() async {
@@ -53,36 +95,21 @@ class _QiblaScreenState extends State<QiblaScreen> {
         pos ??= await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.medium,
-            timeLimit: Duration(seconds: 6),
+            timeLimit: Duration(seconds: 5),
           ),
         );
 
         final qibla = Qibla(Coordinates(pos.latitude, pos.longitude));
-        String resolvedName = _locationName;
-        try {
-          await setLocaleIdentifier('ar');
-          final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
-          if (placemarks.isNotEmpty) {
-            final p = placemarks.first;
-            final city = p.subAdministrativeArea ?? p.locality ?? '';
-            final gov = p.administrativeArea ?? '';
-            if (city.isNotEmpty || gov.isNotEmpty) {
-              resolvedName = [city, gov].where((e) => e.isNotEmpty).join('، ');
-            }
-          }
-        } catch (_) {}
-
         if (mounted) {
           setState(() {
             _qiblaAngle = qibla.direction;
-            _locationName = resolvedName;
+            _locationName = _resolveGovName(pos!.latitude, pos.longitude);
           });
         }
       }
     } catch (_) {}
   }
 
-  // فلتر تنعيم دائري لمنع اهتزاز الإبرة
   double _smoothAngle(double rawHeading) {
     if (_smoothedHeading == null) {
       _smoothedHeading = rawHeading;
@@ -137,7 +164,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // شارة الموقع الحالي بالعربي
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
@@ -158,8 +184,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // حالة المحاذاة
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 240),
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -179,21 +203,16 @@ class _QiblaScreenState extends State<QiblaScreen> {
                     ),
                   ),
                   const SizedBox(height: 30),
-
-                  // إطار البوصلة الهندسي الإسلامي
                   SizedBox(
                     width: 300,
                     height: 300,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // الزخرفة الإسلامية الثابتة
                         CustomPaint(
                           size: const Size(300, 300),
                           painter: _IslamicCompassPainter(accentColor: activeColor),
                         ),
-
-                        // قرص الاتجاهات الدوار (الشمال + الكعبة)
                         Transform.rotate(
                           angle: (-heading * (math.pi / 180)),
                           child: SizedBox(
@@ -213,7 +232,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
                                     ),
                                   ),
                                 ),
-                                // إبرة اتجاه الكعبة المشرفة
                                 Transform.rotate(
                                   angle: (_qiblaAngle * (math.pi / 180)),
                                   child: Column(
@@ -257,8 +275,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
                             ),
                           ),
                         ),
-
-                        // نقطة الارتكاز المركزية
                         Container(
                           width: 18,
                           height: 18,
@@ -295,14 +311,7 @@ class _IslamicCompassPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final outerRadius = size.width / 2 - 6;
 
-    // الخلفية الدائرية
-    canvas.drawCircle(
-      center,
-      outerRadius,
-      Paint()..color = ThalabTheme.cardSurface,
-    );
-
-    // الإطار الخارجي
+    canvas.drawCircle(center, outerRadius, Paint()..color = ThalabTheme.cardSurface);
     canvas.drawCircle(
       center,
       outerRadius,
@@ -312,7 +321,6 @@ class _IslamicCompassPainter extends CustomPainter {
         ..strokeWidth = 3,
     );
 
-    // رسم النجمة الإسلامية الثمانية (مربعين متقاطعين بزاوية 45 درجة)
     final starRadius = outerRadius - 28;
     final starPaint = Paint()
       ..color = accentColor.withOpacity(0.14)
@@ -337,7 +345,6 @@ class _IslamicCompassPainter extends CustomPainter {
       canvas.drawPath(path, starPaint);
     }
 
-    // شرطات الدرجات المحيطية
     final tickPaint = Paint()
       ..color = ThalabTheme.mutedSlate.withOpacity(0.35)
       ..strokeWidth = 1.5;
