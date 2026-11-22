@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
 import '../../core/adhkar_data.dart';
 
@@ -15,6 +16,7 @@ class AdhkarScreen extends StatefulWidget {
 class _AdhkarScreenState extends State<AdhkarScreen> {
   late int _selectedTab;
   final Map<String, int> _progress = {};
+  Set<String> _favoriteKeys = {};
   final PageController _pageController = PageController(viewportFraction: 0.93);
   int _currentCardIndex = 0;
   String _searchQuery = '';
@@ -29,12 +31,14 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
     'حصن المسلم',
     'الرقية',
     'الأسماء الحسنى',
+    'المفضلة',
   ];
 
   @override
   void initState() {
     super.initState();
     _selectedTab = widget.initialTabIndex.clamp(0, _tabs.length - 1);
+    _loadSavedState();
   }
 
   @override
@@ -42,6 +46,74 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
     _pageController.dispose();
     super.dispose();
   }
+
+  String get _todayDateKey {
+    final now = DateTime.now();
+    return '${now.year}-${now.month}-${now.day}';
+  }
+
+  Future<void> _loadSavedState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedDate = prefs.getString('adhkar_progress_date');
+    final favs = prefs.getStringList('adhkar_favorites') ?? [];
+
+    setState(() {
+      _favoriteKeys = favs.toSet();
+    });
+
+    if (savedDate == _todayDateKey) {
+      final savedPairs = prefs.getStringList('adhkar_progress_items') ?? [];
+      final restored = <String, int>{};
+      for (final entry in savedPairs) {
+        final sep = entry.lastIndexOf(':');
+        if (sep > 0) {
+          final k = entry.substring(0, sep);
+          final v = int.tryParse(entry.substring(sep + 1)) ?? 0;
+          restored[k] = v;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _progress
+            ..clear()
+            ..addAll(restored);
+        });
+      }
+    } else {
+      await prefs.setString('adhkar_progress_date', _todayDateKey);
+      await prefs.setStringList('adhkar_progress_items', []);
+    }
+  }
+
+  Future<void> _persistProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('adhkar_progress_date', _todayDateKey);
+    final encoded = _progress.entries.map((e) => '${e.key}:${e.value}').toList();
+    await prefs.setStringList('adhkar_progress_items', encoded);
+  }
+
+  Future<void> _toggleFavorite(String text) async {
+    final id = text.hashCode.toString();
+    setState(() {
+      if (_favoriteKeys.contains(id)) {
+        _favoriteKeys.remove(id);
+      } else {
+        _favoriteKeys.add(id);
+      }
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('adhkar_favorites', _favoriteKeys.toList());
+  }
+
+  List<DhikrItem> get _allAdhkarCombined => [
+        ...AdhkarRepository.morningAdhkar,
+        ...AdhkarRepository.eveningAdhkar,
+        ...AdhkarRepository.afterPrayerAdhkar,
+        ...AdhkarRepository.sleepAdhkar,
+        ...AdhkarRepository.wakingUpAdhkar,
+        ...AdhkarRepository.hisnAlMuslimAdhkar,
+        ...AdhkarRepository.ruqyahAdhkar,
+      ];
 
   List<DhikrItem> _rawListForTab(int tab) {
     switch (tab) {
@@ -59,6 +131,10 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
         return AdhkarRepository.hisnAlMuslimAdhkar;
       case 6:
         return AdhkarRepository.ruqyahAdhkar;
+      case 8:
+        return _allAdhkarCombined
+            .where((d) => _favoriteKeys.contains(d.text.hashCode.toString()))
+            .toList();
       default:
         return const [];
     }
@@ -96,24 +172,26 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
       if (q.isEmpty) return true;
       return _normalize(item.text).contains(q) ||
           _normalize(item.reference).contains(q) ||
-          _normalize(item.subChapter).contains(q);
+          _normalize(item.subChapter).contains(q) ||
+          _normalize(item.category).contains(q);
     }).toList();
   }
 
-  String _keyFor(int tab, int index, String text) => '$tab-$index-${text.hashCode}';
+  String _keyFor(int tab, String text) => '$tab-${text.hashCode}';
 
   void _onTapDhikr(DhikrItem item, int index, int totalCount) {
-    final key = _keyFor(_selectedTab, index, item.text);
+    final key = _keyFor(_selectedTab, item.text);
     final current = _progress[key] ?? 0;
     if (current >= item.count) return;
 
     final next = current + 1;
     setState(() => _progress[key] = next);
+    _persistProgress();
 
     if (next == item.count) {
       HapticFeedback.mediumImpact();
       if (index + 1 < totalCount) {
-        Future.delayed(const Duration(milliseconds: 360), () {
+        Future.delayed(const Duration(milliseconds: 350), () {
           if (mounted && _pageController.hasClients) {
             _pageController.animateToPage(
               index + 1,
@@ -133,6 +211,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
       _progress.removeWhere((k, _) => k.startsWith('$_selectedTab-'));
       _currentCardIndex = 0;
     });
+    _persistProgress();
     if (_pageController.hasClients) {
       _pageController.jumpToPage(0);
     }
@@ -145,7 +224,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
 
     int completedCount = 0;
     for (int i = 0; i < items.length; i++) {
-      final key = _keyFor(_selectedTab, i, items[i].text);
+      final key = _keyFor(_selectedTab, items[i].text);
       if ((_progress[key] ?? 0) >= items[i].count) {
         completedCount++;
       }
@@ -176,7 +255,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                 final selected = _selectedTab == idx;
                 return ChoiceChip(
                   label: Text(
-                    _tabs[idx],
+                    idx == 8 ? 'المفضلة (${_favoriteKeys.length})' : _tabs[idx],
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -222,7 +301,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
               decoration: InputDecoration(
                 hintText: isNamesTab
                     ? 'ابحث باسم من أسماء الله أو معناه...'
-                    : 'ابحث (لبس الثوب، الخلاء، الكرب، المسجد...)',
+                    : 'ابحث في الأذكار أو الأدعية أو الأبواب...',
                 hintStyle: const TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate),
                 prefixIcon: const Icon(Icons.search_rounded, color: ThalabTheme.foxOrange),
                 filled: true,
@@ -284,7 +363,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
               child: Row(
                 children: [
                   Text(
-                    'المنجز: $completedCount من ${items.length}',
+                    'المنجز اليوم: $completedCount من ${items.length}',
                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(width: 12),
@@ -313,10 +392,13 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
             ),
             Expanded(
               child: items.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        'لا توجد نتائج مطابقة لبحثك',
-                        style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 15),
+                        _selectedTab == 8
+                            ? 'لم تُضف أي أذكار للمفضلة بعد — اضغط على أيقونة القلب لحفظ الذكر'
+                            : 'لا توجد نتائج مطابقة لبحثك',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 14),
                       ),
                     )
                   : PageView.builder(
@@ -325,10 +407,11 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                       onPageChanged: (idx) => setState(() => _currentCardIndex = idx),
                       itemBuilder: (context, index) {
                         final item = items[index];
-                        final key = _keyFor(_selectedTab, index, item.text);
+                        final key = _keyFor(_selectedTab, item.text);
                         final currentCount = _progress[key] ?? 0;
                         final remaining = (item.count - currentCount).clamp(0, item.count);
                         final isDone = remaining == 0;
+                        final isFav = _favoriteKeys.contains(item.text.hashCode.toString());
 
                         return Padding(
                           padding: const EdgeInsets.fromLTRB(6, 4, 6, 20),
@@ -361,37 +444,59 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 5),
-                                        decoration: BoxDecoration(
-                                          color: ThalabTheme.foxOrange.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(14),
-                                        ),
-                                        child: Text(
-                                          item.subChapter.isNotEmpty
-                                              ? item.subChapter
-                                              : item.category,
-                                          style: const TextStyle(
-                                            color: ThalabTheme.foxOrange,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
+                                      Flexible(
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: ThalabTheme.foxOrange.withOpacity(0.12),
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                          child: Text(
+                                            item.subChapter.isNotEmpty
+                                                ? item.subChapter
+                                                : item.category,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: ThalabTheme.foxOrange,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                      IconButton(
-                                        tooltip: 'نسخ الذكر',
-                                        icon: const Icon(Icons.copy_rounded,
-                                            size: 20, color: ThalabTheme.mutedSlate),
-                                        onPressed: () {
-                                          Clipboard.setData(ClipboardData(text: item.text));
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('تم نسخ الذكر بنجاح'),
-                                              duration: Duration(seconds: 1),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            tooltip: isFav ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
+                                            icon: Icon(
+                                              isFav
+                                                  ? Icons.favorite_rounded
+                                                  : Icons.favorite_border_rounded,
+                                              size: 21,
+                                              color: isFav
+                                                  ? Colors.redAccent
+                                                  : ThalabTheme.mutedSlate,
                                             ),
-                                          );
-                                        },
+                                            onPressed: () => _toggleFavorite(item.text),
+                                          ),
+                                          IconButton(
+                                            tooltip: 'نسخ الذكر',
+                                            icon: const Icon(Icons.copy_rounded,
+                                                size: 20, color: ThalabTheme.mutedSlate),
+                                            onPressed: () {
+                                              Clipboard.setData(ClipboardData(text: item.text));
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('تم نسخ الذكر بنجاح'),
+                                                  duration: Duration(seconds: 1),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
