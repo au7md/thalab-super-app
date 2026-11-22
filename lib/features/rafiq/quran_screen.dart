@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:quran/quran.dart' as quran;
@@ -21,6 +23,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
   int _lastPage = 1;
   int _khatmahGoalDays = 30;
   int _completedPagesCount = 0;
+  bool _isKhatmahMode = false;
   Set<String> _bookmarkedPages = {};
   Set<String> _completedPagesSet = {};
 
@@ -44,10 +47,12 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
     final prefs = await SharedPreferences.getInstance();
     final savedBookmarks = prefs.getStringList('quran_bookmarks') ?? [];
     final savedCompleted = prefs.getStringList('quran_completed_pages') ?? [];
+    final khatmahEntry = prefs.getBool('quran_is_khatmah_entry') ?? false;
 
     setState(() {
       _lastPage = prefs.getInt('quran_last_page') ?? 1;
       _khatmahGoalDays = prefs.getInt('khatmah_goal_days') ?? 30;
+      _isKhatmahMode = khatmahEntry;
       _bookmarkedPages = savedBookmarks.toSet();
       _completedPagesSet = savedCompleted.toSet();
       _completedPagesCount = _completedPagesSet.length;
@@ -55,11 +60,16 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
     await prefs.setInt('khatmah_pages_read', _completedPagesCount);
   }
 
-  Future<void> _openPage(int pageNumber, {bool isFirstTimePrompt = true}) async {
+  Future<void> _openPage(int pageNumber, {bool? khatmahOverride}) async {
     final safePage = pageNumber.clamp(1, 604);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('quran_last_page', safePage);
-    setState(() => _lastPage = safePage);
+    final bool effectiveKhatmah = khatmahOverride ?? _isKhatmahMode;
+    await prefs.setBool('quran_is_khatmah_entry', effectiveKhatmah);
+    setState(() {
+      _lastPage = safePage;
+      _isKhatmahMode = effectiveKhatmah;
+    });
 
     if (!mounted) return;
     await Navigator.push(
@@ -67,6 +77,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
       MaterialPageRoute(
         builder: (_) => QuranPageReaderScreen(
           initialPage: safePage,
+          isKhatmahMode: effectiveKhatmah,
           onDownloadAllRequested: _startOfflineDownloadAll,
         ),
       ),
@@ -261,7 +272,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                         ),
                         onPressed: () {
                           Navigator.pop(ctx);
-                          _openPage(wirdStartPage);
+                          _openPage(wirdStartPage, khatmahOverride: true);
                         },
                         icon: const Icon(Icons.play_arrow_rounded),
                         label: Text('ابدأ ورد اليوم (ص $wirdStartPage)'),
@@ -329,7 +340,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                     label: Text('ص $p (${quran.getSurahNameArabic(surahNum)})'),
                     onPressed: () {
                       Navigator.pop(context);
-                      _openPage(p);
+                      _openPage(p, khatmahOverride: false);
                     },
                   );
                 }).toList(),
@@ -349,7 +360,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('المصحف الشريف'),
+        title: Text(_isKhatmahMode ? 'المصحف والختمة' : 'المصحف الشريف'),
         actions: [
           IconButton(
             tooltip: 'البحث في آيات القرآن والسور',
@@ -358,7 +369,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
               showSearch(
                 context: context,
                 delegate: _QuranSmartSearchDelegate(
-                  onSelectPage: (page) => _openPage(page),
+                  onSelectPage: (page) => _openPage(page, khatmahOverride: false),
                 ),
               );
             },
@@ -377,7 +388,6 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
       ),
       body: Column(
         children: [
-          // شريط تقدم التنزيل أوفلاين إذا كان نشطاً
           if (_isDownloadingOffline)
             Container(
               margin: const EdgeInsets.fromLTRB(16, 4, 16, 6),
@@ -404,11 +414,11 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
               ),
             ),
 
-          // شريط المتابعة من حيث توقفت (مدمج وأنيق)
+          // شريط المتابعة من حيث توقفت
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
             child: GestureDetector(
-              onTap: () => _openPage(_lastPage),
+              onTap: () => _openPage(_lastPage, khatmahOverride: _isKhatmahMode),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
@@ -441,9 +451,11 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'متابعة القراءة من حيث توقفت',
-                            style: TextStyle(color: Colors.white70, fontSize: 11.5),
+                          Text(
+                            _isKhatmahMode
+                                ? 'متابعة الختمة (ورد اليوم: ص $nextWirdPage)'
+                                : 'متابعة القراءة من حيث توقفت',
+                            style: const TextStyle(color: Colors.white70, fontSize: 11.5),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -455,7 +467,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                             ),
                           ),
                           Text(
-                            'الورد اليومي ($pagesPerDay ص) • ص $nextWirdPage',
+                            'الورد اليومي ($pagesPerDay ص) • المنجز $_completedPagesCount / 604',
                             style: const TextStyle(color: Colors.white70, fontSize: 11),
                           ),
                         ],
@@ -538,7 +550,8 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
 
         return InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => _openPage(startPage),
+          // الدخول من الفهرس على سورة معينة يكون تلاوة حرة (بدون زر إتمام الصفحة)
+          onTap: () => _openPage(startPage, khatmahOverride: false),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
             decoration: BoxDecoration(
@@ -622,7 +635,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
 
         return InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => _openPage(page),
+          onTap: () => _openPage(page, khatmahOverride: false),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
@@ -681,15 +694,17 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
 }
 
 // =========================================================================
-// قارئ صفحات المصحف (المصور أوفلاين + الخط الأميري العثماني المريح)
+// قارئ صفحات المصحف (المصور بمساحة موسعة + النص العثماني مع مشاركة ونسخ الآية)
 // =========================================================================
 class QuranPageReaderScreen extends StatefulWidget {
   final int initialPage;
+  final bool isKhatmahMode;
   final VoidCallback onDownloadAllRequested;
 
   const QuranPageReaderScreen({
     super.key,
     required this.initialPage,
+    this.isKhatmahMode = false,
     required this.onDownloadAllRequested,
   });
 
@@ -700,17 +715,22 @@ class QuranPageReaderScreen extends StatefulWidget {
 class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
   late PageController _pageController;
   late int _currentPage;
-  bool _isImageMushaf = true; // الأولوية للمصحف المصور
+  late bool _isKhatmahMode;
+  bool _isImageMushaf = true;
   double _fontSize = 23.0;
   bool _isNightPaper = false;
+  bool _isChromeVisible = true;
   Set<String> _bookmarks = {};
   Set<String> _completedPages = {};
   String _docsPath = '';
+
+  final GlobalKey _verseCardKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _currentPage = widget.initialPage;
+    _isKhatmahMode = widget.isKhatmahMode;
     _pageController = PageController(initialPage: _currentPage - 1);
     _initReaderPrefs();
   }
@@ -720,12 +740,14 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
     final prefs = await SharedPreferences.getInstance();
     final askedOffline = prefs.getBool('mushaf_asked_offline_download') ?? false;
     final alreadyDownloaded = prefs.getBool('mushaf_offline_downloaded') ?? false;
+    final khatmahStored = prefs.getBool('quran_is_khatmah_entry') ?? widget.isKhatmahMode;
 
     setState(() {
       _docsPath = dir.path;
       _isImageMushaf = prefs.getBool('quran_is_image_mode') ?? true;
       _fontSize = prefs.getDouble('quran_font_size') ?? 23.0;
       _isNightPaper = prefs.getBool('quran_night_paper') ?? false;
+      _isKhatmahMode = widget.isKhatmahMode || khatmahStored;
       _bookmarks = (prefs.getStringList('quran_bookmarks') ?? []).toSet();
       _completedPages = (prefs.getStringList('quran_completed_pages') ?? []).toSet();
     });
@@ -771,9 +793,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
               Navigator.pop(ctx);
               widget.onDownloadAllRequested();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('بدأ تنزيل صفحات المصحف في الخلفية بنجاح'),
-                ),
+                const SnackBar(content: Text('بدأ تنزيل صفحات المصحف في الخلفية بنجاح')),
               );
             },
             child: const Text('تنزيل الآن'),
@@ -814,6 +834,208 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
     });
     await prefs.setStringList('quran_completed_pages', _completedPages.toList());
     await prefs.setInt('khatmah_pages_read', _completedPages.length);
+  }
+
+  /// قائمة التفاعل عند الضغط على آية في المصحف النصي (نسخ الآية أو مشاركتها كصورة)
+  void _showVerseActionsSheet(int surahNum, int verseNum, String verseText) {
+    HapticFeedback.selectionClick();
+    final surahName = quran.getSurahNameArabic(surahNum);
+    final formattedVerse = '﴿$verseText﴾\n— سورة $surahName • آية ${_toArabicDigits(verseNum)} (صفحة $_currentPage)';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ThalabTheme.cardSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'سورة $surahName • آية ${_toArabicDigits(verseNum)}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: ThalabTheme.creamBackground,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: ThalabTheme.softBorder),
+              ),
+              child: Text(
+                '﴿$verseText﴾',
+                textAlign: TextAlign.center,
+                textDirection: TextDirection.rtl,
+                style: GoogleFonts.amiriQuran(
+                  fontSize: 20,
+                  height: 2.0,
+                  color: ThalabTheme.darkSlate,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: formattedVerse));
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('تم نسخ الآية الكريمة بنجاح')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.copy_rounded, color: ThalabTheme.foxOrange),
+                    label: const Text('نسخ الآية'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ThalabTheme.foxOrange,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _openVerseImageShareDialog(surahName, verseNum, verseText);
+                    },
+                    icon: const Icon(Icons.image_rounded),
+                    label: const Text('مشاركة كصورة'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// توليد صورة أنيقة للآية ومشاركتها عبر share_plus
+  void _openVerseImageShareDialog(String surahName, int verseNum, String verseText) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThalabTheme.cardSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('معاينة بطاقة الآية', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: RepaintBoundary(
+          key: _verseCardKey,
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFFAF2), Color(0xFFFFEBD6)],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: ThalabTheme.foxOrange.withOpacity(0.45), width: 1.5),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.menu_book_rounded, color: ThalabTheme.foxOrange, size: 24),
+                const SizedBox(height: 10),
+                Text(
+                  '﴿$verseText﴾',
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: GoogleFonts.amiriQuran(
+                    fontSize: 21,
+                    height: 2.1,
+                    color: const Color(0xFF1F1D1A),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.foxOrange.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'سورة $surahName • آية ${_toArabicDigits(verseNum)}',
+                    style: const TextStyle(
+                      color: ThalabTheme.foxOrange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'تطبيق الثعلب • المصحف الشريف',
+                  style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedSlate)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ThalabTheme.foxOrange,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: () async {
+              try {
+                final boundary = _verseCardKey.currentContext?.findRenderObject()
+                    as RenderRepaintBoundary?;
+                if (boundary != null) {
+                  final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+                  final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+                  if (byteData != null) {
+                    final tempDir = await getTemporaryDirectory();
+                    final file = File('${tempDir.path}/aya_${surahNum}_$verseNum.png');
+                    await file.writeAsBytes(byteData.buffer.asUint8List());
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    await Share.shareXFiles(
+                      [XFile(file.path)],
+                      text: 'سورة $surahName • آية ${_toArabicDigits(verseNum)} — تطبيق الثعلب',
+                    );
+                    return;
+                  }
+                }
+              } catch (_) {}
+              if (ctx.mounted) Navigator.pop(ctx);
+              await Share.share(
+                '﴿$verseText﴾\n— سورة $surahName • آية ${_toArabicDigits(verseNum)}',
+              );
+            },
+            icon: const Icon(Icons.share_rounded, size: 18),
+            label: const Text('مشاركة الصورة'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _openDisplaySettings() {
@@ -932,106 +1154,137 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
     final isBookmarked = _bookmarks.contains(_currentPage.toString());
     final isCompleted = _completedPages.contains(_currentPage.toString());
 
-    final paperBg = _isNightPaper ? const Color(0xFF1A1816) : const Color(0xFFFFFCF7);
+    // في وضع المصحف المصور نستخدم خلفية داكنة مريحة عند القراءة أو حسب إعداد الليلي/النهاري
+    final paperBg = _isNightPaper
+        ? const Color(0xFF141312)
+        : (_isImageMushaf ? const Color(0xFF181715) : const Color(0xFFFFFCF7));
 
     return Scaffold(
       backgroundColor: paperBg,
-      appBar: AppBar(
-        backgroundColor: paperBg,
-        title: Text(
-          'سورة ${quran.getSurahNameArabic(firstSurah)} • الجزء $juzNumber',
-          style: TextStyle(
-            fontSize: 16.5,
-            fontWeight: FontWeight.bold,
-            color: _isNightPaper ? Colors.white : ThalabTheme.darkSlate,
-          ),
-        ),
-        iconTheme: IconThemeData(color: _isNightPaper ? Colors.white : ThalabTheme.darkSlate),
-        actions: [
-          IconButton(
-            tooltip: 'حفظ علامة مرجعية',
-            icon: Icon(
-              isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-              color: ThalabTheme.foxOrange,
-            ),
-            onPressed: _toggleBookmark,
-          ),
-          IconButton(
-            tooltip: 'مشاركة الصفحة',
-            icon: const Icon(Icons.share_rounded, color: ThalabTheme.foxOrange),
-            onPressed: () {
-              Share.share('أقرأ الآن سورة ${quran.getSurahNameArabic(firstSurah)} - صفحة $_currentPage من تطبيق الثعلب.');
-            },
-          ),
-          IconButton(
-            tooltip: 'إعدادات العرض (مصور / نصي)',
-            icon: const Icon(Icons.tune_rounded, color: ThalabTheme.foxOrange),
-            onPressed: _openDisplaySettings,
-          ),
-        ],
-      ),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: 604,
-        onPageChanged: (index) {
-          final newPage = index + 1;
-          setState(() => _currentPage = newPage);
-          _savePageVisit(newPage);
-        },
-        itemBuilder: (context, index) {
-          final pageNum = index + 1;
-          return _isImageMushaf
-              ? _buildImageMushafPage(pageNum)
-              : _buildUthmaniTextPage(pageNum);
-        },
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-        color: paperBg,
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _isNightPaper ? const Color(0xFF2A2622) : ThalabTheme.cardSurface,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: ThalabTheme.softBorder),
-              ),
-              child: Text(
-                'صفحة $_currentPage / 604',
+      appBar: _isChromeVisible
+          ? AppBar(
+              backgroundColor: paperBg,
+              elevation: 0,
+              title: Text(
+                'سورة ${quran.getSurahNameArabic(firstSurah)} • الجزء $juzNumber',
                 style: TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  color: _isNightPaper ? Colors.white : ThalabTheme.darkSlate,
+                  color: (paperBg == const Color(0xFF141312) || paperBg == const Color(0xFF181715))
+                      ? Colors.white
+                      : ThalabTheme.darkSlate,
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isCompleted ? const Color(0xFF1B8A5A) : ThalabTheme.foxOrange,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(0, 46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                ),
-                onPressed: _togglePageCompleted,
-                icon: Icon(
-                  isCompleted ? Icons.check_circle_rounded : Icons.task_alt_rounded,
-                  size: 20,
-                ),
-                label: Text(
-                  isCompleted ? 'تمت قراءة الصفحة ✓' : 'إتمام الصفحة في الختمة',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                ),
+              iconTheme: IconThemeData(
+                color: (paperBg == const Color(0xFF141312) || paperBg == const Color(0xFF181715))
+                    ? Colors.white
+                    : ThalabTheme.darkSlate,
               ),
-            ),
-          ],
+              actions: [
+                IconButton(
+                  tooltip: 'حفظ علامة مرجعية',
+                  icon: Icon(
+                    isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                    color: ThalabTheme.foxOrange,
+                  ),
+                  onPressed: _toggleBookmark,
+                ),
+                IconButton(
+                  tooltip: 'مشاركة الصفحة',
+                  icon: const Icon(Icons.share_rounded, color: ThalabTheme.foxOrange),
+                  onPressed: () {
+                    Share.share(
+                      'أقرأ الآن سورة ${quran.getSurahNameArabic(firstSurah)} - صفحة $_currentPage من تطبيق الثعلب.',
+                    );
+                  },
+                ),
+                IconButton(
+                  tooltip: 'إعدادات العرض (مصور / نصي)',
+                  icon: const Icon(Icons.tune_rounded, color: ThalabTheme.foxOrange),
+                  onPressed: _openDisplaySettings,
+                ),
+              ],
+            )
+          : null,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onDoubleTap: () => setState(() => _isChromeVisible = !_isChromeVisible),
+        child: PageView.builder(
+          controller: _pageController,
+          itemCount: 604,
+          onPageChanged: (index) {
+            final newPage = index + 1;
+            setState(() => _currentPage = newPage);
+            _savePageVisit(newPage);
+          },
+          itemBuilder: (context, index) {
+            final pageNum = index + 1;
+            return _isImageMushaf
+                ? _buildImageMushafPage(pageNum)
+                : _buildUthmaniTextPage(pageNum);
+          },
         ),
       ),
+      bottomNavigationBar: _isChromeVisible
+          ? Container(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+              color: paperBg,
+              child: Row(
+                mainAxisAlignment:
+                    _isKhatmahMode ? MainAxisAlignment.start : MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: (paperBg == const Color(0xFF141312) || paperBg == const Color(0xFF181715))
+                          ? const Color(0xFF282522)
+                          : ThalabTheme.cardSurface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: ThalabTheme.softBorder),
+                    ),
+                    child: Text(
+                      'صفحة $_currentPage / 604',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: (paperBg == const Color(0xFF141312) || paperBg == const Color(0xFF181715))
+                            ? Colors.white
+                            : ThalabTheme.darkSlate,
+                      ),
+                    ),
+                  ),
+                  // زر إتمام الصفحة يظهر فقط عند الدخول من اختصار الختمة
+                  if (_isKhatmahMode) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              isCompleted ? const Color(0xFF1B8A5A) : ThalabTheme.foxOrange,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(0, 46),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        ),
+                        onPressed: _togglePageCompleted,
+                        icon: Icon(
+                          isCompleted ? Icons.check_circle_rounded : Icons.task_alt_rounded,
+                          size: 20,
+                        ),
+                        label: Text(
+                          isCompleted ? 'تمت قراءة الصفحة ✓' : 'إتمام الصفحة في الختمة',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            )
+          : null,
     );
   }
 
+  /// مساحة عرض موسّعة للمصحف المصور تملأ الشاشة بأقل هوامش ممكنة
   Widget _buildImageMushafPage(int pageNum) {
     final padded = pageNum.toString().padLeft(3, '0');
     final imageUrl = 'https://android.quran.com/data/width_1024/page$padded.png';
@@ -1040,11 +1293,11 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
 
     Widget imageWidget;
     if (hasLocalFile) {
-      imageWidget = Image.file(localFile, fit: BoxFit.contain);
+      imageWidget = Image.file(localFile, fit: BoxFit.fill);
     } else {
       imageWidget = Image.network(
         imageUrl,
-        fit: BoxFit.contain,
+        fit: BoxFit.fill,
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
           return const Center(
@@ -1097,10 +1350,13 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
     return InteractiveViewer(
       minScale: 1.0,
       maxScale: 3.0,
-      child: Center(
+      child: SizedBox.expand(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: imageWidget,
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: imageWidget,
+          ),
         ),
       ),
     );
@@ -1112,12 +1368,12 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
     final frameBg = _isNightPaper ? const Color(0xFF23201D) : const Color(0xFFFFFAF2);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         decoration: BoxDecoration(
           color: frameBg,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: ThalabTheme.foxOrange.withOpacity(0.45),
             width: 1.6,
@@ -1159,7 +1415,6 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (startVerse == 1) ...[
-                  // إطار زخرفي مستقل لاسم السورة
                   Container(
                     margin: const EdgeInsets.only(bottom: 10, top: 4),
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -1203,7 +1458,6 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
                       ],
                     ),
                   ),
-                  // سطر البسملة المستقل تماماً عن الآيات (ما عدا الفاتحة والتوبة)
                   if (surahNum != 1 && surahNum != 9)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -1222,6 +1476,36 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
                   textAlign: TextAlign.justify,
                   textDirection: TextDirection.rtl,
                   text: TextSpan(children: verseSpans),
+                ),
+                const SizedBox(height: 8),
+                // شريط سريع لاختيار آية من هذا المقطع للنسخ أو المشاركة كصورة
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (int v = startVerse; v <= endVerse; v++)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: ActionChip(
+                            visualDensity: VisualDensity.compact,
+                            backgroundColor: ThalabTheme.foxOrange.withOpacity(0.08),
+                            side: BorderSide(color: ThalabTheme.foxOrange.withOpacity(0.25)),
+                            label: Text(
+                              'آية ${_toArabicDigits(v)}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: ThalabTheme.foxOrange,
+                              ),
+                            ),
+                            onPressed: () {
+                              final txt = quran.getVerse(surahNum, v, verseEndSymbol: false);
+                              _showVerseActionsSheet(surahNum, v, txt);
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 10),
               ],
@@ -1244,7 +1528,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
 }
 
 // =========================================================================
-// محرك البحث الذكي في القرآن الكريم (بدون تشكيل + يفتح المصحف المصور مباشرة)
+// محرك البحث الذكي في القرآن الكريم
 // =========================================================================
 class _QuranSmartSearchDelegate extends SearchDelegate<void> {
   final ValueChanged<int> onSelectPage;
@@ -1252,14 +1536,28 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
   _QuranSmartSearchDelegate({required this.onSelectPage});
 
   @override
-  String get searchFieldLabel => 'ابحث بكلمة أو آية أو اسم سورة...';
+  String get searchFieldLabel => 'ابحث باسم السورة أو كلمة من القرآن...';
 
-  String _normalize(String s) {
-    return s
-        .replaceAll(RegExp(r'[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]'), '')
-        .replaceAll(RegExp(r'[أإآٱ]'), 'ا')
-        .replaceAll('ة', 'ه')
+  @override
+  ThemeData appBarTheme(BuildContext context) {
+    return Theme.of(context).copyWith(
+      appBarTheme: const AppBarTheme(
+        backgroundColor: ThalabTheme.creamBackground,
+        elevation: 0,
+      ),
+    );
+  }
+
+  String _normalizeArabic(String input) {
+    return input
+        .replaceAll(RegExp(r'[\u064B-\u065F\u0670\u06D6-\u06ED]'), '')
+        .replaceAll('أ', 'ا')
+        .replaceAll('إ', 'ا')
+        .replaceAll('آ', 'ا')
         .replaceAll('ى', 'ي')
+        .replaceAll('ة', 'ه')
+        .replaceAll('ؤ', 'و')
+        .replaceAll('ئ', 'ي')
         .trim();
   }
 
@@ -1268,7 +1566,7 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
     return [
       if (query.isNotEmpty)
         IconButton(
-          icon: const Icon(Icons.clear_rounded),
+          icon: const Icon(Icons.clear_rounded, color: ThalabTheme.foxOrange),
           onPressed: () => query = '',
         ),
     ];
@@ -1277,90 +1575,77 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
   @override
   Widget? buildLeading(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.arrow_back_rounded),
+      icon: const Icon(Icons.arrow_forward_rounded),
       onPressed: () => close(context, null),
     );
   }
 
   @override
-  Widget buildResults(BuildContext context) => _buildMatches(context);
+  Widget buildResults(BuildContext context) => _buildSearchBody(context);
 
   @override
-  Widget buildSuggestions(BuildContext context) => _buildMatches(context);
+  Widget buildSuggestions(BuildContext context) => _buildSearchBody(context);
 
-  Widget _buildMatches(BuildContext context) {
-    final q = _normalize(query);
-    if (q.length < 2) {
+  Widget _buildSearchBody(BuildContext context) {
+    final normQuery = _normalizeArabic(query);
+    if (normQuery.isEmpty) {
       return const Center(
         child: Text(
-          'اكتب كلمتين أو أكثر للبحث في جميع آيات القرآن الكريم والسور',
+          'اكتب اسم السورة أو جزءاً من آية للبحث الفوري',
           style: TextStyle(color: ThalabTheme.mutedSlate),
         ),
       );
     }
 
-    final List<Map<String, dynamic>> results = [];
+    final List<Map<String, dynamic>> matches = [];
 
-    // 1. البحث في أسماء السور
     for (int s = 1; s <= 114; s++) {
-      final sName = quran.getSurahNameArabic(s);
-      if (_normalize(sName).contains(q)) {
-        results.add({
+      final surahAr = quran.getSurahNameArabic(s);
+      if (_normalizeArabic(surahAr).contains(normQuery)) {
+        matches.add({
           'type': 'surah',
-          'surah': s,
-          'verse': 1,
-          'title': 'سورة $sName',
-          'snippet': 'الانتقال إلى بداية سورة $sName',
+          'title': 'سورة $surahAr',
+          'subtitle': 'صفحة ${quran.getSurahPages(s).first} • ${quran.getVerseCount(s)} آية',
           'page': quran.getSurahPages(s).first,
         });
       }
     }
 
-    // 2. البحث في الآيات بدون تشكيل
-    for (int s = 1; s <= 114; s++) {
-      if (results.length >= 60) break;
+    for (int s = 1; s <= 114 && matches.length < 35; s++) {
       final count = quran.getVerseCount(s);
-      for (int v = 1; v <= count; v++) {
-        final rawVerse = quran.getVerse(s, v);
-        if (_normalize(rawVerse).contains(q)) {
-          results.add({
+      for (int v = 1; v <= count && matches.length < 35; v++) {
+        final verse = quran.getVerse(s, v, verseEndSymbol: false);
+        if (_normalizeArabic(verse).contains(normQuery)) {
+          matches.add({
             'type': 'verse',
-            'surah': s,
-            'verse': v,
             'title': 'سورة ${quran.getSurahNameArabic(s)} • آية $v',
-            'snippet': rawVerse,
+            'subtitle': verse,
             'page': quran.getPageNumber(s, v),
           });
-          if (results.length >= 60) break;
         }
       }
     }
 
-    if (results.isEmpty) {
+    if (matches.isEmpty) {
       return const Center(
-        child: Text(
-          'لم يتم العثور على نتائج مطابقة',
-          style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 15),
-        ),
+        child: Text('لا توجد نتائج مطابقة لبحثك', style: TextStyle(color: ThalabTheme.mutedSlate)),
       );
     }
 
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemCount: matches.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        final item = results[index];
-        final int page = item['page'] as int;
+        final item = matches[index];
         return InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: () async {
             final prefs = await SharedPreferences.getInstance();
-            // تفعيل المصحف المصور كأولوية عند فتح نتيجة البحث
             await prefs.setBool('quran_is_image_mode', true);
             if (context.mounted) {
               close(context, null);
-              onSelectPage(page);
+              onSelectPage(item['page'] as int);
             }
           },
           child: Container(
@@ -1370,41 +1655,32 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: ThalabTheme.softBorder),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      item['title'] as String,
-                      style: const TextStyle(
-                        color: ThalabTheme.foxOrange,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: ThalabTheme.creamBackground,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'المصحف المصور • ص $page',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
+                Icon(
+                  item['type'] == 'surah' ? Icons.menu_book_rounded : Icons.format_quote_rounded,
+                  color: ThalabTheme.foxOrange,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  item['snippet'] as String,
-                  style: GoogleFonts.amiri(
-                    fontSize: 19,
-                    height: 1.8,
-                    color: ThalabTheme.darkSlate,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item['title'] as String,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 2),
+                      Text(
+                        item['subtitle'] as String,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 12),
+                      ),
+                    ],
                   ),
+                ),
+                Text(
+                  'ص ${item['page']}',
+                  style: const TextStyle(color: ThalabTheme.foxOrange, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
