@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -266,7 +267,7 @@ class _QuickCard extends StatelessWidget {
 }
 
 // =========================================================================
-// 2. تبويب رفيق (الواحة الإيمانية المتكاملة — كروت مدمجة مضغوطة ومريحة)
+// 2. تبويب رفيق (الواحة الإيمانية المتكاملة — التصميم الجديد المعتمد)
 // =========================================================================
 class RafiqTab extends StatefulWidget {
   const RafiqTab({super.key});
@@ -278,6 +279,10 @@ class RafiqTab extends StatefulWidget {
 class _RafiqTabState extends State<RafiqTab> {
   int _khatmahRead = 0;
   int _hijriOffset = 0;
+  Coordinates _coords = Coordinates(30.0444, 31.2357);
+  String _locationName = 'القاهرة، مصر';
+  PrayerTimes? _prayerTimes;
+  Timer? _liveTimer;
 
   static const List<String> _hijriMonthsAr = [
     'محرم',
@@ -298,33 +303,155 @@ class _RafiqTabState extends State<RafiqTab> {
   void initState() {
     super.initState();
     _refreshWidgets();
+    _liveTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _liveTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _refreshWidgets() async {
     final prefs = await SharedPreferences.getInstance();
+    final lat = prefs.getDouble('saved_lat') ?? prefs.getDouble('prayer_lat') ?? 30.0444;
+    final lng = prefs.getDouble('saved_lng') ?? prefs.getDouble('prayer_lng') ?? 31.2357;
+    final locLabel = prefs.getString('saved_loc_name') ?? 'القاهرة، مصر';
+
+    final params = CalculationMethod.egyptian.getParameters();
+    params.madhab = Madhab.shafi;
+    final pt = PrayerTimes(Coordinates(lat, lng), DateComponents.from(DateTime.now()), params);
+
     if (!mounted) return;
     setState(() {
       _khatmahRead = prefs.getInt('khatmah_pages_read') ?? 0;
       _hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
+      _coords = Coordinates(lat, lng);
+      _locationName = locLabel;
+      _prayerTimes = pt;
     });
   }
 
-  void _open(Widget screen) async {
+  Future<void> _open(Widget screen, {bool isKhatmah = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('quran_is_khatmah_entry', isKhatmah);
+    if (!mounted) return;
     await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
     _refreshWidgets();
   }
 
+  /// تحديد الذكر التلقائي اللحظي (بعد الصلاة لمدة 30 دقيقة، أو الاستيقاظ/الصباح/المساء/النوم)
   (String title, String subtitle, IconData icon, int tabIndex) _getTimelyDhikrInfo() {
-    final hour = DateTime.now().hour;
-    if (hour >= 4 && hour < 12) {
+    final now = DateTime.now();
+    final pt = _prayerTimes;
+
+    // 1. التحقق أولاً: هل نحن في وقت أذكار ما بعد الصلاة (خلال 30 دقيقة من أذان أي فرض)؟
+    if (pt != null) {
+      final fardList = [
+        ('الفجر', pt.fajr),
+        ('الظهر', pt.dhuhr),
+        ('العصر', pt.asr),
+        ('المغرب', pt.maghrib),
+        ('العشاء', pt.isha),
+      ];
+      for (final fard in fardList) {
+        final diff = now.difference(fard.$2);
+        if (diff.inMinutes >= 0 && diff.inMinutes <= 30) {
+          return ('أذكار بعد الصلاة', 'دُبُر صلاة ${fard.$1} الآن', Icons.check_circle_outline_rounded, 2);
+        }
+      }
+    }
+
+    // 2. حسب فترة اليوم
+    final hour = now.hour;
+    if (hour >= 4 && hour < 7) {
+      return ('أذكار الاستيقاظ', 'بداية يومك بذكر الله', Icons.wb_twilight_rounded, 4);
+    } else if (hour >= 7 && hour < 12) {
       return ('أذكار الصباح', 'وقت الصباح المبارك الآن', Icons.wb_sunny_rounded, 0);
-    } else if (hour >= 15 && hour < 21) {
+    } else if (hour >= 15 && hour < 20) {
       return ('أذكار المساء', 'وقت المساء وحفظ النفس', Icons.nights_stay_rounded, 1);
-    } else if (hour >= 21 || hour < 4) {
+    } else if (hour >= 20 || hour < 4) {
       return ('أذكار النوم', 'حصّن نفسك قبل المنام', Icons.bedtime_rounded, 3);
     } else {
-      return ('حصن المسلم', 'أذكار اليوم والليلة', Icons.auto_stories_rounded, 5);
+      return ('أذكار الصباح', 'أذكار اليوم والليلة', Icons.wb_sunny_outlined, 0);
     }
+  }
+
+  /// خصائص الهوية البصرية الديناميكية للويدجت حسب الصلاة القادمة/الحالية
+  ({
+    List<Color> gradient,
+    IconData skyIcon,
+    String periodBadge,
+    Color accentText,
+  }) _prayerTheme(Prayer p) {
+    switch (p) {
+      case Prayer.fajr:
+      case Prayer.none:
+        return (
+          gradient: const [Color(0xFF1E3A5F), Color(0xFF3B6E9C), Color(0xFFD98236)],
+          skyIcon: Icons.wb_twilight_rounded,
+          periodBadge: 'نسائم الفجر',
+          accentText: const Color(0xFFFFE4C4),
+        );
+      case Prayer.sunrise:
+      case Prayer.dhuhr:
+        return (
+          gradient: const [Color(0xFF1976D2), Color(0xFF42A5F5), Color(0xFF64B5F6)],
+          skyIcon: Icons.wb_sunny_rounded,
+          periodBadge: 'ضياء الظهيرة',
+          accentText: Colors.white,
+        );
+      case Prayer.asr:
+        return (
+          gradient: const [Color(0xFFD96B14), Color(0xFFF39237), Color(0xFFF7B267)],
+          skyIcon: Icons.wb_sunny_outlined,
+          periodBadge: 'أصيل العصر',
+          accentText: Colors.white,
+        );
+      case Prayer.maghrib:
+        return (
+          gradient: const [Color(0xFF4A1D5C), Color(0xFFA8385D), Color(0xFFE86A17)],
+          skyIcon: Icons.nights_stay_outlined,
+          periodBadge: 'شفق المغرب',
+          accentText: const Color(0xFFFFE8D6),
+        );
+      case Prayer.isha:
+        return (
+          gradient: const [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155)],
+          skyIcon: Icons.bedtime_rounded,
+          periodBadge: 'سكون العشاء',
+          accentText: const Color(0xFFE2E8F0),
+        );
+    }
+  }
+
+  String _arabicPrayerName(Prayer p) {
+    switch (p) {
+      case Prayer.fajr:
+        return 'الفجر';
+      case Prayer.sunrise:
+        return 'الشروق';
+      case Prayer.dhuhr:
+        return 'الظهر';
+      case Prayer.asr:
+        return 'العصر';
+      case Prayer.maghrib:
+        return 'المغرب';
+      case Prayer.isha:
+        return 'العشاء';
+      case Prayer.none:
+        return 'الفجر';
+    }
+  }
+
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '--:--';
+    final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final m = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'م' : 'ص';
+    return '$h:$m $period';
   }
 
   int _daysUntilRamadan() {
@@ -346,12 +473,25 @@ class _RafiqTabState extends State<RafiqTab> {
     final timely = _getTimelyDhikrInfo();
     final todayH = HijriCalendar.fromDate(DateTime.now().add(Duration(days: _hijriOffset)));
     final monthName = _hijriMonthsAr[(todayH.hMonth - 1).clamp(0, 11)];
+    final hijriFullText = '${todayH.hDay} $monthName ${todayH.hYear} هـ';
     final ramadanDays = _daysUntilRamadan();
 
+    final pt = _prayerTimes;
+    final nextPrayer = pt?.nextPrayer() ?? Prayer.none;
+    DateTime? nextTime = pt?.timeForPrayer(nextPrayer);
+    if (nextPrayer == Prayer.none && pt != null) {
+      nextTime = pt.fajr.add(const Duration(days: 1));
+    }
+    final remaining = nextTime != null ? nextTime.difference(DateTime.now()) : Duration.zero;
+    final remHours = remaining.inHours.clamp(0, 23).toString().padLeft(2, '0');
+    final remMins = (remaining.inMinutes % 60).clamp(0, 59).toString().padLeft(2, '0');
+    final remSecs = (remaining.inSeconds % 60).clamp(0, 59).toString().padLeft(2, '0');
+    final pVisual = _prayerTheme(nextPrayer);
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 110),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 115),
       children: [
-        // العنوان العلوي مع زر منظومة الإشعارات
+        // 1. العنوان العلوي + زر الإشعارات المستقل
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -368,7 +508,7 @@ class _RafiqTabState extends State<RafiqTab> {
         ),
         const SizedBox(height: 10),
 
-        // الكارت المدمج الأول: الختمة والقرآن + الأذكار اللحظية
+        // 2. الكارت المزدوج العلوي: الختمة والقرآن (وضع الختمة) + الذكر التلقائي حسب الوقت
         Container(
           decoration: BoxDecoration(
             color: ThalabTheme.cardSurface,
@@ -385,11 +525,11 @@ class _RafiqTabState extends State<RafiqTab> {
           child: IntrinsicHeight(
             child: Row(
               children: [
-                // النصف الأيمن: متابعة الختمة والمصحف
+                // النصف الأيمن: المصحف والختمة (يفتح وضع الختمة)
                 Expanded(
                   child: InkWell(
                     borderRadius: const BorderRadius.horizontal(right: Radius.circular(22)),
-                    onTap: () => _open(const QuranScreen()),
+                    onTap: () => _open(const QuranScreen(), isKhatmah: true),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                       decoration: const BoxDecoration(
@@ -437,7 +577,7 @@ class _RafiqTabState extends State<RafiqTab> {
                   ),
                 ),
 
-                // النصف الأيسر: الأذكار المناسبة للوقت الحالي
+                // النصف الأيسر: الذكر التلقائي حسب الوقت ودبر الصلوات
                 Expanded(
                   child: InkWell(
                     borderRadius: const BorderRadius.horizontal(left: Radius.circular(22)),
@@ -459,7 +599,7 @@ class _RafiqTabState extends State<RafiqTab> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Text(
-                                  'الآن',
+                                  'تلقائي',
                                   style: TextStyle(
                                     color: ThalabTheme.foxOrange,
                                     fontSize: 10.5,
@@ -495,136 +635,130 @@ class _RafiqTabState extends State<RafiqTab> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
 
-        // الكارت المدمج الثاني: التقويم الهجري + العد التنازلي للمناسبات
-        Container(
-          decoration: BoxDecoration(
-            color: ThalabTheme.cardSurface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(20)),
-                    onTap: () => _open(const HijriEventsScreen(initialTab: 1)),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_month_rounded, color: ThalabTheme.foxOrange, size: 22),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '${todayH.hDay} $monthName',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                                ),
-                                Text(
-                                  '${todayH.hYear} هـ • التقويم',
-                                  style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                VerticalDivider(width: 1, thickness: 1, color: ThalabTheme.softBorder, indent: 10, endIndent: 10),
-                Expanded(
-                  child: InkWell(
-                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
-                    onTap: () => _open(const HijriEventsScreen(initialTab: 0)),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.nights_stay_rounded, color: ThalabTheme.foxOrange, size: 21),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  ramadanDays == 0 ? 'رمضان كريم!' : 'رمضان: $ramadanDays يوم',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                                ),
-                                const Text(
-                                  'المناسبات الإسلامية',
-                                  style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+        // 3. ويدجت الصلاة الحي الديناميكي (يتغير لونه وأيقونته حسب الفرض القادم + الهجري + الموقع)
+        InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => _open(const PrayerTimesScreen()),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: pVisual.gradient,
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: pVisual.gradient.first.withOpacity(0.28),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // بطاقة مواقيت الصلاة والعد التنازلي
-        InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => _open(const PrayerTimesScreen()),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-            decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
-            ),
-            child: Row(
+            child: Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: ThalabTheme.foxOrange.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.mosque_rounded, color: ThalabTheme.foxOrange, size: 24),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'مواقيت الصلاة والأذان',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                // الصف العلوي: الموقع المختار + التاريخ الهجري
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.location_on_rounded, color: pVisual.accentText, size: 14),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              _locationName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        'تحديد الموقع التلقائي والعد التنازلي للفرض القادم',
-                        style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ],
-                  ),
+                      child: Text(
+                        hijriFullText,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: ThalabTheme.foxOrange),
+                const SizedBox(height: 14),
+
+                // الصف الأوسط: الفرض القادم + العد التنازلي + أيقونة الجو
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(pVisual.skyIcon, color: Colors.white, size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              'الصلاة القادمة: ${_arabicPrayerName(nextPrayer)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'موعد الأذان: ${_formatTime(nextTime)} • ${pVisual.periodBadge}',
+                          style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$remHours:$remMins:$remSecs',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 25,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        Text(
+                          'متبقي على الأذان',
+                          style: TextStyle(color: pVisual.accentText, fontSize: 10.5),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 12),
 
-        // شبكة الأدوات الأربع المضغوطة
+        // 4. الشبكة الأساسية (6 بطاقات مرتبة في 3 صفوف):
+        // الصف الأول: المصحف الشريف (وضع القراءة الحرة) + أذكاري (أذكار اليوم والليلة)
+        // الصف الثاني: السبحة الذكية + اتجاه القبلة
+        // الصف الثالث: حصن المسلم (الحصن + الرقية + الأسماء) + التقويم الهجري والمناسبات
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -635,15 +769,15 @@ class _RafiqTabState extends State<RafiqTab> {
           children: [
             _RafiqServiceCard(
               title: 'المصحف الشريف',
-              subtitle: 'تلاوة وختمة وبحث',
+              subtitle: 'تلاوة حرة وفهرس السور',
               icon: Icons.menu_book_rounded,
-              onTap: () => _open(const QuranScreen()),
+              onTap: () => _open(const QuranScreen(), isKhatmah: false),
             ),
             _RafiqServiceCard(
-              title: 'حصن المسلم',
-              subtitle: 'الأذكار والرقية والأسماء',
-              icon: Icons.auto_stories_rounded,
-              onTap: () => _open(const AdhkarScreen()),
+              title: 'أذكاري',
+              subtitle: 'الصباح، المساء، النوم، الصلاة',
+              icon: Icons.wb_sunny_outlined,
+              onTap: () => _open(const AdhkarScreen(initialTabIndex: 0)),
             ),
             _RafiqServiceCard(
               title: 'السبحة الذكية',
@@ -653,9 +787,21 @@ class _RafiqTabState extends State<RafiqTab> {
             ),
             _RafiqServiceCard(
               title: 'اتجاه القبلة',
-              subtitle: 'بوصلة دقيقة بالموقع',
+              subtitle: 'بوصلة هندسية دقيقة',
               icon: Icons.explore_rounded,
               onTap: () => _open(const QiblaScreen()),
+            ),
+            _RafiqServiceCard(
+              title: 'حصن المسلم',
+              subtitle: 'الأدعية، الرقية، الأسماء الحسنى',
+              icon: Icons.auto_stories_rounded,
+              onTap: () => _open(const AdhkarScreen(initialTabIndex: 5)),
+            ),
+            _RafiqServiceCard(
+              title: 'التقويم والمناسبات',
+              subtitle: ramadanDays == 0 ? 'رمضان كريم اليوم!' : 'رمضان: $ramadanDays يوم • الهجري',
+              icon: Icons.calendar_month_rounded,
+              onTap: () => _open(const HijriEventsScreen(initialTab: 0)),
             ),
           ],
         ),
