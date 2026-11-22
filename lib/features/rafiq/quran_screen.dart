@@ -1014,7 +1014,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
                   final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
                   if (byteData != null) {
                     final tempDir = await getTemporaryDirectory();
-                    final file = File('${tempDir.path}/aya_${surahNum}_$verseNum.png');
+                    final file = File('${tempDir.path}/aya_${surahName.hashCode}_$verseNum.png');
                     await file.writeAsBytes(byteData.buffer.asUint8List());
                     if (ctx.mounted) Navigator.pop(ctx);
                     await Share.shareXFiles(
