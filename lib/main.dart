@@ -25,8 +25,8 @@ void main() async {
   Future.microtask(() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final lat = prefs.getDouble('prayer_lat') ?? 30.0444;
-      final lng = prefs.getDouble('prayer_lng') ?? 31.2357;
+      final lat = prefs.getDouble('saved_lat') ?? prefs.getDouble('prayer_lat') ?? 30.0444;
+      final lng = prefs.getDouble('saved_lng') ?? prefs.getDouble('prayer_lng') ?? 31.2357;
       await RafiqNotificationsService.syncAllScheduledNotifications(
         lat: lat,
         lng: lng,
@@ -94,7 +94,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
   }
 }
 
+// =========================================================================
 // 1. تبويب الرئيسية
+// =========================================================================
 class HomeDashboardTab extends StatelessWidget {
   const HomeDashboardTab({super.key});
 
@@ -206,7 +208,7 @@ class HomeDashboardTab extends StatelessWidget {
             ),
             _QuickCard(
               title: 'مواقيت الصلاة',
-              subtitle: 'المواقيت والسنن الرواتب',
+              subtitle: 'المواقيت والأذان المباشر',
               icon: Icons.access_time_filled_rounded,
               onTap: () => _open(context, const PrayerTimesScreen()),
             ),
@@ -263,7 +265,9 @@ class _QuickCard extends StatelessWidget {
   }
 }
 
-// 2. تبويب رفيق (الواحة الإيمانية المتكاملة)
+// =========================================================================
+// 2. تبويب رفيق (الواحة الإيمانية المتكاملة — كروت مدمجة مضغوطة ومريحة)
+// =========================================================================
 class RafiqTab extends StatefulWidget {
   const RafiqTab({super.key});
 
@@ -298,6 +302,7 @@ class _RafiqTabState extends State<RafiqTab> {
 
   Future<void> _refreshWidgets() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _khatmahRead = prefs.getInt('khatmah_pages_read') ?? 0;
       _hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
@@ -344,12 +349,16 @@ class _RafiqTabState extends State<RafiqTab> {
     final ramadanDays = _daysUntilRamadan();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 110),
       children: [
+        // العنوان العلوي مع زر منظومة الإشعارات
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('رفيق — الواحة الإيمانية', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text(
+              'رفيق — الواحة الإيمانية',
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+            ),
             IconButton(
               tooltip: 'منظومة الإشعارات الذكية',
               icon: const Icon(Icons.notifications_active_rounded, color: ThalabTheme.foxOrange),
@@ -357,236 +366,294 @@ class _RafiqTabState extends State<RafiqTab> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
-        Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _open(const QuranScreen()),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [ThalabTheme.foxOrange, ThalabTheme.foxOrangeLight],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Icon(Icons.menu_book_rounded, color: Colors.white),
-                          Text('الختمة', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '${(khatmahPct * 100).toStringAsFixed(0)}%',
-                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '$_khatmahRead / 604 صفحة',
-                        style: const TextStyle(color: Colors.white70, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
+        // الكارت المدمج الأول: الختمة والقرآن + الأذكار اللحظية
+        Container(
+          decoration: BoxDecoration(
+            color: ThalabTheme.cardSurface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _open(AdhkarScreen(initialTabIndex: timely.$4)),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: ThalabTheme.cardSurface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: ThalabTheme.foxOrange.withOpacity(0.5), width: 1.5),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Icon(timely.$3, color: ThalabTheme.foxOrange),
-                          const Text('الآن', style: TextStyle(color: ThalabTheme.foxOrange, fontSize: 12, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        timely.$1,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: ThalabTheme.darkSlate,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+            ],
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                // النصف الأيمن: متابعة الختمة والمصحف
+                Expanded(
+                  child: InkWell(
+                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(22)),
+                    onTap: () => _open(const QuranScreen()),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [ThalabTheme.foxOrange, ThalabTheme.foxOrangeLight],
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
                         ),
+                        borderRadius: BorderRadius.horizontal(right: Radius.circular(20)),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        timely.$2,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Icon(Icons.menu_book_rounded, color: Colors.white, size: 20),
+                              Text(
+                                '${(khatmahPct * 100).toStringAsFixed(0)}%',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'المصحف والختمة',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '$_khatmahRead / 604 صفحة',
+                            style: const TextStyle(color: Colors.white70, fontSize: 11),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
 
-        Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _open(const HijriEventsScreen(initialTab: 1)),
-                child: Container(
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: ThalabTheme.cardSurface,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                // النصف الأيسر: الأذكار المناسبة للوقت الحالي
+                Expanded(
+                  child: InkWell(
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(22)),
+                    onTap: () => _open(AdhkarScreen(initialTabIndex: timely.$4)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.calendar_month_rounded, color: ThalabTheme.foxOrange, size: 22),
-                          Text('الهجري', style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Icon(timely.$3, color: ThalabTheme.foxOrange, size: 20),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: ThalabTheme.foxOrange.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'الآن',
+                                  style: TextStyle(
+                                    color: ThalabTheme.foxOrange,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            timely.$1,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: ThalabTheme.darkSlate,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            timely.$2,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '${todayH.hDay} $monthName',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      Text(
-                        '${todayH.hYear} هـ • الأيام البيض',
-                        style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _open(const HijriEventsScreen(initialTab: 0)),
-                child: Container(
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: ThalabTheme.cardSurface,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // الكارت المدمج الثاني: التقويم الهجري + العد التنازلي للمناسبات
+        Container(
+          decoration: BoxDecoration(
+            color: ThalabTheme.cardSurface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(20)),
+                    onTap: () => _open(const HijriEventsScreen(initialTab: 1)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_month_rounded, color: ThalabTheme.foxOrange, size: 22),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '${todayH.hDay} $monthName',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                ),
+                                Text(
+                                  '${todayH.hYear} هـ • التقويم',
+                                  style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
+                ),
+                VerticalDivider(width: 1, thickness: 1, color: ThalabTheme.softBorder, indent: 10, endIndent: 10),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+                    onTap: () => _open(const HijriEventsScreen(initialTab: 0)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.nights_stay_rounded, color: ThalabTheme.foxOrange, size: 21),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  ramadanDays == 0 ? 'رمضان كريم!' : 'رمضان: $ramadanDays يوم',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                                ),
+                                const Text(
+                                  'المناسبات الإسلامية',
+                                  style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // بطاقة مواقيت الصلاة والعد التنازلي
+        InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => _open(const PrayerTimesScreen()),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              color: ThalabTheme.cardSurface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.foxOrange.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.mosque_rounded, color: ThalabTheme.foxOrange, size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Icon(Icons.nights_stay_rounded, color: ThalabTheme.foxOrange, size: 22),
-                          Text('المناسبات', style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
                       Text(
-                        ramadanDays == 0 ? 'رمضان كريم!' : 'رمضان: $ramadanDays يوم',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        'مواقيت الصلاة والأذان',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
                       ),
-                      const Text(
-                        'اضغط لعرض كل المناسبات',
+                      Text(
+                        'تحديد الموقع التلقائي والعد التنازلي للفرض القادم',
                         style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-
-        GestureDetector(
-          onTap: () => _open(const PrayerTimesScreen()),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: ThalabTheme.foxOrange.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(Icons.mosque_rounded, color: ThalabTheme.foxOrange, size: 28),
-                ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('مواقيت الصلاة والسنن والنوافل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-                      Text(
-                        'الرواتب، الضحى، الثلث الأخير + 27 محافظة',
-                        style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11.5),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: ThalabTheme.foxOrange),
+                const Icon(Icons.arrow_forward_ios_rounded, size: 15, color: ThalabTheme.foxOrange),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
+        // شبكة الأدوات الأربع المضغوطة
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 2,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 14,
-          childAspectRatio: 1.18,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.38,
           children: [
             _RafiqServiceCard(
               title: 'المصحف الشريف',
-              subtitle: 'مصور ونصي + ختمة ومشاركة',
+              subtitle: 'تلاوة وختمة وبحث',
               icon: Icons.menu_book_rounded,
               onTap: () => _open(const QuranScreen()),
             ),
             _RafiqServiceCard(
-              title: 'الأذكار الكاملة',
-              subtitle: 'انتقال تلقائي + حصن المسلم',
+              title: 'حصن المسلم',
+              subtitle: 'الأذكار والرقية والأسماء',
               icon: Icons.auto_stories_rounded,
               onTap: () => _open(const AdhkarScreen()),
             ),
             _RafiqServiceCard(
               title: 'السبحة الذكية',
-              subtitle: '33 / 100 تصفير تلقائي',
+              subtitle: 'عداد تفاعلي وإجمالي دائم',
               icon: Icons.radio_button_checked_rounded,
               onTap: () => _open(const TasbihScreen()),
             ),
             _RafiqServiceCard(
               title: 'اتجاه القبلة',
-              subtitle: 'بوصلة هندسية إسلامية',
+              subtitle: 'بوصلة دقيقة بالموقع',
               icon: Icons.explore_rounded,
               onTap: () => _open(const QiblaScreen()),
             ),
@@ -613,30 +680,35 @@ class _RafiqServiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: ThalabTheme.cardSurface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: ThalabTheme.foxOrange.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: ThalabTheme.foxOrange, size: 26),
+              child: Icon(icon, color: ThalabTheme.foxOrange, size: 22),
             ),
             const Spacer(),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            Text(subtitle, style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
+            ),
           ],
         ),
       ),
@@ -644,7 +716,9 @@ class _RafiqServiceCard extends StatelessWidget {
   }
 }
 
+// =========================================================================
 // 3. تبويب المعرض
+// =========================================================================
 class MediaTab extends StatelessWidget {
   const MediaTab({super.key});
   @override
@@ -659,7 +733,9 @@ class MediaTab extends StatelessWidget {
       );
 }
 
+// =========================================================================
 // 4. تبويب الموسيقى
+// =========================================================================
 class MusicTab extends StatelessWidget {
   const MusicTab({super.key});
   @override
@@ -674,7 +750,9 @@ class MusicTab extends StatelessWidget {
       );
 }
 
+// =========================================================================
 // 5. تبويب المزيد
+// =========================================================================
 class MoreToolsTab extends StatelessWidget {
   const MoreToolsTab({super.key});
   @override
