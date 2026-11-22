@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,13 +12,20 @@ class TasbihScreen extends StatefulWidget {
   State<TasbihScreen> createState() => _TasbihScreenState();
 }
 
-class _TasbihScreenState extends State<TasbihScreen> {
+class _TasbihScreenState extends State<TasbihScreen>
+    with SingleTickerProviderStateMixin {
   int _tasbihCount = 0;
   int _tasbihTarget = 33;
+  int _completedRounds = 0;
   int _totalLifetimeTasbih = 0;
   int _selectedPhraseIndex = 0;
+  int _selectedStyleIndex = 0; // 0: سبحة خرزية فاخرة, 1: خاتم التسبيح الرقمي
+  bool _vibrationEnabled = true;
 
-  static const List<Map<String, dynamic>> _tasbihPhrases = [
+  late AnimationController _beadAnimController;
+  final List<Map<String, dynamic>> _customPhrases = [];
+
+  static const List<Map<String, dynamic>> _defaultPhrases = [
     {'text': 'سُبْحَانَ اللَّهِ', 'target': 33},
     {'text': 'الْحَمْدُ لِلَّهِ', 'target': 33},
     {'text': 'اللَّهُ أَكْبَرُ', 'target': 34},
@@ -28,68 +36,297 @@ class _TasbihScreenState extends State<TasbihScreen> {
     {'text': 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ', 'target': 100},
   ];
 
+  static const List<int> _presetTargets = [33, 34, 99, 100, 500, 1000];
+
+  List<Map<String, dynamic>> get _allPhrases => [
+        ..._defaultPhrases,
+        ..._customPhrases,
+      ];
+
   @override
   void initState() {
     super.initState();
+    _beadAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
     _loadTasbihData();
+  }
+
+  @override
+  void dispose() {
+    _beadAnimController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadTasbihData() async {
     final prefs = await SharedPreferences.getInstance();
+    final savedCustom = prefs.getStringList('tasbih_custom_phrases') ?? [];
+    final parsedCustom = <Map<String, dynamic>>[];
+    for (final item in savedCustom) {
+      final sep = item.lastIndexOf('::');
+      if (sep > 0) {
+        final txt = item.substring(0, sep);
+        final tgt = int.tryParse(item.substring(sep + 2)) ?? 33;
+        parsedCustom.add({'text': txt, 'target': tgt});
+      }
+    }
+
     setState(() {
+      _customPhrases
+        ..clear()
+        ..addAll(parsedCustom);
       _tasbihCount = prefs.getInt('tasbih_current') ?? 0;
+      _completedRounds = prefs.getInt('tasbih_rounds') ?? 0;
       _totalLifetimeTasbih = prefs.getInt('tasbih_lifetime') ?? 0;
+      _selectedStyleIndex = prefs.getInt('tasbih_style_idx') ?? 0;
+      _vibrationEnabled = prefs.getBool('tasbih_vibration') ?? true;
       _selectedPhraseIndex = (prefs.getInt('tasbih_phrase_idx') ?? 0)
-          .clamp(0, _tasbihPhrases.length - 1);
-      _tasbihTarget = _tasbihPhrases[_selectedPhraseIndex]['target'] as int;
+          .clamp(0, _allPhrases.length - 1);
+      _tasbihTarget = prefs.getInt('tasbih_custom_target') ??
+          (_allPhrases[_selectedPhraseIndex]['target'] as int);
     });
   }
 
   Future<void> _incrementTasbih() async {
-    HapticFeedback.lightImpact();
+    _beadAnimController.forward(from: 0.0);
+    if (_vibrationEnabled) {
+      HapticFeedback.lightImpact();
+    }
+
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _tasbihCount++;
       _totalLifetimeTasbih++;
-      if (_tasbihCount == _tasbihTarget) {
-        HapticFeedback.heavyImpact();
+      if (_tasbihCount % _tasbihTarget == 0) {
+        _completedRounds++;
+        if (_vibrationEnabled) {
+          HapticFeedback.heavyImpact();
+        }
       }
     });
+
     await prefs.setInt('tasbih_current', _tasbihCount);
+    await prefs.setInt('tasbih_rounds', _completedRounds);
     await prefs.setInt('tasbih_lifetime', _totalLifetimeTasbih);
   }
 
   Future<void> _resetTasbih() async {
-    HapticFeedback.mediumImpact();
+    if (_vibrationEnabled) {
+      HapticFeedback.mediumImpact();
+    }
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _tasbihCount = 0);
+    setState(() {
+      _tasbihCount = 0;
+      _completedRounds = 0;
+    });
     await prefs.setInt('tasbih_current', 0);
+    await prefs.setInt('tasbih_rounds', 0);
+  }
+
+  void _openAddCustomPhraseDialog() {
+    final textController = TextEditingController();
+    int selectedTarget = 33;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: ThalabTheme.cardSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'إضافة ذِكر أو ورد خاص للسبحة',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: textController,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'اكتب الذكر هنا (مثال: رَبِّ اغْفِرْ لِي وَتُبْ عَلَيَّ)...',
+                  filled: true,
+                  fillColor: ThalabTheme.creamBackground,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'الهدف المطلوب للحلقة:',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: _presetTargets.map((t) {
+                  final active = selectedTarget == t;
+                  return ChoiceChip(
+                    label: Text('$t'),
+                    selected: active,
+                    selectedColor: ThalabTheme.foxOrange,
+                    labelStyle: TextStyle(
+                      color: active ? Colors.white : ThalabTheme.darkSlate,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSelected: (_) => setSheetState(() => selectedTarget = t),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ThalabTheme.foxOrange,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                onPressed: () async {
+                  final txt = textController.text.trim();
+                  if (txt.isEmpty) return;
+                  final prefs = await SharedPreferences.getInstance();
+                  setState(() {
+                    _customPhrases.add({'text': txt, 'target': selectedTarget});
+                    _selectedPhraseIndex = _allPhrases.length - 1;
+                    _tasbihTarget = selectedTarget;
+                    _tasbihCount = 0;
+                    _completedRounds = 0;
+                  });
+                  final encoded = _customPhrases
+                      .map((e) => '${e['text']}::${e['target']}')
+                      .toList();
+                  await prefs.setStringList('tasbih_custom_phrases', encoded);
+                  await prefs.setInt('tasbih_phrase_idx', _selectedPhraseIndex);
+                  await prefs.setInt('tasbih_custom_target', _tasbihTarget);
+                  await prefs.setInt('tasbih_current', 0);
+                  await prefs.setInt('tasbih_rounds', 0);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                child: const Text('حفظ وبدء التسبيح', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openTargetSelectorSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ThalabTheme.cardSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'تحديد عدد حبات الحلقة (الهدف)',
+              style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _presetTargets.map((target) {
+                final isSelected = _tasbihTarget == target;
+                return ChoiceChip(
+                  label: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    child: Text(
+                      '$target تسبيحة',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.white : ThalabTheme.darkSlate,
+                      ),
+                    ),
+                  ),
+                  selected: isSelected,
+                  selectedColor: ThalabTheme.foxOrange,
+                  backgroundColor: ThalabTheme.creamBackground,
+                  onSelected: (_) async {
+                    final prefs = await SharedPreferences.getInstance();
+                    setState(() => _tasbihTarget = target);
+                    await prefs.setInt('tasbih_custom_target', target);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentPhrase = _tasbihPhrases[_selectedPhraseIndex]['text'] as String;
-    final progress = (_tasbihCount / _tasbihTarget).clamp(0.0, 1.0);
+    final phrases = _allPhrases;
+    final currentPhrase = phrases[_selectedPhraseIndex]['text'] as String;
+    final roundProgressCount = _tasbihCount % _tasbihTarget;
+    final displayInRound =
+        (_tasbihCount > 0 && roundProgressCount == 0) ? _tasbihTarget : roundProgressCount;
+    final progress = (displayInRound / _tasbihTarget).clamp(0.0, 1.0);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('السبحة الذكية'),
+        title: const Text('السبحة الإلكترونية'),
+        actions: [
+          IconButton(
+            tooltip: _vibrationEnabled ? 'إيقاف الاهتزاز' : 'تفعيل الاهتزاز',
+            icon: Icon(
+              _vibrationEnabled ? Icons.vibration_rounded : Icons.smartphone_rounded,
+              color: _vibrationEnabled ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+            ),
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              setState(() => _vibrationEnabled = !_vibrationEnabled);
+              await prefs.setBool('tasbih_vibration', _vibrationEnabled);
+            },
+          ),
+          IconButton(
+            tooltip: 'إضافة ذكر مخصص',
+            icon: const Icon(Icons.add_circle_outline_rounded, color: ThalabTheme.foxOrange),
+            onPressed: _openAddCustomPhraseDialog,
+          ),
+        ],
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
         child: Column(
           children: [
+            // شريط اختيار الذكر
             SizedBox(
               height: 44,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: _tasbihPhrases.length,
+                itemCount: phrases.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, idx) {
                   final selected = _selectedPhraseIndex == idx;
                   return ChoiceChip(
                     label: Text(
-                      _tasbihPhrases[idx]['text'] as String,
+                      phrases[idx]['text'] as String,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -99,28 +336,47 @@ class _TasbihScreenState extends State<TasbihScreen> {
                     selected: selected,
                     selectedColor: ThalabTheme.foxOrange,
                     backgroundColor: ThalabTheme.cardSurface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      side: BorderSide(
+                        color: selected ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                      ),
+                    ),
                     onSelected: (_) async {
                       final prefs = await SharedPreferences.getInstance();
+                      final newTarget = phrases[idx]['target'] as int;
                       setState(() {
                         _selectedPhraseIndex = idx;
-                        _tasbihTarget = _tasbihPhrases[idx]['target'] as int;
+                        _tasbihTarget = newTarget;
                         _tasbihCount = 0;
+                        _completedRounds = 0;
                       });
                       await prefs.setInt('tasbih_phrase_idx', idx);
+                      await prefs.setInt('tasbih_custom_target', newTarget);
                       await prefs.setInt('tasbih_current', 0);
+                      await prefs.setInt('tasbih_rounds', 0);
                     },
                   );
                 },
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
+            // بطاقة الذكر والإحصائيات
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 color: ThalabTheme.cardSurface,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(color: ThalabTheme.softBorder, width: 1.3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
@@ -128,51 +384,172 @@ class _TasbihScreenState extends State<TasbihScreen> {
                     currentPhrase,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.amiri(
-                      fontSize: 24,
+                      fontSize: 23,
                       fontWeight: FontWeight.bold,
-                      height: 1.8,
+                      height: 1.75,
                       color: ThalabTheme.darkSlate,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'الهدف: $_tasbihTarget • إجمالي تسبيحاتك: $_totalLifetimeTasbih',
-                    style: const TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _StatBadge(
+                        label: 'الدورات',
+                        value: '$_completedRounds',
+                      ),
+                      InkWell(
+                        onTap: _openTargetSelectorSheet,
+                        borderRadius: BorderRadius.circular(12),
+                        child: _StatBadge(
+                          label: 'الهدف (اضغط)',
+                          value: '$displayInRound / $_tasbihTarget',
+                          highlight: true,
+                        ),
+                      ),
+                      _StatBadge(
+                        label: 'الإجمالي العام',
+                        value: '$_totalLifetimeTasbih',
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
+
+            const SizedBox(height: 12),
+
+            // مبدّل نمط السبحة (سبحة الخرز الدائرية / خاتم التسبيح الرقمي)
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: ThalabTheme.cardSurface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: ThalabTheme.softBorder),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _StyleToggleBtn(
+                      title: 'سبحة الخرز التفاعلية',
+                      icon: Icons.blur_circular_rounded,
+                      selected: _selectedStyleIndex == 0,
+                      onTap: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        setState(() => _selectedStyleIndex = 0);
+                        await prefs.setInt('tasbih_style_idx', 0);
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: _StyleToggleBtn(
+                      title: 'خاتم التسبيح الرقمي',
+                      icon: Icons.watch_rounded,
+                      selected: _selectedStyleIndex == 1,
+                      onTap: () async {
+                        final prefs = await SharedPreferences.getInstance();
+                        setState(() => _selectedStyleIndex = 1);
+                        await prefs.setInt('tasbih_style_idx', 1);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             const Spacer(),
-            GestureDetector(
-              onTap: _incrementTasbih,
+
+            // جسم السبحة التفاعلية
+            if (_selectedStyleIndex == 0)
+              _buildBeadedRosaryWidget(progress, displayInRound)
+            else
+              _buildDigitalRingCounterWidget(progress),
+
+            const Spacer(),
+
+            // شريط التحكم السفلي (تصفير العداد + تغيير الهدف)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ThalabTheme.foxOrange,
+                    side: const BorderSide(color: ThalabTheme.foxOrange),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: _resetTasbih,
+                  icon: const Icon(Icons.refresh_rounded, size: 19),
+                  label: const Text('تصفير العداد', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ThalabTheme.darkSlate,
+                    side: const BorderSide(color: ThalabTheme.softBorder),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: _openTargetSelectorSheet,
+                  icon: const Icon(Icons.flag_rounded, size: 19, color: ThalabTheme.foxOrange),
+                  label: Text('الهدف: $_tasbihTarget',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// التصميم الأول: سبحة خرزية دائرية تتحرك خرزاتها مع كل ضغطة
+  Widget _buildBeadedRosaryWidget(double progress, int displayInRound) {
+    return GestureDetector(
+      onTap: _incrementTasbih,
+      child: AnimatedBuilder(
+        animation: _beadAnimController,
+        builder: (context, child) {
+          final bounce = 1.0 - (math.sin(_beadAnimController.value * math.pi) * 0.045);
+          return Transform.scale(
+            scale: bounce,
+            child: SizedBox(
+              width: 268,
+              height: 268,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  SizedBox(
-                    width: 220,
-                    height: 220,
-                    child: CircularProgressIndicator(
-                      value: progress,
-                      strokeWidth: 10,
-                      backgroundColor: ThalabTheme.softBorder,
-                      valueColor: const AlwaysStoppedAnimation(ThalabTheme.foxOrange),
+                  // حلقة الخرز المرسومة حول المحيط
+                  CustomPaint(
+                    size: const Size(268, 268),
+                    painter: _TasbihBeadsPainter(
+                      totalBeads: 33,
+                      activeCount: _tasbihCount,
+                      animPhase: _beadAnimController.value,
+                      primaryColor: ThalabTheme.foxOrange,
+                      secondaryColor: const Color(0xFFD97724),
                     ),
                   ),
+                  // القلب المركزي للسبحة
                   Container(
-                    width: 190,
-                    height: 190,
+                    width: 178,
+                    height: 178,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(
-                        colors: [ThalabTheme.foxOrange, ThalabTheme.foxOrangeLight],
+                        colors: [Color(0xFF2B231D), Color(0xFF4A3728)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
+                      border: Border.all(
+                        color: const Color(0xFFD4AF37),
+                        width: 2.5,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: ThalabTheme.foxOrange.withOpacity(0.35),
+                          color: ThalabTheme.foxOrange.withOpacity(0.28),
                           blurRadius: 22,
-                          offset: const Offset(0, 10),
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
@@ -182,14 +559,32 @@ class _TasbihScreenState extends State<TasbihScreen> {
                         Text(
                           '$_tasbihCount',
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 50,
+                            color: Color(0xFFFFE6B8),
+                            fontSize: 48,
                             fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
                           ),
                         ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$displayInRound / $_tasbihTarget',
+                            style: const TextStyle(
+                              color: Color(0xFFD4AF37),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
                         const Text(
-                          'اضغط للتسبيح',
-                          style: TextStyle(color: Colors.white70, fontSize: 13.5),
+                          'المس للتسبيح',
+                          style: TextStyle(color: Colors.white70, fontSize: 11.5),
                         ),
                       ],
                     ),
@@ -197,21 +592,293 @@ class _TasbihScreenState extends State<TasbihScreen> {
                 ],
               ),
             ),
-            const Spacer(),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: ThalabTheme.foxOrange,
-                side: const BorderSide(color: ThalabTheme.foxOrange),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          );
+        },
+      ),
+    );
+  }
+
+  /// التصميم الثاني: خاتم التسبيح الرقمي بشاشة LCD كلاسيكية
+  Widget _buildDigitalRingCounterWidget(double progress) {
+    return GestureDetector(
+      onTap: _incrementTasbih,
+      child: AnimatedBuilder(
+        animation: _beadAnimController,
+        builder: (context, _) {
+          final pressScale = 1.0 - (math.sin(_beadAnimController.value * math.pi) * 0.04);
+          return Transform.scale(
+            scale: pressScale,
+            child: Container(
+              width: 235,
+              height: 265,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1F242D), Color(0xFF323946)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(48),
+                border: Border.all(color: ThalabTheme.foxOrange, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.22),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-              onPressed: _resetTasbih,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('تصفير العداد الحالي', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // شاشة العرض الرقمية LCD
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF9EB398),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFF5A6956), width: 2.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'ROUND $_completedRounds',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E291C),
+                              ),
+                            ),
+                            Text(
+                              'TARGET $_tasbihTarget',
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E291C),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _tasbihCount.toString().padLeft(5, '0'),
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 38,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                            color: Color(0xFF141E12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // شريط تقدم الحلقة
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: Colors.white12,
+                      valueColor: const AlwaysStoppedAnimation(ThalabTheme.foxOrange),
+                    ),
+                  ),
+
+                  // زر الضغط الدائري الكبير للخاتم
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [ThalabTheme.foxOrange, ThalabTheme.foxOrangeLight],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      border: Border.all(color: Colors.white24, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: ThalabTheme.foxOrange.withOpacity(0.45),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.fingerprint_rounded,
+                      color: Colors.white,
+                      size: 46,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StatBadge extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool highlight;
+
+  const _StatBadge({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: highlight
+            ? ThalabTheme.foxOrange.withOpacity(0.12)
+            : ThalabTheme.creamBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10.5, color: ThalabTheme.mutedSlate),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.bold,
+              color: highlight ? ThalabTheme.foxOrange : ThalabTheme.darkSlate,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StyleToggleBtn extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _StyleToggleBtn({
+    required this.title,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: selected ? ThalabTheme.foxOrange : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: selected ? Colors.white : ThalabTheme.mutedSlate,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: selected ? Colors.white : ThalabTheme.darkSlate,
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _TasbihBeadsPainter extends CustomPainter {
+  final int totalBeads;
+  final int activeCount;
+  final double animPhase;
+  final Color primaryColor;
+  final Color secondaryColor;
+
+  _TasbihBeadsPainter({
+    required this.totalBeads,
+    required this.activeCount,
+    required this.animPhase,
+    required this.primaryColor,
+    required this.secondaryColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final ringRadius = (size.width / 2) - 18;
+
+    // خيط السبحة الواصل بين الخرزات
+    final stringPaint = Paint()
+      ..color = const Color(0xFFD4AF37).withOpacity(0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2;
+    canvas.drawCircle(center, ringRadius, stringPaint);
+
+    final activeBeadIndex = activeCount % totalBeads;
+    final stepAngle = (2 * math.pi) / totalBeads;
+    final rotationOffset = (activeCount * stepAngle) + (animPhase * stepAngle * 0.35);
+
+    for (int i = 0; i < totalBeads; i++) {
+      final angle = -math.pi / 2 + (i * stepAngle) + rotationOffset;
+      final bx = center.dx + math.cos(angle) * ringRadius;
+      final by = center.dy + math.sin(angle) * ringRadius;
+      final beadCenter = Offset(bx, by);
+
+      final isDivider = i % 11 == 0; // الفواصل الذهبية كل 11 خرزة
+      final isHighlighted = i == (activeBeadIndex % totalBeads);
+      final beadRadius = isDivider ? 8.5 : (isHighlighted ? 8.0 : 6.4);
+
+      final beadPaint = Paint()
+        ..shader = RadialGradient(
+          colors: isDivider
+              ? [const Color(0xFFFFE082), const Color(0xFFB8860B)]
+              : isHighlighted
+                  ? [Colors.white, primaryColor]
+                  : [primaryColor, secondaryColor],
+          center: const Alignment(-0.35, -0.35),
+        ).createShader(Rect.fromCircle(center: beadCenter, radius: beadRadius));
+
+      canvas.drawCircle(beadCenter, beadRadius, beadPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TasbihBeadsPainter oldDelegate) =>
+      oldDelegate.activeCount != activeCount || oldDelegate.animPhase != animPhase;
 }
