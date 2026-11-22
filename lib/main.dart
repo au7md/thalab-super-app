@@ -16,16 +16,24 @@ import 'features/rafiq/hijri_events_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await StorageService.init();
-  final prefs = await SharedPreferences.getInstance();
-  final lat = prefs.getDouble('prayer_lat') ?? 30.0444;
-  final lng = prefs.getDouble('prayer_lng') ?? 31.2357;
-  await RafiqNotificationsService.syncAllScheduledNotifications(
-    lat: lat,
-    lng: lng,
-    params: CalculationMethod.egyptian.getParameters(),
-  );
+  try {
+    await StorageService.init();
+  } catch (_) {}
+
   runApp(const ThalabApp());
+
+  Future.microtask(() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lat = prefs.getDouble('prayer_lat') ?? 30.0444;
+      final lng = prefs.getDouble('prayer_lng') ?? 31.2357;
+      await RafiqNotificationsService.syncAllScheduledNotifications(
+        lat: lat,
+        lng: lng,
+        params: CalculationMethod.egyptian.getParameters(),
+      );
+    } catch (_) {}
+  });
 }
 
 class ThalabApp extends StatelessWidget {
@@ -543,11 +551,95 @@ class _RafiqTabState extends State<RafiqTab> {
                     ],
                   ),
                 ),
+                const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: ThalabTheme.foxOrange),
               ],
             ),
           ),
         ),
+        const SizedBox(height: 16),
+
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 14,
+          crossAxisSpacing: 14,
+          childAspectRatio: 1.18,
+          children: [
+            _RafiqServiceCard(
+              title: 'المصحف الشريف',
+              subtitle: 'مصور ونصي + ختمة ومشاركة',
+              icon: Icons.menu_book_rounded,
+              onTap: () => _open(const QuranScreen()),
+            ),
+            _RafiqServiceCard(
+              title: 'الأذكار الكاملة',
+              subtitle: 'انتقال تلقائي + حصن المسلم',
+              icon: Icons.auto_stories_rounded,
+              onTap: () => _open(const AdhkarScreen()),
+            ),
+            _RafiqServiceCard(
+              title: 'السبحة الذكية',
+              subtitle: '33 / 100 تصفير تلقائي',
+              icon: Icons.radio_button_checked_rounded,
+              onTap: () => _open(const TasbihScreen()),
+            ),
+            _RafiqServiceCard(
+              title: 'اتجاه القبلة',
+              subtitle: 'بوصلة هندسية إسلامية',
+              icon: Icons.explore_rounded,
+              onTap: () => _open(const QiblaScreen()),
+            ),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+class _RafiqServiceCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _RafiqServiceCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: ThalabTheme.cardSurface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: ThalabTheme.foxOrange.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: ThalabTheme.foxOrange, size: 26),
+            ),
+            const Spacer(),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            Text(subtitle, style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -571,20 +663,48 @@ class MediaTab extends StatelessWidget {
 class MusicTab extends StatelessWidget {
   const MusicTab({super.key});
   @override
-  Widget build(BuildContext context) => const Center(child: Text('الموسيقى'));
+  Widget build(BuildContext context) => _SectionGridTemplate(
+        title: 'الموسيقى والصوتيات',
+        items: [
+          _GridToolItem('كل الصوتيات', Icons.library_music_rounded, null),
+          _GridToolItem('قوائم التشغيل', Icons.queue_music_rounded, null),
+          _GridToolItem('مسجل الصوت', Icons.mic_rounded, null),
+          _GridToolItem('وضع الاسترخاء', Icons.spa_rounded, null),
+        ],
+      );
 }
 
 // 5. تبويب المزيد
 class MoreToolsTab extends StatelessWidget {
   const MoreToolsTab({super.key});
   @override
-  Widget build(BuildContext context) => const Center(child: Text('المزيد'));
+  Widget build(BuildContext context) => _SectionGridTemplate(
+        title: 'المزيد من الأدوات',
+        items: [
+          _GridToolItem('مدير الملفات', Icons.folder_rounded, null),
+          _GridToolItem('التنظيف الذكي', Icons.cleaning_services_rounded, null),
+          _GridToolItem('صور إلى PDF', Icons.picture_as_pdf_rounded, null),
+          _GridToolItem('الخزنة السرية', Icons.lock_rounded, null),
+          _GridToolItem('الآلة الحاسبة', Icons.calculate_rounded, null),
+          _GridToolItem('سلة المحذوفات', Icons.delete_outline_rounded, null),
+          _GridToolItem('الإعدادات', Icons.settings_rounded, null),
+          _GridToolItem('حول التطبيق', Icons.info_outline_rounded, null),
+        ],
+      );
 }
 
-// قالب الشبكة
+class _GridToolItem {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  _GridToolItem(this.label, this.icon, this.onTap);
+}
+
 class _SectionGridTemplate extends StatelessWidget {
   final String title;
   final List<_GridToolItem> items;
+
   const _SectionGridTemplate({required this.title, required this.items});
 
   @override
@@ -593,32 +713,64 @@ class _SectionGridTemplate extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
       children: [
         Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 14),
-        GridView.count(
+        const SizedBox(height: 18),
+        GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.45,
-          children: [
-            for (final item in items)
-              _QuickCard(
-                title: item.title,
-                subtitle: 'اضغط للفتح',
-                icon: item.icon,
-                onTap: () {},
+          itemCount: items.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 0.90,
+          ),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: item.onTap ??
+                  () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('قسم "${item.label}" جاهز للدمج في الدفعة القادمة'),
+                        duration: const Duration(seconds: 1),
+                        backgroundColor: ThalabTheme.darkSlate,
+                      ),
+                    );
+                  },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  color: ThalabTheme.cardSurface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: ThalabTheme.foxOrange.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(item.icon, color: ThalabTheme.foxOrange, size: 28),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      item.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
               ),
-          ],
+            );
+          },
         ),
       ],
     );
   }
-}
-
-class _GridToolItem {
-  final String title;
-  final IconData icon;
-  final VoidCallback? onTap;
-  const _GridToolItem(this.title, this.icon, this.onTap);
 }
