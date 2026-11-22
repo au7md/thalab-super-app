@@ -1,5 +1,5 @@
 name: al_thaalab
-description: تطبيق الثعلب - تجربة متكاملة للوسائط والموسيقى.
+description: تطبيق الثعلب - منظومة متكاملة تشمل الواحة الإيمانية (رفيق) وميزات الترفيه والتنظيم.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,21 +9,31 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # إدارة الحالة والتنقل
-  provider: ^6.1.1
-  # أيقونات عصرية وتصميم هادئ
-  cupertino_icons: ^1.0.6
-  google_fonts: ^6.1.0
-  # تشغيل الصوتيات والفيديو
-  just_audio: ^0.9.36
-  video_player: ^2.8.2
-  # الإشعارات المحلية
-  flutter_local_notifications: ^16.3.2
+  flutter_localizations:
+    sdk: flutter
+
+  # الواجهة والأيقونات والخطوط
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+
+  # حسابات المواقيت والتقويم الهجري والموقع
+  adhan: ^2.0.0+1
+  hijri: ^3.0.0
+  geolocator: ^13.0.1
+  intl: ^0.19.0
+
+  # الإشعارات والجدولة والمنطقة الزمنية
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+  flutter_timezone: ^3.0.1
+
+  # التخزين المحلي والحالة
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.1
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
