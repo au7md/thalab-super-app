@@ -1,28 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/rafiq_notifications_service.dart';
 import 'features/rafiq/hijri_events_screen.dart';
 import 'features/rafiq/prayer_times_screen.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await RafiqNotificationsService.instance.init();
-  await RafiqNotificationsService.instance.scheduleDailyAzkar(
-    id: 201,
-    title: 'أذكار الصباح',
-    body: 'حصّن يومك بذكر الله — افتح واحة رفيق',
-    hour: 6,
-    minute: 30,
-  );
-  await RafiqNotificationsService.instance.scheduleDailyAzkar(
-    id: 202,
-    title: 'أذكار المساء',
-    body: 'موعد أذكار المساء وطمأنينة القلب',
-    hour: 17,
-    minute: 30,
-  );
   runApp(const AlThaalabApp());
 }
 
@@ -45,7 +29,6 @@ class AlThaalabApp extends StatelessWidget {
         useMaterial3: true,
         colorSchemeSeed: const Color(0xFF1E6F5C),
         brightness: Brightness.dark,
-        textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
       ),
       home: const MainShellScreen(),
     );
@@ -61,6 +44,32 @@ class MainShellScreen extends StatefulWidget {
 
 class _MainShellScreenState extends State<MainShellScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initNotificationsSafely();
+    });
+  }
+
+  Future<void> _initNotificationsSafely() async {
+    await RafiqNotificationsService.instance.init();
+    await RafiqNotificationsService.instance.scheduleDailyAzkar(
+      id: 201,
+      title: 'أذكار الصباح',
+      body: 'حصّن يومك بذكر الله — افتح واحة رفيق',
+      hour: 6,
+      minute: 30,
+    );
+    await RafiqNotificationsService.instance.scheduleDailyAzkar(
+      id: 202,
+      title: 'أذكار المساء',
+      body: 'موعد أذكار المساء وطمأنينة القلب',
+      hour: 17,
+      minute: 30,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
