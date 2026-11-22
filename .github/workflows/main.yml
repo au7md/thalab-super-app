@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'رقم الإصدار (مثال: v1.2.0)'
+        description: 'رقم الإصدار (مثال: v1.3.0)'
         required: true
-        default: 'v1.2.0'
+        default: 'v1.3.0'
 
 jobs:
   build:
@@ -30,12 +30,22 @@ jobs:
       - name: Initialize Android & Permissions
         run: |
           flutter create --platforms=android --org com.au7md --project-name thalab_app .
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
           sed -i 's/compileOptions {/compileOptions {\n        isCoreLibraryDesugaringEnabled = true/' android/app/build.gradle.kts
           cat << 'EOF' >> android/app/build.gradle.kts
 
           dependencies {
               coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+          }
+          EOF
+          cat << 'EOF' >> android/build.gradle.kts
+
+          subprojects {
+              afterEvaluate {
+                  extensions.findByType(com.android.build.gradle.BaseExtension::class.java)?.apply {
+                      compileSdkVersion(35)
+                  }
+              }
           }
           EOF
           flutter pub get
