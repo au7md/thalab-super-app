@@ -1,3 +1,5 @@
+// lib/features/more/more_hub_screen.dart
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -5,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme.dart';
+import 'pro_tools_screens.dart';
 
 class MoreHubScreen extends StatefulWidget {
   const MoreHubScreen({super.key});
@@ -323,6 +326,66 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 icon: Icons.share_rounded,
                 onTap: () => Share.share(
                   'تطبيق الثعلب المتكامل — أوقات الصلاة، القرآن، الاستوديو، والأدوات الذكية.\nتطوير: أحمد تعلب (@au7md)',
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 22),
+          const _SectionHeader(
+              title: 'الأدوات الذكية والحاسبات', icon: Icons.calculate_rounded),
+          const SizedBox(height: 10),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.45,
+            children: [
+              _ToolGridCard(
+                title: 'حاسبة الزكاة',
+                subtitle: 'حساب النصاب والزكاة',
+                icon: Icons.mosque_rounded,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ZakatCalculatorScreen()),
+                ),
+              ),
+              _ToolGridCard(
+                title: 'محول الوحدات',
+                subtitle: 'طول، وزن، مساحة، حرارة',
+                icon: Icons.swap_horiz_rounded,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UnitConverterScreen()),
+                ),
+              ),
+              _ToolGridCard(
+                title: 'حاسبة العمر',
+                subtitle: 'بالسنة والشهر واليوم',
+                icon: Icons.cake_rounded,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AgeCalculatorScreen()),
+                ),
+              ),
+              _ToolGridCard(
+                title: 'مولد كلمات المرور',
+                subtitle: 'تشفير وأمان عالي',
+                icon: Icons.password_rounded,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PasswordGeneratorScreen()),
+                ),
+              ),
+              _ToolGridCard(
+                title: 'محلل النصوص',
+                subtitle: 'كلمات، أحرف، وقت قراءة',
+                icon: Icons.text_fields_rounded,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TextAnalyzerScreen()),
                 ),
               ),
             ],
@@ -654,7 +717,7 @@ class _HabitTrackerScreen extends StatefulWidget {
 }
 
 class _HabitTrackerScreenState extends State<_HabitTrackerScreen> {
-  List> _habits = [];
+  List<Map<String, dynamic>> _habits = [];
   final TextEditingController _ctrl = TextEditingController();
 
   @override
@@ -667,7 +730,8 @@ class _HabitTrackerScreenState extends State<_HabitTrackerScreen> {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('thalab_habits_json');
     if (raw != null && raw.isNotEmpty) {
-      setState(() => _habits = List>.from(jsonDecode(raw)));
+      setState(() =>
+          _habits = List<Map<String, dynamic>>.from(jsonDecode(raw)));
     } else {
       _habits = [
         {'title': 'أذكار الصباح والمساء', 'done': false},
