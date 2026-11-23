@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
@@ -159,18 +158,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
         _position = Duration(milliseconds: lastPosMs);
       });
       try {
-        await _player.setAudioSource(
-          AudioSource.file(
-            track.path,
-            tag: MediaItem(
-              id: track.id,
-              album: track.folder,
-              title: track.title,
-              artist: track.subtitle,
-            ),
-          ),
-          initialPosition: Duration(milliseconds: lastPosMs),
-        );
+        await _player.setFilePath(track.path);
+        await _player.seek(Duration(milliseconds: lastPosMs));
       } catch (_) {}
     }
   }
@@ -332,17 +321,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     final track = _allTracks[indexInAll];
     try {
       setState(() => _currentIndex = indexInAll);
-      await _player.setAudioSource(
-        AudioSource.file(
-          track.path,
-          tag: MediaItem(
-            id: track.id,
-            album: track.folder,
-            title: track.title,
-            artist: track.subtitle,
-          ),
-        ),
-      );
+      await _player.setFilePath(track.path);
       await _player.setSpeed(_playbackSpeed);
       await _player.play();
       _savePlaybackCheckpoint();
