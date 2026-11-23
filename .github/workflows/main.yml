@@ -74,7 +74,7 @@ jobs:
           import androidx.core.app.ActivityCompat
           import androidx.core.app.NotificationCompat
           import androidx.core.content.ContextCompat
-          import com.ryanheise.audioservice.AudioServiceActivity
+          import io.flutter.embedding.android.FlutterActivity
           import io.flutter.embedding.engine.FlutterEngine
           import io.flutter.plugin.common.MethodChannel
           import java.io.File
@@ -83,7 +83,7 @@ jobs:
           import java.util.ArrayList
           import java.util.HashMap
 
-          class MainActivity : AudioServiceActivity() {
+          class MainActivity : FlutterActivity() {
               private var mediaRecorder: MediaRecorder? = null
               private var currentRecordPath: String? = null
               private var currentRecordTitle: String? = null
