@@ -93,6 +93,18 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
       vsync: this,
       duration: const Duration(seconds: 14),
     );
+    _studioChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onMediaAction') {
+        final action = call.arguments?.toString() ?? '';
+        if (action == 'play_pause') {
+          _isPlaying ? _player.pause() : _player.play();
+        } else if (action == 'next') {
+          _playNext();
+        } else if (action == 'prev') {
+          _playPrevious();
+        }
+      }
+    });
     _bindPlayerStreams();
     _loadAudioLibrary(restoreLastSession: true);
   }
@@ -107,6 +119,14 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
       } else {
         _discController.stop();
         _savePlaybackCheckpoint();
+      }
+      if (_currentIndex >= 0 && _currentIndex < _allTracks.length) {
+        final track = _allTracks[_currentIndex];
+        _studioChannel.invokeMethod('updateMediaNotification', {
+          'title': track.title,
+          'subtitle': track.subtitle,
+          'isPlaying': playing,
+        });
       }
       if (state.processingState == ProcessingState.completed) {
         _handleTrackCompleted();
@@ -2256,7 +2276,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
 }
 
 // =========================================================================
-// استوديو قص وتحرير الصوتيات المُعاد هيكلته (ضبط دقيق بالثانية + معاينة + حفظ في Music)
+// استوديو قص وتحرير الصوتيات (الموجة الصوتية + Trim / Remove + تقديم/تأخير 3 ثوانٍ)
 // =========================================================================
 class AudioTrimmerStudioScreen extends StatefulWidget {
   final String filePath;
@@ -2280,16 +2300,20 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
   bool _isReady = false;
   bool _isPlaying = false;
   bool _isProcessing = false;
-  String _editMode = 'keep'; // 'keep' = قص الأطراف, 'cut' = حذف المقطع المحدد من المنتصف
+  String _editMode = 'keep'; // 'keep' = Trim (إبقاء المحدد), 'cut' = Remove (حذف المحدد)
 
   double _totalSec = 10.0;
   double _startSec = 0.0;
   double _endSec = 10.0;
   double _currentSec = 0.0;
 
+  late final List<double> _waveHeights;
+
   @override
   void initState() {
     super.initState();
+    final rng = math.Random(widget.initialTitle.hashCode);
+    _waveHeights = List<double>.generate(48, (_) => 0.2 + rng.nextDouble() * 0.8);
     _initAudio();
   }
 
@@ -2325,11 +2349,11 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
     super.dispose();
   }
 
-  String _fmt(double s) {
+  String _fmtPrecise(double s) {
     final m = (s ~/ 60).toString().padLeft(2, '0');
     final rem = (s.toInt() % 60).toString().padLeft(2, '0');
-    final tenth = ((s * 10).toInt() % 10);
-    return '$m:$rem.$tenth';
+    final hundredths = ((s * 100).toInt() % 100).toString().padLeft(2, '0');
+    return '$m:$rem.$hundredths';
   }
 
   Future<void> _applyAudioEdit({required bool overwriteOriginal}) async {
@@ -2375,8 +2399,8 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
             SnackBar(
               content: Text(
                 _editMode == 'keep'
-                    ? 'تم قص أطراف الصوت وحفظه في مجلد Music بنجاح ✓'
-                    : 'تم حذف المقطع المحدد ودمج الصوت بنجاح ✓',
+                    ? 'تم قص الصوت وحفظه في مجلد Music/Thalab Recordings ✓'
+                    : 'تم حذف الجزء المحدد ودمج الصوت بنجاح ✓',
               ),
             ),
           );
@@ -2396,221 +2420,222 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedDuration = (_endSec - _startSec).clamp(0.0, _totalSec);
-    final resultDuration =
-        _editMode == 'keep' ? selectedDuration : (_totalSec - selectedDuration);
+    final progressRatio = (_currentSec / _totalSec).clamp(0.0, 1.0);
+    final startRatio = (_startSec / _totalSec).clamp(0.0, 1.0);
+    final endRatio = (_endSec / _totalSec).clamp(0.0, 1.0);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('استوديو قص وتحرير الصوت')),
+      appBar: AppBar(
+        leading: TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('إلغاء',
+              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+        ),
+        leadingWidth: 70,
+        title: const Text('تحرير وقص الصوت'),
+        actions: [
+          TextButton(
+            onPressed: _isProcessing ? null : () => _applyAudioEdit(overwriteOriginal: false),
+            child: const Text('حفظ',
+                style: TextStyle(
+                    color: ThalabTheme.foxOrange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15)),
+          ),
+        ],
+      ),
       body: !_isReady
           ? const Center(child: CircularProgressIndicator(color: ThalabTheme.foxOrange))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // بطاقة معلومات الملف والوضع
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: ThalabTheme.cardSurface,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: ThalabTheme.softBorder),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: ThalabTheme.foxOrange.withOpacity(0.14),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Icon(Icons.graphic_eq_rounded,
-                                  color: ThalabTheme.foxOrange),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.initialTitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold, fontSize: 15),
-                                  ),
-                                  Text(
-                                    'المدة الأصلية: ${_fmt(_totalSec)}  •  الناتج: ${_fmt(resultDuration)}',
-                                    style: const TextStyle(
-                                        color: ThalabTheme.mutedSlate, fontSize: 11.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // اختيار العملية (قص الأطراف / حذف مقطع من المنتصف)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _EditModeTile(
-                                title: 'قص الأطراف',
-                                subtitle: 'إبقاء المحدد فقط',
-                                icon: Icons.content_cut_rounded,
-                                selected: _editMode == 'keep',
-                                activeColor: ThalabTheme.foxOrange,
-                                onTap: () => setState(() => _editMode = 'keep'),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _EditModeTile(
-                                title: 'حذف من المنتصف',
-                                subtitle: 'إزالة المقطع المحدد',
-                                icon: Icons.delete_sweep_rounded,
-                                selected: _editMode == 'cut',
-                                activeColor: Colors.redAccent,
-                                onTap: () => setState(() => _editMode = 'cut'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+          : Column(
+              children: [
+                const SizedBox(height: 12),
+                // منطقة الموجة الصوتية التفاعلية مع مؤشر التشغيل الأحمر
+                Container(
+                  height: 170,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.darkSlate,
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  const SizedBox(height: 16),
-
-                  // شريط التحديد المرئي
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: ThalabTheme.cardSurface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: ThalabTheme.softBorder),
-                    ),
-                    child: Column(
-                      children: [
-                        RangeSlider(
-                          values: RangeValues(_startSec, _endSec),
-                          min: 0.0,
-                          max: _totalSec,
-                          activeColor: _editMode == 'cut' ? Colors.redAccent : ThalabTheme.foxOrange,
-                          labels: RangeLabels(_fmt(_startSec), _fmt(_endSec)),
-                          onChanged: (val) {
-                            setState(() {
-                              _startSec = val.start;
-                              _endSec = val.end;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(_fmt(0), style: const TextStyle(fontSize: 11)),
-                            Text(_fmt(_totalSec), style: const TextStyle(fontSize: 11)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // أدوات الضبط الدقيق (±0.1 ثانية)
-                  Row(
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      Expanded(
-                        child: _FineTuneTimeBox(
-                          label: 'بداية المقطع',
-                          timeText: _fmt(_startSec),
-                          onMinus: () => setState(() => _startSec = (_startSec - 0.1).clamp(0.0, _endSec - 0.1)),
-                          onPlus: () => setState(() => _startSec = (_startSec + 0.1).clamp(0.0, _endSec - 0.1)),
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: List.generate(_waveHeights.length, (i) {
+                          final barRatio = i / _waveHeights.length;
+                          final inRange = barRatio >= startRatio && barRatio <= endRatio;
+                          final barColor = inRange
+                              ? (_editMode == 'keep'
+                                  ? ThalabTheme.foxOrange
+                                  : Colors.redAccent)
+                              : Colors.white24;
+                          return Container(
+                            width: 3.5,
+                            height: 110 * _waveHeights[i],
+                            decoration: BoxDecoration(
+                              color: barColor,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        }),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _FineTuneTimeBox(
-                          label: 'نهاية المقطع',
-                          timeText: _fmt(_endSec),
-                          onMinus: () => setState(() => _endSec = (_endSec - 0.1).clamp(_startSec + 0.1, _totalSec)),
-                          onPlus: () => setState(() => _endSec = (_endSec + 0.1).clamp(_startSec + 0.1, _totalSec)),
+                      Align(
+                        alignment: Alignment(-1.0 + (progressRatio * 2.0), 0),
+                        child: Container(
+                          width: 2.5,
+                          height: 140,
+                          color: Colors.redAccent,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
+                ),
+                const SizedBox(height: 22),
 
-                  // أزرار المعاينة والحفظ
-                  Row(
+                // العداد الزمني الدقيق واسم الملف
+                Text(
+                  _fmtPrecise(_currentSec),
+                  style: const TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    widget.initialTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: ThalabTheme.mutedSlate,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const Spacer(),
+
+                // شريط التحديد الزمني مع الضبط الدقيق
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
                     children: [
-                      IconButton(
-                        iconSize: 44,
-                        icon: Icon(
-                          _isPlaying
-                              ? Icons.pause_circle_filled_rounded
-                              : Icons.play_circle_filled_rounded,
-                          color: ThalabTheme.foxOrange,
-                        ),
-                        onPressed: () async {
-                          if (_isPlaying) {
-                            await _player.pause();
-                          } else {
-                            await _player.seek(Duration(milliseconds: (_startSec * 1000).toInt()));
-                            await _player.play();
-                          }
+                      RangeSlider(
+                        values: RangeValues(_startSec, _endSec),
+                        min: 0.0,
+                        max: _totalSec,
+                        activeColor: _editMode == 'keep'
+                            ? ThalabTheme.foxOrange
+                            : Colors.redAccent,
+                        onChanged: (vals) {
+                          setState(() {
+                            _startSec = vals.start;
+                            _endSec = vals.end;
+                          });
+                          _player.seek(Duration(milliseconds: (vals.start * 1000).toInt()));
                         },
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _editMode == 'cut' ? Colors.redAccent : ThalabTheme.foxOrange,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(0, 48),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          ),
-                          onPressed: _isProcessing ? null : () => _applyAudioEdit(overwriteOriginal: false),
-                          icon: _isProcessing
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Icon(Icons.save_as_rounded),
-                          label: Text(_isProcessing ? 'جارٍ المعالجة…' : 'حفظ كملف جديد'),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('البداية: ${_fmtPrecise(_startSec)}',
+                                style: const TextStyle(
+                                    fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+                            Text('النهاية: ${_fmtPrecise(_endSec)}',
+                                style: const TextStyle(
+                                    fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 18),
+
+                // شريط التحكم السفلي: Remove | -3s | Play/Pause | +3s | Trim
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 30),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _StudioBottomAction(
+                        icon: Icons.delete_sweep_rounded,
+                        label: 'Remove',
+                        active: _editMode == 'cut',
+                        activeColor: Colors.redAccent,
+                        onTap: () => setState(() => _editMode = 'cut'),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.replay_5_rounded, size: 30),
+                        onPressed: () {
+                          final t = (_currentSec - 3).clamp(0.0, _totalSec);
+                          _player.seek(Duration(milliseconds: (t * 1000).toInt()));
+                        },
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          if (_isPlaying) {
+                            _player.pause();
+                          } else {
+                            _player.seek(
+                                Duration(milliseconds: (_startSec * 1000).toInt()));
+                            _player.play();
+                          }
+                        },
+                        child: Container(
+                          width: 68,
+                          height: 68,
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 38,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.forward_5_rounded, size: 30),
+                        onPressed: () {
+                          final t = (_currentSec + 3).clamp(0.0, _totalSec);
+                          _player.seek(Duration(milliseconds: (t * 1000).toInt()));
+                        },
+                      ),
+                      _StudioBottomAction(
+                        icon: Icons.content_cut_rounded,
+                        label: 'Trim',
+                        active: _editMode == 'keep',
+                        activeColor: ThalabTheme.foxOrange,
+                        onTap: () => setState(() => _editMode = 'keep'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
     );
   }
 }
 
-// =========================================================================
-// الكلاسات المساعدة (Widgets)
-// =========================================================================
-
-class _EditModeTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
+class _StudioBottomAction extends StatelessWidget {
   final IconData icon;
-  final bool selected;
+  final String label;
+  final bool active;
   final Color activeColor;
   final VoidCallback onTap;
 
-  const _EditModeTile({
-    required this.title,
-    required this.subtitle,
+  const _StudioBottomAction({
     required this.icon,
-    required this.selected,
+    required this.label,
+    required this.active,
     required this.activeColor,
     required this.onTap,
   });
@@ -2618,33 +2643,29 @@ class _EditModeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? activeColor.withOpacity(0.12) : ThalabTheme.creamBackground,
-          borderRadius: BorderRadius.circular(16),
+          color: active ? activeColor.withOpacity(0.14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? activeColor : ThalabTheme.softBorder,
-            width: 1.5,
+            color: active ? activeColor : ThalabTheme.softBorder,
           ),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: selected ? activeColor : ThalabTheme.mutedSlate, size: 22),
-            const SizedBox(height: 4),
+            Icon(icon, color: active ? activeColor : ThalabTheme.mutedSlate, size: 22),
+            const SizedBox(height: 2),
             Text(
-              title,
+              label,
               style: TextStyle(
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
-                fontSize: 12.5,
-                color: selected ? activeColor : ThalabTheme.darkSlate,
+                color: active ? activeColor : ThalabTheme.mutedSlate,
               ),
-            ),
-            Text(
-              subtitle,
-              style: const TextStyle(fontSize: 10.5, color: ThalabTheme.mutedSlate),
             ),
           ],
         ),
@@ -2653,54 +2674,9 @@ class _EditModeTile extends StatelessWidget {
   }
 }
 
-class _FineTuneTimeBox extends StatelessWidget {
-  final String label;
-  final String timeText;
-  final VoidCallback onMinus;
-  final VoidCallback onPlus;
-
-  const _FineTuneTimeBox({
-    required this.label,
-    required this.timeText,
-    required this.onMinus,
-    required this.onPlus,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: ThalabTheme.creamBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ThalabTheme.softBorder),
-      ),
-      child: Column(
-        children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              InkWell(
-                onTap: onMinus,
-                child: const Icon(Icons.remove_circle_outline_rounded,
-                    color: ThalabTheme.foxOrange, size: 22),
-              ),
-              Text(timeText,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              InkWell(
-                onTap: onPlus,
-                child: const Icon(Icons.add_circle_outline_rounded,
-                    color: ThalabTheme.foxOrange, size: 22),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
+// =========================================================================
+// الكلاسات المساعدة (Widgets)
+// =========================================================================
 
 class _TopAudioActionCard extends StatelessWidget {
   final String title;
