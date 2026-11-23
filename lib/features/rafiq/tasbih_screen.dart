@@ -5,6 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
 
+class _TasbihPhraseItem {
+  final String text;
+  final int target;
+
+  const _TasbihPhraseItem({required this.text, required this.target});
+}
+
 class TasbihScreen extends StatefulWidget {
   const TasbihScreen({super.key});
 
@@ -14,31 +21,31 @@ class TasbihScreen extends StatefulWidget {
 
 class _TasbihScreenState extends State<TasbihScreen>
     with SingleTickerProviderStateMixin {
-  int _tasbihCount = 0; // عداد الحلقة الحالية (من 0 إلى _tasbihTarget)
+  int _tasbihCount = 0;
   int _tasbihTarget = 33;
   int _completedRounds = 0;
   int _totalLifetimeTasbih = 0;
   int _selectedPhraseIndex = 0;
-  int _selectedStyleIndex = 0; // 0: سبحة خرزية فاخرة, 1: خاتم التسبيح الرقمي
+  int _selectedStyleIndex = 0;
   bool _vibrationEnabled = true;
 
   late AnimationController _beadAnimController;
-  final List> _customPhrases = [];
+  final List<_TasbihPhraseItem> _customPhrases = [];
 
-  static const List> _defaultPhrases = [
-    {'text': 'سُبْحَانَ اللَّهِ', 'target': 33},
-    {'text': 'الْحَمْدُ لِلَّهِ', 'target': 33},
-    {'text': 'اللَّهُ أَكْبَرُ', 'target': 34},
-    {'text': 'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ', 'target': 100},
-    {'text': 'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ', 'target': 100},
-    {'text': 'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ', 'target': 100},
-    {'text': 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ الْعَظِيمِ', 'target': 100},
-    {'text': 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ', 'target': 100},
+  static const List<_TasbihPhraseItem> _defaultPhrases = [
+    _TasbihPhraseItem(text: 'سُبْحَانَ اللَّهِ', target: 33),
+    _TasbihPhraseItem(text: 'الْحَمْدُ لِلَّهِ', target: 33),
+    _TasbihPhraseItem(text: 'اللَّهُ أَكْبَرُ', target: 34),
+    _TasbihPhraseItem(text: 'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ', target: 100),
+    _TasbihPhraseItem(text: 'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ', target: 100),
+    _TasbihPhraseItem(text: 'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ', target: 100),
+    _TasbihPhraseItem(text: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ الْعَظِيمِ', target: 100),
+    _TasbihPhraseItem(text: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ', target: 100),
   ];
 
   static const List<int> _presetTargets = [33, 34, 99, 100, 500, 1000];
 
-  List> get _allPhrases => [
+  List<_TasbihPhraseItem> get _allPhrases => [
         ..._defaultPhrases,
         ..._customPhrases,
       ];
@@ -62,13 +69,13 @@ class _TasbihScreenState extends State<TasbihScreen>
   Future<void> _loadTasbihData() async {
     final prefs = await SharedPreferences.getInstance();
     final savedCustom = prefs.getStringList('tasbih_custom_phrases') ?? [];
-    final parsedCustom = >[];
+    final List<_TasbihPhraseItem> parsedCustom = [];
     for (final item in savedCustom) {
       final sep = item.lastIndexOf('::');
       if (sep > 0) {
         final txt = item.substring(0, sep);
         final tgt = int.tryParse(item.substring(sep + 2)) ?? 33;
-        parsedCustom.add({'text': txt, 'target': tgt});
+        parsedCustom.add(_TasbihPhraseItem(text: txt, target: tgt));
       }
     }
 
@@ -81,11 +88,10 @@ class _TasbihScreenState extends State<TasbihScreen>
       _selectedPhraseIndex = (prefs.getInt('tasbih_phrase_idx') ?? 0)
           .clamp(0, _allPhrases.length - 1);
       final target = prefs.getInt('tasbih_custom_target') ??
-          (_allPhrases[_selectedPhraseIndex]['target'] as int);
+          _allPhrases[_selectedPhraseIndex].target;
       _tasbihTarget = target > 0 ? target : 33;
 
       final savedCurrent = prefs.getInt('tasbih_current') ?? 0;
-      // ضمان أن العداد المحفوظ لا يتجاوز الهدف عند التحميل
       _tasbihCount = savedCurrent >= _tasbihTarget ? 0 : savedCurrent;
       _completedRounds = prefs.getInt('tasbih_rounds') ?? 0;
       _totalLifetimeTasbih = prefs.getInt('tasbih_lifetime') ?? 0;
@@ -104,7 +110,6 @@ class _TasbihScreenState extends State<TasbihScreen>
     setState(() {
       _totalLifetimeTasbih++;
       if (_tasbihCount + 1 >= _tasbihTarget) {
-        // إتمام الدورة بالكامل والعودة للصفر تلقائياً للدورة الجديدة
         _tasbihCount = 0;
         _completedRounds++;
         roundJustCompleted = true;
@@ -224,14 +229,14 @@ class _TasbihScreenState extends State<TasbihScreen>
                   if (txt.isEmpty) return;
                   final prefs = await SharedPreferences.getInstance();
                   setState(() {
-                    _customPhrases.add({'text': txt, 'target': selectedTarget});
+                    _customPhrases.add(_TasbihPhraseItem(text: txt, target: selectedTarget));
                     _selectedPhraseIndex = _allPhrases.length - 1;
                     _tasbihTarget = selectedTarget;
                     _tasbihCount = 0;
                     _completedRounds = 0;
                   });
                   final encoded = _customPhrases
-                      .map((e) => '${e['text']}::${e['target']}')
+                      .map((e) => '${e.text}::${e.target}')
                       .toList();
                   await prefs.setStringList('tasbih_custom_phrases', encoded);
                   await prefs.setInt('tasbih_phrase_idx', _selectedPhraseIndex);
@@ -368,7 +373,7 @@ class _TasbihScreenState extends State<TasbihScreen>
   @override
   Widget build(BuildContext context) {
     final phrases = _allPhrases;
-    final currentPhrase = phrases[_selectedPhraseIndex]['text'] as String;
+    final currentPhrase = phrases[_selectedPhraseIndex].text;
     final progress = (_tasbihCount / _tasbihTarget).clamp(0.0, 1.0);
 
     return Scaffold(
@@ -398,7 +403,6 @@ class _TasbihScreenState extends State<TasbihScreen>
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
         child: Column(
           children: [
-            // شريط اختيار الذكر
             SizedBox(
               height: 44,
               child: ListView.separated(
@@ -409,7 +413,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                   final selected = _selectedPhraseIndex == idx;
                   return ChoiceChip(
                     label: Text(
-                      phrases[idx]['text'] as String,
+                      phrases[idx].text,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -427,7 +431,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                     ),
                     onSelected: (_) async {
                       final prefs = await SharedPreferences.getInstance();
-                      final newTarget = phrases[idx]['target'] as int;
+                      final newTarget = phrases[idx].target;
                       setState(() {
                         _selectedPhraseIndex = idx;
                         _tasbihTarget = newTarget;
@@ -445,7 +449,6 @@ class _TasbihScreenState extends State<TasbihScreen>
             ),
             const SizedBox(height: 12),
 
-            // بطاقة الذكر والإحصائيات
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -502,7 +505,6 @@ class _TasbihScreenState extends State<TasbihScreen>
 
             const SizedBox(height: 12),
 
-            // مبدّل نمط السبحة (سبحة الخرز الدائرية / خاتم التسبيح الرقمي)
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -542,7 +544,6 @@ class _TasbihScreenState extends State<TasbihScreen>
 
             const Spacer(),
 
-            // جسم السبحة التفاعلية
             if (_selectedStyleIndex == 0)
               _buildBeadedRosaryWidget(progress)
             else
@@ -550,7 +551,6 @@ class _TasbihScreenState extends State<TasbihScreen>
 
             const Spacer(),
 
-            // شريط التحكم السفلي (تصفير العداد + تغيير الهدف)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -586,7 +586,6 @@ class _TasbihScreenState extends State<TasbihScreen>
     );
   }
 
-  /// التصميم الأول: سبحة خرزية دائرية تتحرك خرزاتها مع كل ضغطة
   Widget _buildBeadedRosaryWidget(double progress) {
     return GestureDetector(
       onTap: _incrementTasbih,
@@ -679,7 +678,6 @@ class _TasbihScreenState extends State<TasbihScreen>
     );
   }
 
-  /// التصميم الثاني: خاتم التسبيح الرقمي بشاشة LCD كلاسيكية
   Widget _buildDigitalRingCounterWidget(double progress) {
     return GestureDetector(
       onTap: _incrementTasbih,
