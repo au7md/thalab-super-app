@@ -2488,4 +2488,349 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                                 onTap: () => setState(() => _editMode = 'keep'),
                               ),
                             ),
-                        
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _EditModeTile(
+                                title: 'حذف من المنتصف',
+                                subtitle: 'إزالة المقطع المحدد',
+                                icon: Icons.delete_sweep_rounded,
+                                selected: _editMode == 'cut',
+                                activeColor: Colors.redAccent,
+                                onTap: () => setState(() => _editMode = 'cut'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // شريط التحديد المرئي
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: ThalabTheme.cardSurface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: ThalabTheme.softBorder),
+                    ),
+                    child: Column(
+                      children: [
+                        RangeSlider(
+                          values: RangeValues(_startSec, _endSec),
+                          min: 0.0,
+                          max: _totalSec,
+                          activeColor: _editMode == 'cut' ? Colors.redAccent : ThalabTheme.foxOrange,
+                          labels: RangeLabels(_fmt(_startSec), _fmt(_endSec)),
+                          onChanged: (val) {
+                            setState(() {
+                              _startSec = val.start;
+                              _endSec = val.end;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(_fmt(0), style: const TextStyle(fontSize: 11)),
+                            Text(_fmt(_totalSec), style: const TextStyle(fontSize: 11)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // أدوات الضبط الدقيق (±0.1 ثانية)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _FineTuneTimeBox(
+                          label: 'بداية المقطع',
+                          timeText: _fmt(_startSec),
+                          onMinus: () => setState(() => _startSec = (_startSec - 0.1).clamp(0.0, _endSec - 0.1)),
+                          onPlus: () => setState(() => _startSec = (_startSec + 0.1).clamp(0.0, _endSec - 0.1)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _FineTuneTimeBox(
+                          label: 'نهاية المقطع',
+                          timeText: _fmt(_endSec),
+                          onMinus: () => setState(() => _endSec = (_endSec - 0.1).clamp(_startSec + 0.1, _totalSec)),
+                          onPlus: () => setState(() => _endSec = (_endSec + 0.1).clamp(_startSec + 0.1, _totalSec)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // أزرار المعاينة والحفظ
+                  Row(
+                    children: [
+                      IconButton(
+                        iconSize: 44,
+                        icon: Icon(
+                          _isPlaying
+                              ? Icons.pause_circle_filled_rounded
+                              : Icons.play_circle_filled_rounded,
+                          color: ThalabTheme.foxOrange,
+                        ),
+                        onPressed: () async {
+                          if (_isPlaying) {
+                            await _player.pause();
+                          } else {
+                            await _player.seek(Duration(milliseconds: (_startSec * 1000).toInt()));
+                            await _player.play();
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _editMode == 'cut' ? Colors.redAccent : ThalabTheme.foxOrange,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 48),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          onPressed: _isProcessing ? null : () => _applyAudioEdit(overwriteOriginal: false),
+                          icon: _isProcessing
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.save_as_rounded),
+                          label: Text(_isProcessing ? 'جارٍ المعالجة…' : 'حفظ كملف جديد'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+// =========================================================================
+// الكلاسات المساعدة (Widgets)
+// =========================================================================
+
+class _EditModeTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool selected;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  const _EditModeTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.selected,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? activeColor.withOpacity(0.12) : ThalabTheme.creamBackground,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? activeColor : ThalabTheme.softBorder,
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: selected ? activeColor : ThalabTheme.mutedSlate, size: 22),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12.5,
+                color: selected ? activeColor : ThalabTheme.darkSlate,
+              ),
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 10.5, color: ThalabTheme.mutedSlate),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FineTuneTimeBox extends StatelessWidget {
+  final String label;
+  final String timeText;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+
+  const _FineTuneTimeBox({
+    required this.label,
+    required this.timeText,
+    required this.onMinus,
+    required this.onPlus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: ThalabTheme.creamBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ThalabTheme.softBorder),
+      ),
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              InkWell(
+                onTap: onMinus,
+                child: const Icon(Icons.remove_circle_outline_rounded,
+                    color: ThalabTheme.foxOrange, size: 22),
+              ),
+              Text(timeText,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              InkWell(
+                onTap: onPlus,
+                child: const Icon(Icons.add_circle_outline_rounded,
+                    color: ThalabTheme.foxOrange, size: 22),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopAudioActionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopAudioActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: ThalabTheme.cardSurface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: ThalabTheme.softBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: ThalabTheme.foxOrange.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: ThalabTheme.foxOrange, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RelaxPresetCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RelaxPresetCard({
+    required this.title,
+    required this.icon,
+    this.isSelected = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? ThalabTheme.foxOrange.withOpacity(0.14)
+              : ThalabTheme.creamBackground,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+            width: isSelected ? 1.8 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: ThalabTheme.foxOrange, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: isSelected ? ThalabTheme.foxOrange : ThalabTheme.darkSlate,
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle_rounded,
+                  color: ThalabTheme.foxOrange, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
