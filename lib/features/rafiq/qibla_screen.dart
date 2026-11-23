@@ -15,14 +15,28 @@ class QiblaScreen extends StatefulWidget {
 }
 
 class _QiblaScreenState extends State<QiblaScreen> {
-  Coordinates _coords = Coordinates(30.0444, 31.2357); // القاهرة كافتراضي
+  Coordinates _coords = Coordinates(30.0444, 31.2357);
   String _locationLabel = 'القاهرة، مصر';
   bool _isUpdating = false;
   bool _wasAligned = false;
 
-  // إحداثيات الكعبة المشرفة الدقيقة لحساب المسافة
   static const double _kaabaLat = 21.422487;
   static const double _kaabaLng = 39.826206;
+
+  static const List<({String name, double lat, double lng})> _quickCities = [
+    (name: 'القاهرة، مصر', lat: 30.0444, lng: 31.2357),
+    (name: 'الإسكندرية، مصر', lat: 31.2001, lng: 29.9187),
+    (name: 'الجيزة، مصر', lat: 30.0131, lng: 31.2089),
+    (name: 'المنصورة، مصر', lat: 31.0409, lng: 31.3785),
+    (name: 'طنطا، مصر', lat: 30.7865, lng: 31.0004),
+    (name: 'الزقازيق، مصر', lat: 30.5877, lng: 31.5020),
+    (name: 'أسيوط، مصر', lat: 27.1783, lng: 31.1859),
+    (name: 'أسوان، مصر', lat: 24.0889, lng: 32.8998),
+    (name: 'مكة المكرمة، السعودية', lat: 21.4225, lng: 39.8262),
+    (name: 'المدينة المنورة، السعودية', lat: 24.4672, lng: 39.6111),
+    (name: 'الرياض، السعودية', lat: 24.7136, lng: 46.6753),
+    (name: 'دبي، الإمارات', lat: 25.2048, lng: 55.2708),
+  ];
 
   @override
   void initState() {
@@ -46,7 +60,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
     }
   }
 
-  /// حساب المسافة بالكيلومتر إلى الكعبة المشرفة بصيغة Haversine
   double _distanceToKaabaKm(double lat1, double lng1) {
     const double r = 6371.0;
     final dLat = (_kaabaLat - lat1) * math.pi / 180.0;
@@ -69,7 +82,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('يرجى تفعيل الموقع (GPS) أو اختيار مدينتك من شاشة مواقيت الصلاة'),
+              content: Text('يرجى تفعيل الموقع (GPS) أو اختيار مدينتك من القائمة'),
             ),
           );
         }
@@ -111,6 +124,60 @@ class _QiblaScreenState extends State<QiblaScreen> {
     }
   }
 
+  void _openCityPickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ThalabTheme.cardSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'اختيار المدينة أوفلاين للقبلة',
+              style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 290,
+              child: ListView.separated(
+                itemCount: _quickCities.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemBuilder: (context, idx) {
+                  final c = _quickCities[idx];
+                  return ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    tileColor: ThalabTheme.creamBackground,
+                    leading: const Icon(Icons.location_city_rounded, color: ThalabTheme.foxOrange),
+                    title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    onTap: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setDouble('saved_lat', c.lat);
+                      await prefs.setDouble('saved_lng', c.lng);
+                      await prefs.setString('saved_loc_name', c.name);
+                      await prefs.setString('saved_loc_mode', 'أوفلاين');
+                      if (mounted) {
+                        setState(() {
+                          _coords = Coordinates(c.lat, c.lng);
+                          _locationLabel = c.name;
+                        });
+                      }
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final qiblaDirection = Qibla(_coords).direction;
@@ -120,6 +187,11 @@ class _QiblaScreenState extends State<QiblaScreen> {
       appBar: AppBar(
         title: const Text('اتجاه القبلة'),
         actions: [
+          IconButton(
+            tooltip: 'اختيار المدينة أوفلاين',
+            icon: const Icon(Icons.edit_location_alt_rounded, color: ThalabTheme.foxOrange),
+            onPressed: _openCityPickerSheet,
+          ),
           IconButton(
             tooltip: 'تحديث الموقع (GPS)',
             icon: _isUpdating
@@ -156,33 +228,35 @@ class _QiblaScreenState extends State<QiblaScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // شارة الموقع الحالي أو المحفوظ أوفلاين
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: ThalabTheme.cardSurface,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: ThalabTheme.softBorder),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.location_on_rounded, size: 16, color: ThalabTheme.foxOrange),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            _locationLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: _openCityPickerSheet,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: ThalabTheme.cardSurface,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: ThalabTheme.softBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.location_on_rounded, size: 16, color: ThalabTheme.foxOrange),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              _locationLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
 
-                  // حالة المحاذاة الفورية
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 250),
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -214,11 +288,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   ),
                   const SizedBox(height: 28),
 
-                  // البوصلة التفاعلية بقرص الاتجاهات ورمز الكعبة المشرفة
                   Stack(
                     alignment: Alignment.center,
                     children: [
-                      // مؤشر تثبيت علوي ثابت يمثل رأس الهاتف
                       Positioned(
                         top: 0,
                         child: Container(
@@ -259,7 +331,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
                         ),
                       ),
 
-                      // إبرة القبلة الدوارة
                       Padding(
                         padding: const EdgeInsets.only(top: 10),
                         child: Transform.rotate(
@@ -307,7 +378,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
                         ),
                       ),
 
-                      // مركز البوصلة
                       Padding(
                         padding: const EdgeInsets.only(top: 10),
                         child: Container(
@@ -324,7 +394,6 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // بطاقات البيانات الفلكية الدقيقة (زاوية القبلة + المسافة للكعبة)
                   Row(
                     children: [
                       Expanded(
@@ -464,7 +533,7 @@ class _CompassDialPainter extends CustomPainter {
       );
     }
 
-    const labels = {0: 'N', 90: 'E', 180: 'S', 270: 'W'};
+    const labels = {0: 'ش', 90: 'ق', 180: 'ج', 270: 'غ'};
     labels.forEach((deg, text) {
       final rad = (deg - 90) * math.pi / 180;
       final rText = radius - 34;
@@ -474,10 +543,10 @@ class _CompassDialPainter extends CustomPainter {
           style: TextStyle(
             color: deg == 0 ? Colors.redAccent : ThalabTheme.darkSlate,
             fontWeight: FontWeight.bold,
-            fontSize: 13,
+            fontSize: 14,
           ),
         ),
-        textDirection: TextDirection.ltr,
+        textDirection: TextDirection.rtl,
       )..layout();
 
       canvas.save();
