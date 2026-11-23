@@ -1,7 +1,7 @@
 name: thalab_app
 description: تطبيق الثعلب المتكامل
 publish_to: 'none'
-version: 1.4.0+6
+version: 1.4.1+7
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -25,6 +25,7 @@ dependencies:
   hijri: ^3.0.0
   photo_manager: ^3.6.3
   video_player: ^2.9.2
+  volume_controller: ^2.0.8
 
 dev_dependencies:
   flutter_test:
