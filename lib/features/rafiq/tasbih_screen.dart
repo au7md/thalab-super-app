@@ -14,7 +14,7 @@ class TasbihScreen extends StatefulWidget {
 
 class _TasbihScreenState extends State<TasbihScreen>
     with SingleTickerProviderStateMixin {
-  int _tasbihCount = 0;
+  int _tasbihCount = 0; // عداد الحلقة الحالية (من 0 إلى _tasbihTarget)
   int _tasbihTarget = 33;
   int _completedRounds = 0;
   int _totalLifetimeTasbih = 0;
@@ -23,9 +23,9 @@ class _TasbihScreenState extends State<TasbihScreen>
   bool _vibrationEnabled = true;
 
   late AnimationController _beadAnimController;
-  final List<Map<String, dynamic>> _customPhrases = [];
+  final List> _customPhrases = [];
 
-  static const List<Map<String, dynamic>> _defaultPhrases = [
+  static const List> _defaultPhrases = [
     {'text': 'سُبْحَانَ اللَّهِ', 'target': 33},
     {'text': 'الْحَمْدُ لِلَّهِ', 'target': 33},
     {'text': 'اللَّهُ أَكْبَرُ', 'target': 34},
@@ -38,7 +38,7 @@ class _TasbihScreenState extends State<TasbihScreen>
 
   static const List<int> _presetTargets = [33, 34, 99, 100, 500, 1000];
 
-  List<Map<String, dynamic>> get _allPhrases => [
+  List> get _allPhrases => [
         ..._defaultPhrases,
         ..._customPhrases,
       ];
@@ -62,7 +62,7 @@ class _TasbihScreenState extends State<TasbihScreen>
   Future<void> _loadTasbihData() async {
     final prefs = await SharedPreferences.getInstance();
     final savedCustom = prefs.getStringList('tasbih_custom_phrases') ?? [];
-    final parsedCustom = <Map<String, dynamic>>[];
+    final parsedCustom = >[];
     for (final item in savedCustom) {
       final sep = item.lastIndexOf('::');
       if (sep > 0) {
@@ -76,15 +76,19 @@ class _TasbihScreenState extends State<TasbihScreen>
       _customPhrases
         ..clear()
         ..addAll(parsedCustom);
-      _tasbihCount = prefs.getInt('tasbih_current') ?? 0;
-      _completedRounds = prefs.getInt('tasbih_rounds') ?? 0;
-      _totalLifetimeTasbih = prefs.getInt('tasbih_lifetime') ?? 0;
       _selectedStyleIndex = prefs.getInt('tasbih_style_idx') ?? 0;
       _vibrationEnabled = prefs.getBool('tasbih_vibration') ?? true;
       _selectedPhraseIndex = (prefs.getInt('tasbih_phrase_idx') ?? 0)
           .clamp(0, _allPhrases.length - 1);
-      _tasbihTarget = prefs.getInt('tasbih_custom_target') ??
+      final target = prefs.getInt('tasbih_custom_target') ??
           (_allPhrases[_selectedPhraseIndex]['target'] as int);
+      _tasbihTarget = target > 0 ? target : 33;
+
+      final savedCurrent = prefs.getInt('tasbih_current') ?? 0;
+      // ضمان أن العداد المحفوظ لا يتجاوز الهدف عند التحميل
+      _tasbihCount = savedCurrent >= _tasbihTarget ? 0 : savedCurrent;
+      _completedRounds = prefs.getInt('tasbih_rounds') ?? 0;
+      _totalLifetimeTasbih = prefs.getInt('tasbih_lifetime') ?? 0;
     });
   }
 
@@ -95,16 +99,23 @@ class _TasbihScreenState extends State<TasbihScreen>
     }
 
     final prefs = await SharedPreferences.getInstance();
+    bool roundJustCompleted = false;
+
     setState(() {
-      _tasbihCount++;
       _totalLifetimeTasbih++;
-      if (_tasbihCount % _tasbihTarget == 0) {
+      if (_tasbihCount + 1 >= _tasbihTarget) {
+        // إتمام الدورة بالكامل والعودة للصفر تلقائياً للدورة الجديدة
+        _tasbihCount = 0;
         _completedRounds++;
-        if (_vibrationEnabled) {
-          HapticFeedback.heavyImpact();
-        }
+        roundJustCompleted = true;
+      } else {
+        _tasbihCount++;
       }
     });
+
+    if (roundJustCompleted && _vibrationEnabled) {
+      HapticFeedback.heavyImpact();
+    }
 
     await prefs.setInt('tasbih_current', _tasbihCount);
     await prefs.setInt('tasbih_rounds', _completedRounds);
@@ -122,6 +133,17 @@ class _TasbihScreenState extends State<TasbihScreen>
     });
     await prefs.setInt('tasbih_current', 0);
     await prefs.setInt('tasbih_rounds', 0);
+  }
+
+  Future<void> _applyNewTarget(int newTarget) async {
+    if (newTarget <= 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _tasbihTarget = newTarget;
+      _tasbihCount = 0;
+    });
+    await prefs.setInt('tasbih_custom_target', newTarget);
+    await prefs.setInt('tasbih_current', 0);
   }
 
   void _openAddCustomPhraseDialog() {
@@ -228,21 +250,48 @@ class _TasbihScreenState extends State<TasbihScreen>
   }
 
   void _openTargetSelectorSheet() {
+    final customTargetController = TextEditingController();
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: ThalabTheme.cardSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(ctx).viewInsets.bottom + 26,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'تحديد عدد حبات الحلقة (الهدف)',
-              style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'تحديد عدد حبات الحلقة (الهدف)',
+                  style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.foxOrange.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'الحالي: $_tasbihTarget',
+                    style: const TextStyle(
+                      color: ThalabTheme.foxOrange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 14),
             Wrap(
@@ -265,13 +314,50 @@ class _TasbihScreenState extends State<TasbihScreen>
                   selectedColor: ThalabTheme.foxOrange,
                   backgroundColor: ThalabTheme.creamBackground,
                   onSelected: (_) async {
-                    final prefs = await SharedPreferences.getInstance();
-                    setState(() => _tasbihTarget = target);
-                    await prefs.setInt('tasbih_custom_target', target);
+                    await _applyNewTarget(target);
                     if (ctx.mounted) Navigator.pop(ctx);
                   },
                 );
               }).toList(),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: customTargetController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      hintText: 'أو اكتب هدفاً مخصصاً (مثل 70)...',
+                      filled: true,
+                      fillColor: ThalabTheme.creamBackground,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ThalabTheme.foxOrange,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(84, 48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () async {
+                    final parsed = int.tryParse(customTargetController.text.trim());
+                    if (parsed != null && parsed > 0) {
+                      await _applyNewTarget(parsed);
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    }
+                  },
+                  child: const Text('تطبيق', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
             ),
           ],
         ),
@@ -283,10 +369,7 @@ class _TasbihScreenState extends State<TasbihScreen>
   Widget build(BuildContext context) {
     final phrases = _allPhrases;
     final currentPhrase = phrases[_selectedPhraseIndex]['text'] as String;
-    final roundProgressCount = _tasbihCount % _tasbihTarget;
-    final displayInRound =
-        (_tasbihCount > 0 && roundProgressCount == 0) ? _tasbihTarget : roundProgressCount;
-    final progress = (displayInRound / _tasbihTarget).clamp(0.0, 1.0);
+    final progress = (_tasbihCount / _tasbihTarget).clamp(0.0, 1.0);
 
     return Scaffold(
       appBar: AppBar(
@@ -403,7 +486,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                         borderRadius: BorderRadius.circular(12),
                         child: _StatBadge(
                           label: 'الهدف (اضغط)',
-                          value: '$displayInRound / $_tasbihTarget',
+                          value: '$_tasbihCount / $_tasbihTarget',
                           highlight: true,
                         ),
                       ),
@@ -461,7 +544,7 @@ class _TasbihScreenState extends State<TasbihScreen>
 
             // جسم السبحة التفاعلية
             if (_selectedStyleIndex == 0)
-              _buildBeadedRosaryWidget(progress, displayInRound)
+              _buildBeadedRosaryWidget(progress)
             else
               _buildDigitalRingCounterWidget(progress),
 
@@ -504,7 +587,7 @@ class _TasbihScreenState extends State<TasbihScreen>
   }
 
   /// التصميم الأول: سبحة خرزية دائرية تتحرك خرزاتها مع كل ضغطة
-  Widget _buildBeadedRosaryWidget(double progress, int displayInRound) {
+  Widget _buildBeadedRosaryWidget(double progress) {
     return GestureDetector(
       onTap: _incrementTasbih,
       child: AnimatedBuilder(
@@ -519,7 +602,6 @@ class _TasbihScreenState extends State<TasbihScreen>
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // حلقة الخرز المرسومة حول المحيط
                   CustomPaint(
                     size: const Size(268, 268),
                     painter: _TasbihBeadsPainter(
@@ -530,7 +612,6 @@ class _TasbihScreenState extends State<TasbihScreen>
                       secondaryColor: const Color(0xFFD97724),
                     ),
                   ),
-                  // القلب المركزي للسبحة
                   Container(
                     width: 178,
                     height: 178,
@@ -573,7 +654,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            '$displayInRound / $_tasbihTarget',
+                            '$_tasbihCount / $_tasbihTarget',
                             style: const TextStyle(
                               color: Color(0xFFD4AF37),
                               fontSize: 12.5,
@@ -631,7 +712,6 @@ class _TasbihScreenState extends State<TasbihScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // شاشة العرض الرقمية LCD
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -668,7 +748,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _tasbihCount.toString().padLeft(5, '0'),
+                          _tasbihCount.toString().padLeft(4, '0'),
                           style: const TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 38,
@@ -681,7 +761,6 @@ class _TasbihScreenState extends State<TasbihScreen>
                     ),
                   ),
 
-                  // شريط تقدم الحلقة
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: LinearProgressIndicator(
@@ -692,7 +771,6 @@ class _TasbihScreenState extends State<TasbihScreen>
                     ),
                   ),
 
-                  // زر الضغط الدائري الكبير للخاتم
                   Container(
                     width: 96,
                     height: 96,
@@ -843,7 +921,6 @@ class _TasbihBeadsPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final ringRadius = (size.width / 2) - 18;
 
-    // خيط السبحة الواصل بين الخرزات
     final stringPaint = Paint()
       ..color = const Color(0xFFD4AF37).withOpacity(0.55)
       ..style = PaintingStyle.stroke
@@ -860,7 +937,7 @@ class _TasbihBeadsPainter extends CustomPainter {
       final by = center.dy + math.sin(angle) * ringRadius;
       final beadCenter = Offset(bx, by);
 
-      final isDivider = i % 11 == 0; // الفواصل الذهبية كل 11 خرزة
+      final isDivider = i % 11 == 0;
       final isHighlighted = i == (activeBeadIndex % totalBeads);
       final beadRadius = isDivider ? 8.5 : (isHighlighted ? 8.0 : 6.4);
 
