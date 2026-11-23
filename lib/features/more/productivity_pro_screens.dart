@@ -318,7 +318,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
   String? _savedPin;
   bool _biometricEnabled = false;
   String _enteredPin = '';
-  List> _notes = [];
+  List<Map<String, dynamic>> _notes = [];
 
   @override
   void initState() {
@@ -331,9 +331,9 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
     final pin = prefs.getString('vault_pin_code');
     final bio = prefs.getBool('vault_biometric_enabled') ?? false;
     final rawNotes = prefs.getString('thalab_vault_notes_json');
-    List> loaded = [];
+    List<Map<String, dynamic>> loaded = [];
     if (rawNotes != null && rawNotes.isNotEmpty) {
-      loaded = List>.from(jsonDecode(rawNotes));
+      loaded = List<Map<String, dynamic>>.from(jsonDecode(rawNotes));
     }
     if (mounted) {
       setState(() {
@@ -676,7 +676,7 @@ class IntegratedHabitScreen extends StatefulWidget {
 }
 
 class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
-  List> _habits = [];
+  List<Map<String, dynamic>> _habits = [];
   final TextEditingController _ctrl = TextEditingController();
 
   @override
@@ -689,7 +689,8 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('thalab_habits_v2_json');
     if (raw != null && raw.isNotEmpty) {
-      setState(() => _habits = List>.from(jsonDecode(raw)));
+      setState(() =>
+          _habits = List<Map<String, dynamic>>.from(jsonDecode(raw)));
     } else {
       _habits = [
         {'title': 'أذكار الصباح والمساء', 'done': false, 'route': 'adhkar'},
