@@ -14,6 +14,7 @@ import 'features/rafiq/prayer_times_screen.dart';
 import 'features/rafiq/quran_screen.dart';
 import 'features/rafiq/qibla_screen.dart';
 import 'features/rafiq/hijri_events_screen.dart';
+import 'features/media/gallery_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -899,20 +900,15 @@ class _RafiqServiceCard extends StatelessWidget {
 }
 
 // =========================================================================
-// 3. تبويب المعرض
+// 3. تبويب المعرض المتكامل
 // =========================================================================
 class MediaTab extends StatelessWidget {
   const MediaTab({super.key});
+
   @override
-  Widget build(BuildContext context) => _SectionGridTemplate(
-        title: 'المعرض',
-        items: [
-          _GridToolItem('الفيديوهات', Icons.video_library_rounded, null),
-          _GridToolItem('الصور', Icons.photo_library_rounded, null),
-          _GridToolItem('قص الفيديو', Icons.content_cut_rounded, null),
-          _GridToolItem('استخراج الصوت', Icons.audiotrack_rounded, null),
-        ],
-      );
+  Widget build(BuildContext context) {
+    return const GalleryScreen(initialCategoryIndex: 0);
+  }
 }
 
 // =========================================================================
