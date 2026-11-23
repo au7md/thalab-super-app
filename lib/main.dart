@@ -269,7 +269,7 @@ class _QuickCard extends StatelessWidget {
 }
 
 // =========================================================================
-// 2. تبويب رفيق (الواحة الإيمانية المتكاملة — التصميم الجديد المعتمد)
+// 2. تبويب رفيق (الواحة الإيمانية المتكاملة — الترتيب المحدث)
 // =========================================================================
 class RafiqTab extends StatefulWidget {
   const RafiqTab({super.key});
@@ -281,7 +281,6 @@ class RafiqTab extends StatefulWidget {
 class _RafiqTabState extends State<RafiqTab> {
   int _khatmahRead = 0;
   int _hijriOffset = 0;
-  Coordinates _coords = Coordinates(30.0444, 31.2357);
   String _locationName = 'القاهرة، مصر';
   PrayerTimes? _prayerTimes;
   Timer? _liveTimer;
@@ -330,7 +329,6 @@ class _RafiqTabState extends State<RafiqTab> {
     setState(() {
       _khatmahRead = prefs.getInt('khatmah_pages_read') ?? 0;
       _hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
-      _coords = Coordinates(lat, lng);
       _locationName = locLabel;
       _prayerTimes = pt;
     });
@@ -344,12 +342,19 @@ class _RafiqTabState extends State<RafiqTab> {
     _refreshWidgets();
   }
 
-  /// تحديد الذكر التلقائي اللحظي (بعد الصلاة لمدة 30 دقيقة، أو الاستيقاظ/الصباح/المساء/النوم)
-  (String title, String subtitle, IconData icon, int tabIndex) _getTimelyDhikrInfo() {
+  /// بيانات وهوية بطاقة الذكر التلقائي بخلفية متدرجة تناسب كل ذكر ووقته
+  ({
+    String title,
+    String subtitle,
+    String badge,
+    IconData icon,
+    int tabIndex,
+    List<Color> gradient,
+  }) _getTimelyDhikrVisual() {
     final now = DateTime.now();
     final pt = _prayerTimes;
 
-    // 1. التحقق أولاً: هل نحن في وقت أذكار ما بعد الصلاة (خلال 30 دقيقة من أذان أي فرض)؟
+    // 1. أذكار ما بعد الصلاة (خلال 30 دقيقة من أذان أي فرض)
     if (pt != null) {
       final fardList = [
         ('الفجر', pt.fajr),
@@ -361,27 +366,68 @@ class _RafiqTabState extends State<RafiqTab> {
       for (final fard in fardList) {
         final diff = now.difference(fard.$2);
         if (diff.inMinutes >= 0 && diff.inMinutes <= 30) {
-          return ('أذكار بعد الصلاة', 'دُبُر صلاة ${fard.$1} الآن', Icons.check_circle_outline_rounded, 2);
+          return (
+            title: 'أذكار بعد الصلاة',
+            subtitle: 'دُبُر صلاة ${fard.$1} — استغفر الله ثلاثاً وسبّح',
+            badge: 'وقت الفرض الآن',
+            icon: Icons.verified_rounded,
+            tabIndex: 2,
+            gradient: const [Color(0xFF0F4C45), Color(0xFF1E7E6C)],
+          );
         }
       }
     }
 
-    // 2. حسب فترة اليوم
+    // 2. حسب فترة اليوم مع خلفية مناسبة لجو الذكر
     final hour = now.hour;
     if (hour >= 4 && hour < 7) {
-      return ('أذكار الاستيقاظ', 'بداية يومك بذكر الله', Icons.wb_twilight_rounded, 4);
+      return (
+        title: 'أذكار الاستيقاظ',
+        subtitle: 'الحمد لله الذي أحيانا بعد ما أماتنا وإليه النشور',
+        badge: 'بداية اليوم',
+        icon: Icons.wb_twilight_rounded,
+        tabIndex: 4,
+        gradient: const [Color(0xFF2B5876), Color(0xFF4E4376)],
+      );
     } else if (hour >= 7 && hour < 12) {
-      return ('أذكار الصباح', 'وقت الصباح المبارك الآن', Icons.wb_sunny_rounded, 0);
+      return (
+        title: 'أذكار الصباح',
+        subtitle: 'أصبحنا وأصبح الملك لله — حصّن يومك بالذكر',
+        badge: 'وِرد الصباح',
+        icon: Icons.wb_sunny_rounded,
+        tabIndex: 0,
+        gradient: const [Color(0xFFD97706), Color(0xFFF59E0B)],
+      );
     } else if (hour >= 15 && hour < 20) {
-      return ('أذكار المساء', 'وقت المساء وحفظ النفس', Icons.nights_stay_rounded, 1);
+      return (
+        title: 'أذكار المساء',
+        subtitle: 'أمسينا وأمسى الملك لله — طمأنينة وحفظ',
+        badge: 'وِرد المساء',
+        icon: Icons.nights_stay_rounded,
+        tabIndex: 1,
+        gradient: const [Color(0xFF7C2D12), Color(0xFFC2410C)],
+      );
     } else if (hour >= 20 || hour < 4) {
-      return ('أذكار النوم', 'حصّن نفسك قبل المنام', Icons.bedtime_rounded, 3);
+      return (
+        title: 'أذكار النوم',
+        subtitle: 'باسمك ربي وضعت جنبي وبك أرفعه — ختمة اليوم',
+        badge: 'قبل المنام',
+        icon: Icons.bedtime_rounded,
+        tabIndex: 3,
+        gradient: const [Color(0xFF1E1B4B), Color(0xFF312E81)],
+      );
     } else {
-      return ('أذكار الصباح', 'أذكار اليوم والليلة', Icons.wb_sunny_outlined, 0);
+      return (
+        title: 'أذكار وتسابيح الظهيرة',
+        subtitle: 'ألا بذكر الله تطمئن القلوب — افتح باقة الأذكار',
+        badge: 'ذكر مستمر',
+        icon: Icons.auto_awesome_rounded,
+        tabIndex: 0,
+        gradient: const [Color(0xFF0369A1), Color(0xFF0284C7)],
+      );
     }
   }
 
-  /// خصائص الهوية البصرية الديناميكية للويدجت حسب الصلاة القادمة/الحالية
   ({
     List<Color> gradient,
     IconData skyIcon,
@@ -471,8 +517,8 @@ class _RafiqTabState extends State<RafiqTab> {
 
   @override
   Widget build(BuildContext context) {
-    final double khatmahPct = (_khatmahRead / 604).clamp(0.0, 1.0);
-    final timely = _getTimelyDhikrInfo();
+    final int khatmahPctInt = ((_khatmahRead / 604) * 100).clamp(0, 100).round();
+    final timely = _getTimelyDhikrVisual();
     final todayH = HijriCalendar.fromDate(DateTime.now().add(Duration(days: _hijriOffset)));
     final monthName = _hijriMonthsAr[(todayH.hMonth - 1).clamp(0, 11)];
     final hijriFullText = '${todayH.hDay} $monthName ${todayH.hYear} هـ';
@@ -493,7 +539,7 @@ class _RafiqTabState extends State<RafiqTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 115),
       children: [
-        // 1. العنوان العلوي + زر الإشعارات المستقل
+        // 1. العنوان العلوي + زر مركز الإشعارات
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -502,7 +548,7 @@ class _RafiqTabState extends State<RafiqTab> {
               style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
             ),
             IconButton(
-              tooltip: 'منظومة الإشعارات الذكية',
+              tooltip: 'منظومة الإشعارات والتنبيهات',
               icon: const Icon(Icons.notifications_active_rounded, color: ThalabTheme.foxOrange),
               onPressed: () => _open(const HijriEventsScreen(initialTab: 2)),
             ),
@@ -510,136 +556,7 @@ class _RafiqTabState extends State<RafiqTab> {
         ),
         const SizedBox(height: 10),
 
-        // 2. الكارت المزدوج العلوي: الختمة والقرآن (وضع الختمة) + الذكر التلقائي حسب الوقت
-        Container(
-          decoration: BoxDecoration(
-            color: ThalabTheme.cardSurface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              children: [
-                // النصف الأيمن: المصحف والختمة (يفتح وضع الختمة)
-                Expanded(
-                  child: InkWell(
-                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(22)),
-                    onTap: () => _open(const QuranScreen(), isKhatmah: true),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [ThalabTheme.foxOrange, ThalabTheme.foxOrangeLight],
-                          begin: Alignment.topRight,
-                          end: Alignment.bottomLeft,
-                        ),
-                        borderRadius: BorderRadius.horizontal(right: Radius.circular(20)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Icon(Icons.menu_book_rounded, color: Colors.white, size: 20),
-                              Text(
-                                '${(khatmahPct * 100).toStringAsFixed(0)}%',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'المصحف والختمة',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            '$_khatmahRead / 604 صفحة',
-                            style: const TextStyle(color: Colors.white70, fontSize: 11),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // النصف الأيسر: الذكر التلقائي حسب الوقت ودبر الصلوات
-                Expanded(
-                  child: InkWell(
-                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(22)),
-                    onTap: () => _open(AdhkarScreen(initialTabIndex: timely.$4)),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Icon(timely.$3, color: ThalabTheme.foxOrange, size: 20),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: ThalabTheme.foxOrange.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'تلقائي',
-                                  style: TextStyle(
-                                    color: ThalabTheme.foxOrange,
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            timely.$1,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: ThalabTheme.darkSlate,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            timely.$2,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // 3. ويدجت الصلاة الحي الديناميكي (يتغير لونه وأيقونته حسب الفرض القادم + الهجري + الموقع)
+        // 2. ويدجت عداد الصلاة الحي في القمة (أعلى عنصر)
         InkWell(
           borderRadius: BorderRadius.circular(24),
           onTap: () => _open(const PrayerTimesScreen()),
@@ -662,7 +579,6 @@ class _RafiqTabState extends State<RafiqTab> {
             ),
             child: Column(
               children: [
-                // الصف العلوي: الموقع المختار + التاريخ الهجري
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -702,8 +618,6 @@ class _RafiqTabState extends State<RafiqTab> {
                   ],
                 ),
                 const SizedBox(height: 14),
-
-                // الصف الأوسط: الفرض القادم + العد التنازلي + أيقونة الجو
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -757,7 +671,92 @@ class _RafiqTabState extends State<RafiqTab> {
         ),
         const SizedBox(height: 12),
 
-        // 4. الشبكة الأساسية (6 بطاقات مرتبة في 3 صفوف)
+        // 3. ويدجت الذكر التلقائي المستقل بخلفية ديناميكية تناسب كل ذكر ووقته
+        InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () => _open(AdhkarScreen(initialTabIndex: timely.tabIndex)),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: timely.gradient,
+                begin: Alignment.centerRight,
+                end: Alignment.centerLeft,
+              ),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: timely.gradient.first.withOpacity(0.24),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(timely.icon, color: Colors.white, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            timely.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.22),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              timely.badge,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        timely.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 4. الشبكة الأساسية المتكاملة (8 بطاقات مرتبة في 4 صفوف)
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -768,8 +767,11 @@ class _RafiqTabState extends State<RafiqTab> {
           children: [
             _RafiqServiceCard(
               title: 'المصحف الشريف',
-              subtitle: 'تلاوة حرة وفهرس السور',
+              subtitle: _khatmahRead > 0
+                  ? 'الختمة: $_khatmahRead/604 ($khatmahPctInt%)'
+                  : 'تلاوة حرة وفهرس السور',
               icon: Icons.menu_book_rounded,
+              badgeText: _khatmahRead > 0 ? '$khatmahPctInt%' : null,
               onTap: () => _open(const QuranScreen(), isKhatmah: false),
             ),
             _RafiqServiceCard(
@@ -802,6 +804,18 @@ class _RafiqTabState extends State<RafiqTab> {
               icon: Icons.calendar_month_rounded,
               onTap: () => _open(const HijriEventsScreen(initialTab: 0)),
             ),
+            _RafiqServiceCard(
+              title: 'سجل الصلوات',
+              subtitle: 'متابعة الفروض الخمس والسنن',
+              icon: Icons.fact_check_rounded,
+              onTap: () => _open(const PrayerTimesScreen()),
+            ),
+            _RafiqServiceCard(
+              title: 'تنبيهات الأذان',
+              subtitle: 'إعدادات قبل وبعد كل صلاة',
+              icon: Icons.alarm_on_rounded,
+              onTap: () => _open(const PrayerTimesScreen()),
+            ),
           ],
         ),
       ],
@@ -813,12 +827,14 @@ class _RafiqServiceCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final String? badgeText;
   final VoidCallback onTap;
 
   const _RafiqServiceCard({
     required this.title,
     required this.subtitle,
     required this.icon,
+    this.badgeText,
     required this.onTap,
   });
 
@@ -838,13 +854,34 @@ class _RafiqServiceCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: ThalabTheme.foxOrange.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: ThalabTheme.foxOrange, size: 22),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.foxOrange.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: ThalabTheme.foxOrange, size: 22),
+                ),
+                if (badgeText != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: ThalabTheme.foxOrange.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      badgeText!,
+                      style: const TextStyle(
+                        color: ThalabTheme.foxOrange,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const Spacer(),
             Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
