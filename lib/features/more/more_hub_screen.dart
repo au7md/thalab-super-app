@@ -1,13 +1,12 @@
-// lib/features/more/more_hub_screen.dart
-
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme.dart';
 import 'pro_tools_screens.dart';
+import 'student_hub_screen.dart';
+import 'productivity_pro_screens.dart';
 
 class MoreHubScreen extends StatefulWidget {
   const MoreHubScreen({super.key});
@@ -21,17 +20,23 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
       MethodChannel('com.au7md.thalab_app/audio_studio');
 
   int _sadaqahDuaCount = 0;
+  String _userName = 'أحمد';
+  String _userGender = 'ذكر'; // 'ذكر' أو 'أنثى'
 
   @override
   void initState() {
     super.initState();
-    _loadDuaCount();
+    _loadUserData();
   }
 
-  Future<void> _loadDuaCount() async {
+  Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
-      setState(() => _sadaqahDuaCount = prefs.getInt('sadaqah_dua_count') ?? 0);
+      setState(() {
+        _sadaqahDuaCount = prefs.getInt('sadaqah_dua_count') ?? 0;
+        _userName = prefs.getString('user_name') ?? 'مستخدم الثعلب';
+        _userGender = prefs.getString('user_gender') ?? 'ذكر';
+      });
     }
   }
 
@@ -79,8 +84,8 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 ),
                 const SizedBox(height: 18),
                 Container(
-                  width: 78,
-                  height: 78,
+                  width: 74,
+                  height: 74,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: const LinearGradient(
@@ -95,10 +100,10 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                     ],
                   ),
                   child: const Center(
-                    child: Icon(Icons.code_rounded, color: Colors.white, size: 38),
+                    child: Icon(Icons.code_rounded, color: Colors.white, size: 36),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 const Text(
                   'أحمد محمد أحمد',
                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
@@ -113,8 +118,6 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // بطاقة الصدقة الجارية
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -162,7 +165,6 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
-
                 const Align(
                   alignment: Alignment.centerRight,
                   child: Text(
@@ -215,19 +217,37 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
         title: const Text('مركز الأدوات والمزيد'),
         actions: [
           IconButton(
-            tooltip: 'عن المطور',
-            icon: const Icon(Icons.person_pin_rounded, color: ThalabTheme.foxOrange),
+            tooltip: 'عن المطور والصدقة الجارية',
+            icon: const Icon(Icons.volunteer_activism_rounded,
+                color: ThalabTheme.foxOrange),
             onPressed: _openDeveloperSheet,
+          ),
+          IconButton(
+            tooltip: 'الإعدادات',
+            icon: const Icon(Icons.settings_rounded, color: ThalabTheme.darkSlate),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
+              );
+              _loadUserData();
+            },
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
         children: [
-          // بطاقة المطور المختصرة في الأعلى
+          // 1. بطاقة الملف الشخصي للمستخدم
           InkWell(
             borderRadius: BorderRadius.circular(24),
-            onTap: _openDeveloperSheet,
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const UserProfileScreen()),
+              );
+              _loadUserData();
+            },
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -239,7 +259,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: ThalabTheme.foxOrange.withOpacity(0.28),
+                    color: ThalabTheme.foxOrange.withOpacity(0.26),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -248,29 +268,37 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    width: 54,
+                    height: 54,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.22),
-                      borderRadius: BorderRadius.circular(16),
+                      shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.volunteer_activism_rounded,
-                        color: Colors.white, size: 28),
+                    child: Icon(
+                      _userGender == 'أنثى'
+                          ? Icons.face_3_rounded
+                          : Icons.face_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'تطوير: أحمد تعلب (au7md)',
-                          style: TextStyle(
+                          'مرحباً، $_userName',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 15),
+                              fontSize: 16.5),
                         ),
-                        SizedBox(height: 3),
-                        Text(
-                          'صدقة جارية • اضغط للتواصل والدعاء بظهر الغيب',
+                        const SizedBox(height: 3),
+                        const Text(
+                          'ملفك الشخصي وإحصائياتك • اضغط للتخصيص',
                           style: TextStyle(color: Colors.white70, fontSize: 11.5),
                         ),
                       ],
@@ -281,9 +309,11 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-          const _SectionHeader(title: 'الإنتاجية والتركيز (Pro)', icon: Icons.bolt_rounded),
+          // 2. قسم الإنتاجية والتركيز + ركن الطلاب
+          const _SectionHeader(
+              title: 'الإنتاجية والتركيز (Pro)', icon: Icons.bolt_rounded),
           const SizedBox(height: 10),
           GridView.count(
             shrinkWrap: true,
@@ -291,47 +321,49 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
             crossAxisCount: 2,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 1.45,
+            childAspectRatio: 1.5,
             children: [
               _ToolGridCard(
                 title: 'مؤقت بومودورو',
-                subtitle: 'تركيز 25د • راحة 5د',
+                subtitle: 'جلسات متعددة وتركيز هادئ',
                 icon: Icons.timer_rounded,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const _PomodoroProScreen()),
+                  MaterialPageRoute(builder: (_) => const PomodoroProScreen()),
                 ),
               ),
               _ToolGridCard(
                 title: 'خزنة الملاحظات',
-                subtitle: 'تدوين سريع ومشاركة',
-                icon: Icons.note_alt_rounded,
+                subtitle: 'محمية برقم سري وبصمة',
+                icon: Icons.lock_person_rounded,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const _QuickNotesVaultScreen()),
+                  MaterialPageRoute(builder: (_) => const SecureNotesVaultScreen()),
                 ),
               ),
               _ToolGridCard(
                 title: 'متتبع العادات',
-                subtitle: 'إنجازك اليومي',
+                subtitle: 'مربوط بمهام التطبيق',
                 icon: Icons.checklist_rounded,
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const _HabitTrackerScreen()),
+                  MaterialPageRoute(builder: (_) => const IntegratedHabitScreen()),
                 ),
               ),
               _ToolGridCard(
-                title: 'مشاركة التطبيق',
-                subtitle: 'انشر الخير مع غيرك',
-                icon: Icons.share_rounded,
-                onTap: () => Share.share(
-                  'تطبيق الثعلب المتكامل — أوقات الصلاة، القرآن، الاستوديو، والأدوات الذكية.\nتطوير: أحمد تعلب (@au7md)',
+                title: 'ركن الطلاب',
+                subtitle: 'أهداف، GPA، وجدول المذاكرة',
+                icon: Icons.school_rounded,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const StudentHubScreen()),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 18),
 
-          const SizedBox(height: 22),
+          // 3. الأدوات الذكية والحاسبات (بدون حاسبة الزكاة وبدون فراغ زائد)
           const _SectionHeader(
               title: 'الأدوات الذكية والحاسبات', icon: Icons.calculate_rounded),
           const SizedBox(height: 10),
@@ -341,17 +373,8 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
             crossAxisCount: 2,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 1.45,
+            childAspectRatio: 1.5,
             children: [
-              _ToolGridCard(
-                title: 'حاسبة الزكاة',
-                subtitle: 'حساب النصاب والزكاة',
-                icon: Icons.mosque_rounded,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ZakatCalculatorScreen()),
-                ),
-              ),
               _ToolGridCard(
                 title: 'محول الوحدات',
                 subtitle: 'طول، وزن، مساحة، حرارة',
@@ -390,315 +413,81 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
+          const SizedBox(height: 18),
 
-// =========================================================================
-// 1. مؤقت بومودورو الاحترافي
-// =========================================================================
-class _PomodoroProScreen extends StatefulWidget {
-  const _PomodoroProScreen();
-
-  @override
-  State<_PomodoroProScreen> createState() => _PomodoroProScreenState();
-}
-
-class _PomodoroProScreenState extends State<_PomodoroProScreen> {
-  static const int _workSec = 25 * 60;
-  static const int _breakSec = 5 * 60;
-
-  bool _isWorkMode = true;
-  int _secondsLeft = _workSec;
-  bool _isRunning = false;
-  int _completedToday = 0;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStats();
-  }
-
-  Future<void> _loadStats() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() => _completedToday = prefs.getInt('pomodoro_count') ?? 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _toggleTimer() {
-    if (_isRunning) {
-      _timer?.cancel();
-      setState(() => _isRunning = false);
-    } else {
-      setState(() => _isRunning = true);
-      _timer = Timer.periodic(const Duration(seconds: 1), (t) async {
-        if (_secondsLeft > 0) {
-          setState(() => _secondsLeft--);
-        } else {
-          t.cancel();
-          setState(() => _isRunning = false);
-          if (_isWorkMode) {
-            final prefs = await SharedPreferences.getInstance();
-            setState(() => _completedToday++);
-            await prefs.setInt('pomodoro_count', _completedToday);
-          }
-          _switchMode(!_isWorkMode);
-        }
-      });
-    }
-  }
-
-  void _switchMode(bool work) {
-    _timer?.cancel();
-    setState(() {
-      _isWorkMode = work;
-      _isRunning = false;
-      _secondsLeft = work ? _workSec : _breakSec;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final total = _isWorkMode ? _workSec : _breakSec;
-    final progress = 1.0 - (_secondsLeft / total);
-    final m = (_secondsLeft ~/ 60).toString().padLeft(2, '0');
-    final s = (_secondsLeft % 60).toString().padLeft(2, '0');
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('مؤقت بومودورو للتركيز')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ChoiceChip(
-                  label: const Text('جلسة عمل (25 د)'),
-                  selected: _isWorkMode,
-                  selectedColor: ThalabTheme.foxOrange,
-                  labelStyle: TextStyle(
-                      color: _isWorkMode ? Colors.white : ThalabTheme.darkSlate,
-                      fontWeight: FontWeight.bold),
-                  onSelected: (_) => _switchMode(true),
+          // 4. الإعدادات والمشاركة
+          const _SectionHeader(title: 'النظام والحساب', icon: Icons.tune_rounded),
+          const SizedBox(height: 10),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.5,
+            children: [
+              _ToolGridCard(
+                title: 'الإعدادات',
+                subtitle: 'المظهر، اللغة، الإشعارات',
+                icon: Icons.settings_rounded,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
+                  );
+                  _loadUserData();
+                },
+              ),
+              _ToolGridCard(
+                title: 'مشاركة التطبيق',
+                subtitle: 'انشر الخير مع غيرك',
+                icon: Icons.share_rounded,
+                onTap: () => Share.share(
+                  'تطبيق الثعلب المتكامل — أوقات الصلاة، القرآن، الاستوديو، والأدوات الذكية.\nتطوير: أحمد تعلب (@au7md)',
                 ),
-                const SizedBox(width: 10),
-                ChoiceChip(
-                  label: const Text('استراحة (5 د)'),
-                  selected: !_isWorkMode,
-                  selectedColor: Colors.teal,
-                  labelStyle: TextStyle(
-                      color: !_isWorkMode ? Colors.white : ThalabTheme.darkSlate,
-                      fontWeight: FontWeight.bold),
-                  onSelected: (_) => _switchMode(false),
-                ),
-              ],
-            ),
-            const SizedBox(height: 36),
-            SizedBox(
-              width: 230,
-              height: 230,
-              child: Stack(
-                alignment: Alignment.center,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // 5. كارت الصدقة الجارية والمطور في نهاية الصفحة
+          InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: _openDeveloperSheet,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: ThalabTheme.cardSurface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: ThalabTheme.softBorder),
+              ),
+              child: Row(
                 children: [
-                  SizedBox(
-                    width: 220,
-                    height: 220,
-                    child: CircularProgressIndicator(
-                      value: progress,
-                      strokeWidth: 12,
-                      backgroundColor: ThalabTheme.softBorder,
-                      color: _isWorkMode ? ThalabTheme.foxOrange : Colors.teal,
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: ThalabTheme.foxOrange.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.volunteer_activism_rounded,
+                        color: ThalabTheme.foxOrange, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('عن المطور والصدقة الجارية',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        Text('تطوير: أحمد تعلب (au7md) • اضغط للتواصل',
+                            style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
+                      ],
                     ),
                   ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('$m:$s',
-                          style: const TextStyle(
-                              fontSize: 48, fontWeight: FontWeight.w900)),
-                      Text(
-                        _isWorkMode ? 'وقت التركيز' : 'وقت الراحة',
-                        style: const TextStyle(
-                            color: ThalabTheme.mutedSlate, fontSize: 13),
-                      ),
-                    ],
-                  ),
+                  const Icon(Icons.chevron_right_rounded, color: ThalabTheme.mutedSlate),
                 ],
               ),
             ),
-            const SizedBox(height: 34),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  iconSize: 32,
-                  icon: const Icon(Icons.refresh_rounded, color: ThalabTheme.mutedSlate),
-                  onPressed: () => _switchMode(_isWorkMode),
-                ),
-                const SizedBox(width: 20),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isWorkMode ? ThalabTheme.foxOrange : Colors.teal,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20)),
-                  ),
-                  onPressed: _toggleTimer,
-                  icon: Icon(_isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                  label: Text(_isRunning ? 'إيقاف مؤقت' : 'ابدأ الآن',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: ThalabTheme.softBorder),
-              ),
-              child: Text(
-                'الجلسات المكتملة: $_completedToday جلسة',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// =========================================================================
-// 2. خزنة الملاحظات السريعة
-// =========================================================================
-class _QuickNotesVaultScreen extends StatefulWidget {
-  const _QuickNotesVaultScreen();
-
-  @override
-  State<_QuickNotesVaultScreen> createState() => _QuickNotesVaultScreenState();
-}
-
-class _QuickNotesVaultScreenState extends State<_QuickNotesVaultScreen> {
-  List<String> _notes = [];
-  final TextEditingController _ctrl = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNotes();
-  }
-
-  Future<void> _loadNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() => _notes = prefs.getStringList('thalab_quick_notes') ?? []);
-    }
-  }
-
-  Future<void> _addNote() async {
-    final text = _ctrl.text.trim();
-    if (text.isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _notes.insert(0, text);
-      _ctrl.clear();
-    });
-    await prefs.setStringList('thalab_quick_notes', _notes);
-  }
-
-  Future<void> _deleteNote(int idx) async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() => _notes.removeAt(idx));
-    await prefs.setStringList('thalab_quick_notes', _notes);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('خزنة الملاحظات السريعة')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ctrl,
-                    decoration: InputDecoration(
-                      hintText: 'اكتب ملاحظة أو فكرة سريعة...',
-                      filled: true,
-                      fillColor: ThalabTheme.cardSurface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: ThalabTheme.softBorder),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  style: IconButton.styleFrom(backgroundColor: ThalabTheme.foxOrange),
-                  onPressed: _addNote,
-                  icon: const Icon(Icons.add_rounded, color: Colors.white),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _notes.isEmpty
-                ? const Center(
-                    child: Text('لا توجد ملاحظات محفوظة بعد',
-                        style: TextStyle(color: ThalabTheme.mutedSlate)),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    itemCount: _notes.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (ctx, i) => Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: ThalabTheme.cardSurface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: ThalabTheme.softBorder),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(child: Text(_notes[i])),
-                          IconButton(
-                            icon: const Icon(Icons.copy_rounded,
-                                size: 19, color: ThalabTheme.foxOrange),
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: _notes[i]));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('تم النسخ ✓')),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded,
-                                size: 19, color: Colors.redAccent),
-                            onPressed: () => _deleteNote(i),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
           ),
         ],
       ),
@@ -707,130 +496,221 @@ class _QuickNotesVaultScreenState extends State<_QuickNotesVaultScreen> {
 }
 
 // =========================================================================
-// 3. متتبع العادات اليومية
+// شاشة الملف الشخصي للمستخدم
 // =========================================================================
-class _HabitTrackerScreen extends StatefulWidget {
-  const _HabitTrackerScreen();
+class UserProfileScreen extends StatefulWidget {
+  const UserProfileScreen({super.key});
 
   @override
-  State<_HabitTrackerScreen> createState() => _HabitTrackerScreenState();
+  State<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
-class _HabitTrackerScreenState extends State<_HabitTrackerScreen> {
-  List<Map<String, dynamic>> _habits = [];
-  final TextEditingController _ctrl = TextEditingController();
+class _UserProfileScreenState extends State<UserProfileScreen> {
+  final TextEditingController _nameCtrl = TextEditingController();
+  String _gender = 'ذكر';
+  int _pomodoroCount = 0;
+  int _khatmahPages = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadHabits();
+    _load();
   }
 
-  Future<void> _loadHabits() async {
+  Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('thalab_habits_json');
-    if (raw != null && raw.isNotEmpty) {
-      setState(() =>
-          _habits = List<Map<String, dynamic>>.from(jsonDecode(raw)));
-    } else {
-      _habits = [
-        {'title': 'أذكار الصباح والمساء', 'done': false},
-        {'title': 'قراءة ورد القرآن', 'done': false},
-        {'title': 'شرب 2 لتر ماء', 'done': false},
-      ];
+    setState(() {
+      _nameCtrl.text = prefs.getString('user_name') ?? 'مستخدم الثعلب';
+      _gender = prefs.getString('user_gender') ?? 'ذكر';
+      _pomodoroCount = prefs.getInt('pomodoro_count') ?? 0;
+      _khatmahPages = prefs.getInt('khatmah_pages_read') ?? 0;
+    });
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_name', _nameCtrl.text.trim().isEmpty ? 'مستخدم الثعلب' : _nameCtrl.text.trim());
+    await prefs.setString('user_gender', _gender);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حفظ بيانات الملف الشخصي ✓')),
+      );
+      Navigator.pop(context);
     }
-  }
-
-  Future<void> _saveHabits() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('thalab_habits_json', jsonEncode(_habits));
   }
 
   @override
   Widget build(BuildContext context) {
-    final doneCount = _habits.where((h) => h['done'] == true).length;
     return Scaffold(
-      appBar: AppBar(title: Text('متتبع العادات ($doneCount/${_habits.length})')),
-      body: Column(
+      appBar: AppBar(title: const Text('الملف الشخصي')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ctrl,
-                    decoration: InputDecoration(
-                      hintText: 'أضف عادة يومية جديدة...',
-                      filled: true,
-                      fillColor: ThalabTheme.cardSurface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: ThalabTheme.softBorder),
-                      ),
-                    ),
-                  ),
+          Center(
+            child: CircleAvatar(
+              radius: 44,
+              backgroundColor: ThalabTheme.foxOrange.withOpacity(0.15),
+              child: Icon(
+                _gender == 'أنثى' ? Icons.face_3_rounded : Icons.face_rounded,
+                size: 48,
+                color: ThalabTheme.foxOrange,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _nameCtrl,
+            decoration: InputDecoration(
+              labelText: 'الاسم الشخصي',
+              filled: true,
+              fillColor: ThalabTheme.cardSurface,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('الجنس', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ChoiceChip(
+                  label: const Center(child: Text('ذكر')),
+                  selected: _gender == 'ذكر',
+                  selectedColor: ThalabTheme.foxOrange,
+                  labelStyle: TextStyle(color: _gender == 'ذكر' ? Colors.white : ThalabTheme.darkSlate),
+                  onSelected: (_) => setState(() => _gender = 'ذكر'),
                 ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  style: IconButton.styleFrom(backgroundColor: ThalabTheme.foxOrange),
-                  onPressed: () {
-                    final t = _ctrl.text.trim();
-                    if (t.isNotEmpty) {
-                      setState(() {
-                        _habits.add({'title': t, 'done': false});
-                        _ctrl.clear();
-                      });
-                      _saveHabits();
-                    }
-                  },
-                  icon: const Icon(Icons.add_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Center(child: Text('أنثى')),
+                  selected: _gender == 'أنثى',
+                  selectedColor: ThalabTheme.foxOrange,
+                  labelStyle: TextStyle(color: _gender == 'أنثى' ? Colors.white : ThalabTheme.darkSlate),
+                  onSelected: (_) => setState(() => _gender = 'أنثى'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: ThalabTheme.cardSurface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: ThalabTheme.softBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('ملخص إنجازك في الثعلب', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Divider(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('جلسات التركيز المكتملة:'),
+                    Text('$_pomodoroCount جلسة', style: const TextStyle(fontWeight: FontWeight.bold, color: ThalabTheme.foxOrange)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('صفحات الختمة المقروءة:'),
+                    Text('$_khatmahPages / 604', style: const TextStyle(fontWeight: FontWeight.bold, color: ThalabTheme.foxOrange)),
+                  ],
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              itemCount: _habits.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (ctx, i) {
-                final item = _habits[i];
-                final done = item['done'] == true;
-                return Container(
-                  decoration: BoxDecoration(
-                    color: ThalabTheme.cardSurface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: done ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
-                    ),
-                  ),
-                  child: CheckboxListTile(
-                    activeColor: ThalabTheme.foxOrange,
-                    value: done,
-                    title: Text(
-                      item['title'],
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        decoration: done ? TextDecoration.lineThrough : null,
-                      ),
-                    ),
-                    secondary: IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded,
-                          color: Colors.redAccent, size: 20),
-                      onPressed: () {
-                        setState(() => _habits.removeAt(i));
-                        _saveHabits();
-                      },
-                    ),
-                    onChanged: (v) {
-                      setState(() => _habits[i]['done'] = v ?? false);
-                      _saveHabits();
-                    },
-                  ),
-                );
-              },
+          const SizedBox(height: 26),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ThalabTheme.foxOrange,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
+            onPressed: _save,
+            child: const Text('حفظ التغييرات', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// شاشة الإعدادات
+// =========================================================================
+class AppSettingsScreen extends StatefulWidget {
+  const AppSettingsScreen({super.key});
+
+  @override
+  State<AppSettingsScreen> createState() => _AppSettingsScreenState();
+}
+
+class _AppSettingsScreenState extends State<AppSettingsScreen> {
+  bool _notificationsEnabled = true;
+  bool _hapticEnabled = true;
+  String _appLang = 'العربية';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notificationsEnabled = prefs.getBool('settings_notifications') ?? true;
+      _hapticEnabled = prefs.getBool('settings_haptic') ?? true;
+      _appLang = prefs.getString('settings_lang') ?? 'العربية';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('الإعدادات')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          SwitchListTile(
+            activeColor: ThalabTheme.foxOrange,
+            title: const Text('تنبيهات الأذان والأذكار', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('تفعيل أو إيقاف الإشعارات اليومية'),
+            value: _notificationsEnabled,
+            onChanged: (v) async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('settings_notifications', v);
+              setState(() => _notificationsEnabled = v);
+            },
+          ),
+          const Divider(),
+          SwitchListTile(
+            activeColor: ThalabTheme.foxOrange,
+            title: const Text('الاهتزاز التفاعلي (Haptic)', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('اهتزاز خفيف عند التسبيح والضغط'),
+            value: _hapticEnabled,
+            onChanged: (v) async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('settings_haptic', v);
+              setState(() => _hapticEnabled = v);
+            },
+          ),
+          const Divider(),
+          ListTile(
+            title: const Text('لغة التطبيق', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(_appLang),
+            trailing: const Icon(Icons.language_rounded, color: ThalabTheme.foxOrange),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('اللغة العربية هي اللغة الأساسية للتطبيق حالياً')),
+              );
+            },
           ),
         ],
       ),
