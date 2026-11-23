@@ -40,11 +40,328 @@ class ThalabApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const MainShellScreen(),
+      home: const SplashScreen(),
     );
   }
 }
 
+// =========================================================================
+// شاشة الفتح (Splash Screen) مع أنيميشن هادئ
+// =========================================================================
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _controller.forward();
+    _checkFirstLaunch();
+  }
+
+  Future<void> _checkFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool isFirst = prefs.getBool('first_launch_v1.7') ?? true;
+    await Future.delayed(const Duration(milliseconds: 2200));
+    if (!mounted) return;
+
+    if (isFirst) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainShellScreen()),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: ThalabTheme.creamBackground,
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ThalabTheme.cardSurface,
+                  boxShadow: [
+                    BoxShadow(
+                      color: ThalabTheme.foxOrange.withOpacity(0.12),
+                      blurRadius: 36,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Image.asset('assets/images/app_logo.png', errorBuilder: (_, __, ___) => const Icon(Icons.pets_rounded, size: 68, color: ThalabTheme.foxOrange)),
+                ),
+              ),
+              const SizedBox(height: 22),
+              const Text(
+                'التَّفَاؤُلُ وَاليَقِينُ',
+                style: TextStyle(
+                  fontSize: 13,
+                  letterSpacing: 2.0,
+                  color: ThalabTheme.mutedSlate,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'الثَّعْلَب',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: ThalabTheme.darkSlate,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// واجهة الترحيب وإعداد البيانات لأول مرة (Onboarding Screen)
+// =========================================================================
+class OnboardingScreen extends StatefulWidget {
+  const OnboardingScreen({super.key});
+
+  @override
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends State<OnboardingScreen> {
+  final PageController _pageController = PageController();
+  final TextEditingController _nameController = TextEditingController();
+  int _currentPage = 0;
+  String _gender = 'ذكر';
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _completeOnboarding() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى كتابة اسمك لنستطيع مناداتك به')),
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_name', name);
+    await prefs.setString('user_gender', _gender);
+    await prefs.setBool('first_launch_v1.7', false);
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainShellScreen()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: ThalabTheme.creamBackground,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (idx) => setState(() => _currentPage = idx),
+                children: [
+                  _buildIntroPage(
+                    title: 'مرحباً بك في الثعلب',
+                    desc: 'مساحتك اليومية الهادئة للإنتاجية والذكر وتنظيم المذاكرة في مكان واحد.',
+                    icon: Icons.auto_awesome_rounded,
+                  ),
+                  _buildIntroPage(
+                    title: 'الواحة الإيمانية',
+                    desc: 'تابع مواقيت الصلاة والأذان، واقرأ وردك القرآني، وتحصن بالأذكار مع السبحة الذكية.',
+                    icon: Icons.mosque_rounded,
+                  ),
+                  _buildIntroPage(
+                    title: 'ركن الطلاب والتحرير',
+                    desc: 'نظم جدولك الأسبوعي، واحسب معدلك GPA، مع استوديو لتسجيل وقص الصوتيات.',
+                    icon: Icons.school_rounded,
+                  ),
+                  _buildSetupPage(),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _currentPage < 3
+                      ? TextButton(
+                          onPressed: () => _pageController.jumpToPage(3),
+                          child: const Text('تخطي', style: TextStyle(color: ThalabTheme.mutedSlate)),
+                        )
+                      : const SizedBox.shrink(),
+                  Row(
+                    children: List.generate(4, (i) {
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: _currentPage == i ? 18 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          color: _currentPage == i ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                        ),
+                      );
+                    }),
+                  ),
+                  _currentPage < 3
+                      ? ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: ThalabTheme.foxOrange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                          onPressed: () => _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.ease),
+                          child: const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+                        )
+                      : ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ThalabTheme.foxOrange,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _completeOnboarding,
+                          child: const Text('ابدأ الآن', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntroPage({required String title, required String desc, required IconData icon}) {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(26),
+            decoration: BoxDecoration(
+              color: ThalabTheme.cardSurface,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: ThalabTheme.foxOrange.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 4)),
+              ],
+            ),
+            child: Icon(icon, size: 68, color: ThalabTheme.foxOrange),
+          ),
+          const SizedBox(height: 36),
+          Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: ThalabTheme.darkSlate)),
+          const SizedBox(height: 12),
+          Text(desc, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: ThalabTheme.mutedSlate, height: 1.6)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSetupPage() {
+    return Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Center(
+            child: Text(
+              'دعنا نتعرف عليك',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: ThalabTheme.darkSlate),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text('الاسم المفضل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              hintText: 'مثال: أحمد، سارة...',
+              filled: true,
+              fillColor: ThalabTheme.cardSurface,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: ThalabTheme.softBorder)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text('الجنس لضبط مناداة الواجهة والذكر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ChoiceChip(
+                  label: const Center(child: Text('ذكر')),
+                  selected: _gender == 'ذكر',
+                  selectedColor: ThalabTheme.foxOrange,
+                  labelStyle: TextStyle(color: _gender == 'ذكر' ? Colors.white : ThalabTheme.darkSlate, fontWeight: FontWeight.bold),
+                  onSelected: (_) => setState(() => _gender = 'ذكر'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Center(child: Text('أنثى')),
+                  selected: _gender == 'أنثى',
+                  selectedColor: ThalabTheme.foxOrange,
+                  labelStyle: TextStyle(color: _gender == 'أنثى' ? Colors.white : ThalabTheme.darkSlate, fontWeight: FontWeight.bold),
+                  onSelected: (_) => setState(() => _gender = 'أنثى'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// شل التطبيق الرئيسي (شريط تنقل رباعي هادئ وبدون الرئيسية)
+// =========================================================================
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({super.key});
 
@@ -56,7 +373,6 @@ class _MainShellScreenState extends State<MainShellScreen> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = const [
-    HomeDashboardTab(),
     RafiqTab(),
     MediaTab(),
     MusicTab(),
@@ -70,7 +386,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       body: SafeArea(
         bottom: false,
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 280),
+          duration: const Duration(milliseconds: 260),
           child: _pages[_selectedIndex],
         ),
       ),
@@ -83,178 +399,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
 }
 
 // =========================================================================
-// 1. تبويب الرئيسية
-// =========================================================================
-class HomeDashboardTab extends StatelessWidget {
-  const HomeDashboardTab({super.key});
-
-  void _open(BuildContext context, Widget screen) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'أهلاً بك في الثعلب',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'مساحتك الذكية الهادئة والمتكاملة',
-                  style: TextStyle(fontSize: 13, color: ThalabTheme.mutedSlate),
-                ),
-              ],
-            ),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: ThalabTheme.softBorder),
-              ),
-              child: const Icon(Icons.pets_rounded, color: ThalabTheme.foxOrange, size: 28),
-            ),
-          ],
-        ),
-        const SizedBox(height: 22),
-        GestureDetector(
-          onTap: () => _open(context, const AdhkarScreen()),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [ThalabTheme.foxOrange, ThalabTheme.foxOrangeLight],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-              ),
-              borderRadius: BorderRadius.circular(26),
-              boxShadow: [
-                BoxShadow(
-                  color: ThalabTheme.foxOrange.withOpacity(0.28),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('رفيقك اليومي', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                      SizedBox(height: 4),
-                      Text(
-                        'وِرد اليوم والأذكار',
-                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        'اضغط لفتح حصن المسلم بالعداد التفاعلي',
-                        style: TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 10),
-                Icon(Icons.mosque_rounded, color: Colors.white, size: 46),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 22),
-        const Text('الوصول السريع', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.45,
-          children: [
-            _QuickCard(
-              title: 'المصحف الشريف',
-              subtitle: 'متابعة الختمة والقراءة',
-              icon: Icons.menu_book_rounded,
-              onTap: () => _open(context, const QuranScreen()),
-            ),
-            _QuickCard(
-              title: 'السبحة الذكية',
-              subtitle: 'تصفير تلقائي للهدف',
-              icon: Icons.adjust_rounded,
-              onTap: () => _open(context, const TasbihScreen()),
-            ),
-            _QuickCard(
-              title: 'مواقيت الصلاة',
-              subtitle: 'المواقيت والأذان المباشر',
-              icon: Icons.access_time_filled_rounded,
-              onTap: () => _open(context, const PrayerTimesScreen()),
-            ),
-            _QuickCard(
-              title: 'التقويم الهجري',
-              subtitle: 'المناسبات والعد التنازلي',
-              icon: Icons.calendar_month_rounded,
-              onTap: () => _open(context, const HijriEventsScreen()),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _QuickCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: ThalabTheme.cardSurface,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: ThalabTheme.softBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: ThalabTheme.foxOrange, size: 26),
-            const Spacer(),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            Text(subtitle, style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// =========================================================================
-// 2. تبويب رفيق (الواحة الإيمانية المتكاملة — الترتيب المحدث)
+// 1. تبويب رفيق (الواحة الإيمانية المتكاملة)
 // =========================================================================
 class RafiqTab extends StatefulWidget {
   const RafiqTab({super.key});
@@ -327,7 +472,6 @@ class _RafiqTabState extends State<RafiqTab> {
     _refreshWidgets();
   }
 
-  /// بيانات وهوية بطاقة الذكر التلقائي بخلفية متدرجة تناسب كل ذكر ووقته
   ({
     String title,
     String subtitle,
