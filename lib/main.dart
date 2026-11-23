@@ -28,10 +28,12 @@ void main() async {
       final prefs = await SharedPreferences.getInstance();
       final lat = prefs.getDouble('saved_lat') ?? prefs.getDouble('prayer_lat') ?? 30.0444;
       final lng = prefs.getDouble('saved_lng') ?? prefs.getDouble('prayer_lng') ?? 31.2357;
-      await RafiqNotificationsService.syncAllScheduledNotifications(
+      final params = CalculationMethod.egyptian.getParameters();
+      params.madhab = Madhab.shafi;
+      await RafiqNotificationsService.instance.syncAllScheduledNotifications(
         lat: lat,
         lng: lng,
-        params: CalculationMethod.egyptian.getParameters(),
+        params: params,
       );
     } catch (_) {}
   });
@@ -755,10 +757,7 @@ class _RafiqTabState extends State<RafiqTab> {
         ),
         const SizedBox(height: 12),
 
-        // 4. الشبكة الأساسية (6 بطاقات مرتبة في 3 صفوف):
-        // الصف الأول: المصحف الشريف (وضع القراءة الحرة) + أذكاري (أذكار اليوم والليلة)
-        // الصف الثاني: السبحة الذكية + اتجاه القبلة
-        // الصف الثالث: حصن المسلم (الحصن + الرقية + الأسماء) + التقويم الهجري والمناسبات
+        // 4. الشبكة الأساسية (6 بطاقات مرتبة في 3 صفوف)
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
