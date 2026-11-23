@@ -225,7 +225,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
     }
   }
 
-  void _showNameDetailSheet(_NameOfAllahItem item) {
+      void _showNameDetailSheet(dynamic item) {
     showModalBottomSheet(
       context: context,
       backgroundColor: ThalabTheme.cardSurface,
