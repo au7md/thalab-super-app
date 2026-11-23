@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'رقم الإصدار (مثال: v1.4.1)'
+        description: 'رقم الإصدار (مثال: v1.5.0)'
         required: true
-        default: 'v1.4.1'
+        default: 'v1.5.0'
 
 jobs:
   build:
@@ -30,7 +30,7 @@ jobs:
       - name: Initialize Android & Permissions
         run: |
           flutter create --platforms=android --org com.au7md --project-name thalab_app .
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"\/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"\/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
           sed -i 's/compileOptions {/compileOptions {\n        isCoreLibraryDesugaringEnabled = true/' android/app/build.gradle.kts
           cat << 'EOF' >> android/app/build.gradle.kts
 
@@ -51,15 +51,25 @@ jobs:
           cat << 'EOF' > android/app/src/main/kotlin/com/au7md/thalab_app/MainActivity.kt
           package com.au7md.thalab_app
 
+          import android.Manifest
           import android.content.Context
+          import android.content.pm.PackageManager
           import android.media.AudioManager
+          import android.media.MediaRecorder
+          import android.os.Build
+          import androidx.core.app.ActivityCompat
+          import androidx.core.content.ContextCompat
           import io.flutter.embedding.android.FlutterActivity
           import io.flutter.embedding.engine.FlutterEngine
           import io.flutter.plugin.common.MethodChannel
 
           class MainActivity : FlutterActivity() {
+              private var mediaRecorder: MediaRecorder? = null
+              private var currentRecordPath: String? = null
+
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
+
                   MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.au7md.thalab_app/system_volume")
                       .setMethodCallHandler { call, result ->
                           val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -74,6 +84,73 @@ jobs:
                                   val target = (vol * maxVol).toInt().coerceIn(0, maxVol)
                                   audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
                                   result.success(null)
+                              }
+                              else -> result.notImplemented()
+                          }
+                      }
+
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.au7md.thalab_app/voice_recorder")
+                      .setMethodCallHandler { call, result ->
+                          when (call.method) {
+                              "hasPermission" -> {
+                                  val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                  if (!granted) {
+                                      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 401)
+                                  }
+                                  result.success(granted)
+                              }
+                              "start" -> {
+                                  val path = call.argument<String>("path") ?: ""
+                                  try {
+                                      mediaRecorder?.release()
+                                      val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                          MediaRecorder(this)
+                                      } else {
+                                          @Suppress("DEPRECATION")
+                                          MediaRecorder()
+                                      }
+                                      recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+                                      recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                                      recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                                      recorder.setAudioEncodingBitRate(128000)
+                                      recorder.setAudioSamplingRate(44100)
+                                      recorder.setOutputFile(path)
+                                      recorder.prepare()
+                                      recorder.start()
+                                      mediaRecorder = recorder
+                                      currentRecordPath = path
+                                      result.success(true)
+                                  } catch (e: Exception) {
+                                      result.error("REC_ERR", e.message, null)
+                                  }
+                              }
+                              "pause" -> {
+                                  try {
+                                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                          mediaRecorder?.pause()
+                                      }
+                                      result.success(true)
+                                  } catch (_: Exception) {
+                                      result.success(false)
+                                  }
+                              }
+                              "resume" -> {
+                                  try {
+                                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                          mediaRecorder?.resume()
+                                      }
+                                      result.success(true)
+                                  } catch (_: Exception) {
+                                      result.success(false)
+                                  }
+                              }
+                              "stop" -> {
+                                  try {
+                                      mediaRecorder?.stop()
+                                      mediaRecorder?.release()
+                                  } catch (_: Exception) {}
+                                  mediaRecorder = null
+                                  result.success(currentRecordPath)
                               }
                               else -> result.notImplemented()
                           }
