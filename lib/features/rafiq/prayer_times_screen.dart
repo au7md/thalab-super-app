@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hijri/hijri_calendar.dart';
@@ -17,13 +18,16 @@ class OfflineCityPreset {
 }
 
 class PrayerTimesScreen extends StatefulWidget {
-  const PrayerTimesScreen({super.key});
+  final int initialTab;
+  const PrayerTimesScreen({super.key, this.initialTab = 0});
 
   @override
   State<PrayerTimesScreen> createState() => _PrayerTimesScreenState();
 }
 
-class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
+class _PrayerTimesScreenState extends State<PrayerTimesScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   PrayerTimes? _prayerTimes;
   Coordinates _coords = Coordinates(30.0444, 31.2357);
   String _locationLabel = 'القاهرة، مصر';
@@ -31,6 +35,46 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   bool _isLoadingLocation = false;
   int _hijriOffset = 0;
   Timer? _countdownTimer;
+
+  // سجل الصلوات اليومي: 0 = لم يُسجّل، 1 = في وقتها، 2 = جماعة في المسجد، 3 = قضاء
+  Map<String, int> _todayPrayerStatus = {
+    'fajr': 0,
+    'dhuhr': 0,
+    'asr': 0,
+    'maghrib': 0,
+    'isha': 0,
+  };
+  Map<String, bool> _todaySunnahDone = {
+    'fajr': false,
+    'dhuhr': false,
+    'asr': false,
+    'maghrib': false,
+    'isha': false,
+  };
+  int _totalPrayerPoints = 0;
+
+  // إعدادات التنبيه لكل صلاة (قبل / عند الأذان / بعد الأذان)
+  Map<String, bool> _adhanNotifEnabled = {
+    'fajr': true,
+    'dhuhr': true,
+    'asr': true,
+    'maghrib': true,
+    'isha': true,
+  };
+  Map<String, int> _beforeNotifMins = {
+    'fajr': 15,
+    'dhuhr': 10,
+    'asr': 10,
+    'maghrib': 10,
+    'isha': 10,
+  };
+  Map<String, int> _afterNotifMins = {
+    'fajr': 20,
+    'dhuhr': 15,
+    'asr': 15,
+    'maghrib': 10,
+    'isha': 15,
+  };
 
   static const List<String> _hijriMonthsAr = [
     'محرم',
@@ -47,7 +91,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     'ذو الحجة',
   ];
 
-  // قاعدة بيانات أوفلاين متكاملة (27 محافظة مصرية + أبرز العواصم العربية والإسلامية)
   static const List<OfflineCityPreset> _offlineCities = [
     OfflineCityPreset('القاهرة', 'مصر', 30.0444, 31.2357),
     OfflineCityPreset('الجيزة', 'مصر', 30.0131, 31.2089),
@@ -88,7 +131,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   @override
   void initState() {
     super.initState();
-    _initSavedLocation();
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 2),
+    );
+    _initAllData();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -96,11 +144,17 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _countdownTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _initSavedLocation() async {
+  String get _todayDateKey {
+    final now = DateTime.now();
+    return '${now.year}_${now.month}_${now.day}';
+  }
+
+  Future<void> _initAllData() async {
     final prefs = await SharedPreferences.getInstance();
     final lat = prefs.getDouble('saved_lat');
     final lng = prefs.getDouble('saved_lng');
@@ -114,6 +168,32 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
       _locationMode = savedMode;
     }
     _hijriOffset = offset;
+
+    // تحميل سجل الصلوات لليوم
+    final dateKey = _todayDateKey;
+    final keys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    final loadedStatus = <String, int>{};
+    final loadedSunnah = <String, bool>{};
+    final loadedAdhan = <String, bool>{};
+    final loadedBefore = <String, int>{};
+    final loadedAfter = <String, int>{};
+
+    for (final k in keys) {
+      loadedStatus[k] = prefs.getInt('prayer_log_${dateKey}_$k') ?? 0;
+      loadedSunnah[k] = prefs.getBool('sunnah_log_${dateKey}_$k') ?? false;
+      loadedAdhan[k] = prefs.getBool('prayer_notif_${k}_adhan') ?? true;
+      loadedBefore[k] = prefs.getInt('prayer_notif_${k}_before') ?? (k == 'fajr' ? 15 : 10);
+      loadedAfter[k] = prefs.getInt('prayer_notif_${k}_after') ?? (k == 'fajr' ? 20 : 15);
+    }
+
+    setState(() {
+      _todayPrayerStatus = loadedStatus;
+      _todaySunnahDone = loadedSunnah;
+      _totalPrayerPoints = prefs.getInt('total_prayer_points') ?? 0;
+      _adhanNotifEnabled = loadedAdhan;
+      _beforeNotifMins = loadedBefore;
+      _afterNotifMins = loadedAfter;
+    });
 
     _calculatePrayerTimes();
     if (lat == null || lng == null) {
@@ -145,6 +225,16 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     });
   }
 
+  Future<void> _syncNotificationsNow() async {
+    final params = CalculationMethod.egyptian.getParameters();
+    params.madhab = Madhab.shafi;
+    await RafiqNotificationsService.instance.syncAllScheduledNotifications(
+      lat: _coords.latitude,
+      lng: _coords.longitude,
+      params: params,
+    );
+  }
+
   Future<void> _applyLocation({
     required double lat,
     required double lng,
@@ -163,16 +253,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
       _locationMode = mode;
     });
     _calculatePrayerTimes();
-
-    if (_prayerTimes != null) {
-      final params = CalculationMethod.egyptian.getParameters();
-      params.madhab = Madhab.shafi;
-      await RafiqNotificationsService.instance.syncAllScheduledNotifications(
-        lat: lat,
-        lng: lng,
-        params: params,
-      );
-    }
+    await _syncNotificationsNow();
   }
 
   Future<void> _updateLocationOnline() async {
@@ -229,7 +310,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     }
   }
 
-  /// نافذة اختيار الموقع المتكاملة (أوفلاين من 34 محافظة/مدينة أو GPS أونلاين)
   void _openLocationSelectorSheet() {
     String query = '';
     showModalBottomSheet(
@@ -352,7 +432,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     );
   }
 
-  /// خصائص الهوية البصرية الديناميكية للويدجت حسب الصلاة القادمة
   ({
     List<Color> gradient,
     IconData skyIcon,
@@ -427,6 +506,45 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     }
   }
 
+  Future<void> _updatePrayerLogStatus(String prayerKey, int newStatus) async {
+    HapticFeedback.selectionClick();
+    final prefs = await SharedPreferences.getInstance();
+    final dateKey = _todayDateKey;
+    final oldStatus = _todayPrayerStatus[prayerKey] ?? 0;
+
+    int pointsDelta = 0;
+    if (oldStatus == 0 && newStatus > 0) {
+      pointsDelta = newStatus == 2 ? 27 : 10;
+    } else if (oldStatus > 0 && newStatus == 0) {
+      pointsDelta = oldStatus == 2 ? -27 : -10;
+    } else if (oldStatus != newStatus) {
+      pointsDelta = (newStatus == 2 ? 27 : 10) - (oldStatus == 2 ? 27 : 10);
+    }
+
+    final updatedPoints = (_totalPrayerPoints + pointsDelta).clamp(0, 9999999);
+    setState(() {
+      _todayPrayerStatus[prayerKey] = newStatus;
+      _totalPrayerPoints = updatedPoints;
+    });
+    await prefs.setInt('prayer_log_${dateKey}_$prayerKey', newStatus);
+    await prefs.setInt('total_prayer_points', updatedPoints);
+  }
+
+  Future<void> _toggleSunnahLog(String prayerKey) async {
+    HapticFeedback.lightImpact();
+    final prefs = await SharedPreferences.getInstance();
+    final dateKey = _todayDateKey;
+    final nextVal = !(_todaySunnahDone[prayerKey] ?? false);
+    final updatedPoints = (_totalPrayerPoints + (nextVal ? 5 : -5)).clamp(0, 9999999);
+
+    setState(() {
+      _todaySunnahDone[prayerKey] = nextVal;
+      _totalPrayerPoints = updatedPoints;
+    });
+    await prefs.setBool('sunnah_log_${dateKey}_$prayerKey', nextVal);
+    await prefs.setInt('total_prayer_points', updatedPoints);
+  }
+
   @override
   Widget build(BuildContext context) {
     final pt = _prayerTimes;
@@ -446,7 +564,192 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     final monthName = _hijriMonthsAr[(todayH.hMonth - 1).clamp(0, 11)];
     final hijriFullText = '${todayH.hDay} $monthName ${todayH.hYear} هـ';
 
-    // حساب أوقات النوافل (الضحى والثلث الأخير من الليل)
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('مواقيت الصلاة والمحاسبة'),
+        actions: [
+          IconButton(
+            tooltip: 'اختيار المدينة (أوفلاين / GPS)',
+            icon: const Icon(Icons.edit_location_alt_rounded, color: ThalabTheme.foxOrange),
+            onPressed: _openLocationSelectorSheet,
+          ),
+          IconButton(
+            tooltip: 'تحديث الموقع (GPS)',
+            icon: _isLoadingLocation
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: ThalabTheme.foxOrange),
+                  )
+                : const Icon(Icons.my_location_rounded, color: ThalabTheme.foxOrange),
+            onPressed: _updateLocationOnline,
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // 1. البطاقة الحية العلوية (الموقع + الهجري + العد التنازلي)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: pVisual.gradient,
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: pVisual.gradient.first.withOpacity(0.28),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: InkWell(
+                          onTap: _openLocationSelectorSheet,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.location_on_rounded, color: pVisual.accentText, size: 15),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  '$_locationLabel ($_locationMode)',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.16),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          hijriFullText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(pVisual.skyIcon, color: Colors.white, size: 20),
+                              const SizedBox(width: 6),
+                              Text(
+                                'الصلاة القادمة: ${_arabicPrayerName(nextPrayer)}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'موعد الأذان: ${_formatTime(nextTime)} • ${pVisual.periodBadge}',
+                            style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '$remHours:$remMins:$remSecs',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          Text(
+                            'متبقي على الأذان',
+                            style: TextStyle(color: pVisual.accentText, fontSize: 10.5),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 2. شريط التبويبات الثلاثة (المواقيت / سجل الصلوات / التنبيهات)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: ThalabTheme.cardSurface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: ThalabTheme.softBorder),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: ThalabTheme.foxOrange,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              labelColor: Colors.white,
+              unselectedLabelColor: ThalabTheme.darkSlate,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+              dividerColor: Colors.transparent,
+              padding: const EdgeInsets.all(4),
+              tabs: const [
+                Tab(text: 'المواقيت والسنن'),
+                Tab(text: 'سجل الصلوات'),
+                Tab(text: 'تنبيهات الأذان'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTimesAndSunnahTab(pt, nextPrayer),
+                _buildPrayerTrackerTab(pt),
+                _buildPrayerNotificationsTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// التبويب الأول: المواقيت والسنن الرواتب والنوافل
+  Widget _buildTimesAndSunnahTab(PrayerTimes? pt, Prayer nextPrayer) {
     final duhaStart = pt?.sunrise.add(const Duration(minutes: 20));
     final duhaEnd = pt?.dhuhr.subtract(const Duration(minutes: 15));
     DateTime? lastThirdNight;
@@ -513,255 +816,484 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
       },
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('مواقيت الصلاة والسنن'),
-        actions: [
-          IconButton(
-            tooltip: 'اختيار المدينة (أوفلاين / GPS)',
-            icon: const Icon(Icons.edit_location_alt_rounded, color: ThalabTheme.foxOrange),
-            onPressed: _openLocationSelectorSheet,
-          ),
-          IconButton(
-            tooltip: 'تحديث الموقع (GPS)',
-            icon: _isLoadingLocation
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: ThalabTheme.foxOrange),
-                  )
-                : const Icon(Icons.my_location_rounded, color: ThalabTheme.foxOrange),
-            onPressed: _updateLocationOnline,
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: [
-          // 1. ويدجت الصلاة الديناميكي المتناغم مع وقت الفرض + التاريخ الهجري + الموقع
-          Container(
-            padding: const EdgeInsets.all(20),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+      children: [
+        ...prayersList.map((p) {
+          final isNext = p['id'] == nextPrayer;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: pVisual.gradient,
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
+              color: isNext ? ThalabTheme.foxOrange.withOpacity(0.09) : ThalabTheme.cardSurface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isNext ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                width: isNext ? 1.8 : 1.2,
               ),
-              borderRadius: BorderRadius.circular(26),
-              boxShadow: [
-                BoxShadow(
-                  color: pVisual.gradient.first.withOpacity(0.28),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: InkWell(
-                        onTap: _openLocationSelectorSheet,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.location_on_rounded, color: pVisual.accentText, size: 15),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                '$_locationLabel ($_locationMode)',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.16),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        hijriFullText,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(pVisual.skyIcon, color: Colors.white, size: 22),
-                    const SizedBox(width: 8),
-                    Text(
-                      'الصلاة القادمة: ${_arabicPrayerName(nextPrayer)}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$remHours:$remMins:$remSecs',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                Text(
-                  'الوقت المتبقي للأذان • ${pVisual.periodBadge}',
-                  style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 2. جدول الفروض والسنن الرواتب الموضحة لكل صلاة
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8, right: 4),
-            child: Text(
-              'الصلوات المفروضة والسنن الرواتب',
-              style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold),
-            ),
-          ),
-          ...prayersList.map((p) {
-            final isNext = p['id'] == nextPrayer;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: isNext ? ThalabTheme.foxOrange.withOpacity(0.09) : ThalabTheme.cardSurface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isNext ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
-                  width: isNext ? 1.8 : 1.2,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        p['icon'] as IconData,
-                        color: isNext ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              p['name'] as String,
-                              style: TextStyle(
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.bold,
-                                color: isNext ? ThalabTheme.foxOrange : ThalabTheme.darkSlate,
-                              ),
-                            ),
-                            Text(
-                              '${p['fard']} • ${p['sunnahCount']}',
-                              style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        _formatTime(p['time'] as DateTime?),
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.bold,
-                          color: isNext ? ThalabTheme.foxOrange : ThalabTheme.darkSlate,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: ThalabTheme.creamBackground,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      p['sunnah'] as String,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: ThalabTheme.darkSlate,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-
-          const SizedBox(height: 10),
-
-          // 3. بطاقة النوافل والأوقات المباركة (الضحى + قيام الليل + الوتر)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: ThalabTheme.foxOrange.withOpacity(0.35), width: 1.4),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.volunteer_activism_rounded, color: ThalabTheme.foxOrange, size: 20),
-                    SizedBox(width: 8),
+                    Icon(
+                      p['icon'] as IconData,
+                      color: isNext ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            p['name'] as String,
+                            style: TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.bold,
+                              color: isNext ? ThalabTheme.foxOrange : ThalabTheme.darkSlate,
+                            ),
+                          ),
+                          Text(
+                            '${p['fard']} • ${p['sunnahCount']}',
+                            style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                          ),
+                        ],
+                      ),
+                    ),
                     Text(
-                      'النوافل والأوقات المباركة اليوم',
-                      style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold),
+                      _formatTime(p['time'] as DateTime?),
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.bold,
+                        color: isNext ? ThalabTheme.foxOrange : ThalabTheme.darkSlate,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                _NaflRow(
-                  title: 'صلاة الضحى (صلاة الأوابين)',
-                  subtitle: 'أقلها ركعتان وأفضلها 8 ركعات',
-                  timeWindow: '${_formatTime(duhaStart)} — ${_formatTime(duhaEnd)}',
-                ),
-                const Divider(height: 18),
-                _NaflRow(
-                  title: 'الثلث الأخير من الليل وقيام الليل',
-                  subtitle: 'وقت النزول الإلهي واستجابة الدعاء',
-                  timeWindow: 'يبدأ ${_formatTime(lastThirdNight)}',
-                ),
-                const Divider(height: 18),
-                _NaflRow(
-                  title: 'صلاة الوتر',
-                  subtitle: 'من بعد العشاء حتى طلوع الفجر (ركعة أو 3 أو أكثر)',
-                  timeWindow: '${_formatTime(pt?.isha)} — ${_formatTime(pt?.fajr)}',
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.creamBackground,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    p['sunnah'] as String,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: ThalabTheme.darkSlate,
+                      height: 1.4,
+                    ),
+                  ),
                 ),
               ],
             ),
+          );
+        }),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: ThalabTheme.cardSurface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: ThalabTheme.foxOrange.withOpacity(0.35), width: 1.4),
           ),
-        ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.volunteer_activism_rounded, color: ThalabTheme.foxOrange, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'النوافل والأوقات المباركة اليوم',
+                    style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _NaflRow(
+                title: 'صلاة الضحى (صلاة الأوابين)',
+                subtitle: 'أقلها ركعتان وأفضلها 8 ركعات',
+                timeWindow: '${_formatTime(duhaStart)} — ${_formatTime(duhaEnd)}',
+              ),
+              const Divider(height: 18),
+              _NaflRow(
+                title: 'الثلث الأخير من الليل وقيام الليل',
+                subtitle: 'وقت النزول الإلهي واستجابة الدعاء',
+                timeWindow: 'يبدأ ${_formatTime(lastThirdNight)}',
+              ),
+              const Divider(height: 18),
+              _NaflRow(
+                title: 'صلاة الوتر',
+                subtitle: 'من بعد العشاء حتى طلوع الفجر (ركعة أو 3 أو أكثر)',
+                timeWindow: '${_formatTime(pt?.isha)} — ${_formatTime(pt?.fajr)}',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// التبويب الثاني: سجل متابعة الصلوات الخمس والسنن الرواتب
+  Widget _buildPrayerTrackerTab(PrayerTimes? pt) {
+    final completedFardCount = _todayPrayerStatus.values.where((v) => v > 0).length;
+    final completedSunnahCount = _todaySunnahDone.values.where((v) => v).length;
+    final double dailyProgress = (completedFardCount / 5.0).clamp(0.0, 1.0);
+
+    final fardItems = [
+      ('fajr', 'صلاة الفجر', '2 سنة قبلية', pt?.fajr),
+      ('dhuhr', 'صلاة الظهر', '4 قبلية + 2 بعدية', pt?.dhuhr),
+      ('asr', 'صلاة العصر', '4 قبلية (مستحبة)', pt?.asr),
+      ('maghrib', 'صلاة المغرب', '2 سنة بعدية', pt?.maghrib),
+      ('isha', 'صلاة العشاء', '2 بعدية + الوتر', pt?.isha),
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+      children: [
+        // بطاقة ملخص إنجاز اليوم
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: ThalabTheme.cardSurface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'محاسبة الصلوات اليوم',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'الفروض: $completedFardCount / 5  •  السنن: $completedSunnahCount / 5',
+                        style: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: ThalabTheme.foxOrange.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.stars_rounded, color: ThalabTheme.foxOrange, size: 17),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$_totalPrayerPoints نقطة',
+                          style: const TextStyle(
+                            color: ThalabTheme.foxOrange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: dailyProgress,
+                  minHeight: 8,
+                  backgroundColor: ThalabTheme.creamBackground,
+                  valueColor: const AlwaysStoppedAnimation(Color(0xFF1B8A5A)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        ...fardItems.map((item) {
+          final key = item.$1;
+          final title = item.$2;
+          final sunnahLabel = item.$3;
+          final time = item.$4;
+          final status = _todayPrayerStatus[key] ?? 0;
+          final sunnahDone = _todaySunnahDone[key] ?? false;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: ThalabTheme.cardSurface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: status > 0 ? const Color(0xFF1B8A5A).withOpacity(0.5) : ThalabTheme.softBorder,
+                width: 1.4,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          status > 0 ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                          color: status > 0 ? const Color(0xFF1B8A5A) : ThalabTheme.mutedSlate,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      ],
+                    ),
+                    Text(
+                      _formatTime(time),
+                      style: const TextStyle(
+                        color: ThalabTheme.mutedSlate,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _StatusChoiceChip(
+                      label: 'جماعة (مسجد)',
+                      selected: status == 2,
+                      color: const Color(0xFF1B8A5A),
+                      onTap: () => _updatePrayerLogStatus(key, status == 2 ? 0 : 2),
+                    ),
+                    _StatusChoiceChip(
+                      label: 'في وقتها',
+                      selected: status == 1,
+                      color: ThalabTheme.foxOrange,
+                      onTap: () => _updatePrayerLogStatus(key, status == 1 ? 0 : 1),
+                    ),
+                    _StatusChoiceChip(
+                      label: 'قضاء',
+                      selected: status == 3,
+                      color: const Color(0xFF64748B),
+                      onTap: () => _updatePrayerLogStatus(key, status == 3 ? 0 : 3),
+                    ),
+                    FilterChip(
+                      label: Text(
+                        'السنن ($sunnahLabel)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: sunnahDone ? Colors.white : ThalabTheme.darkSlate,
+                        ),
+                      ),
+                      selected: sunnahDone,
+                      selectedColor: const Color(0xFF0F766E),
+                      backgroundColor: ThalabTheme.creamBackground,
+                      checkmarkColor: Colors.white,
+                      onSelected: (_) => _toggleSunnahLog(key),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  /// التبويب الثالث: إعدادات تنبيهات كل صلاة (قبل الأذان / عند الأذان / بعد الأذان)
+  Widget _buildPrayerNotificationsTab() {
+    final prayers = [
+      ('fajr', 'صلاة الفجر', Icons.wb_twilight_rounded),
+      ('dhuhr', 'صلاة الظهر', Icons.wb_sunny_rounded),
+      ('asr', 'صلاة العصر', Icons.wb_sunny_outlined),
+      ('maghrib', 'صلاة المغرب', Icons.nights_stay_outlined),
+      ('isha', 'صلاة العشاء', Icons.bedtime_rounded),
+    ];
+
+    const beforeOptions = [0, 5, 10, 15, 30];
+    const afterOptions = [0, 10, 15, 20, 25];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: ThalabTheme.foxOrange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.notifications_active_rounded, color: ThalabTheme.foxOrange),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'خصّص تنبيه الاستعداد قبل الأذان، تنبيه الأذان، وتنبيه الإقامة وأذكار ما بعد الصلاة لكل فرض بشكل مستقل.',
+                  style: TextStyle(fontSize: 12, height: 1.45),
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...prayers.map((p) {
+          final key = p.$1;
+          final title = p.$2;
+          final icon = p.$3;
+          final adhanOn = _adhanNotifEnabled[key] ?? true;
+          final beforeVal = _beforeNotifMins[key] ?? 10;
+          final afterVal = _afterNotifMins[key] ?? 15;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: ThalabTheme.cardSurface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: ThalabTheme.softBorder, width: 1.3),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, color: ThalabTheme.foxOrange, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        const Text('الأذان', style: TextStyle(fontSize: 12)),
+                        Switch(
+                          value: adhanOn,
+                          activeColor: ThalabTheme.foxOrange,
+                          onChanged: (val) async {
+                            final prefs = await SharedPreferences.getInstance();
+                            setState(() => _adhanNotifEnabled[key] = val);
+                            await prefs.setBool('prayer_notif_${key}_adhan', val);
+                            await _syncNotificationsNow();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const Divider(height: 14),
+                const Text(
+                  'تنبيه الاستعداد قبل الأذان:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThalabTheme.mutedSlate),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: beforeOptions.map((mins) {
+                    final selected = beforeVal == mins;
+                    return ChoiceChip(
+                      label: Text(
+                        mins == 0 ? 'إيقاف' : 'قبل $mins د',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: selected ? Colors.white : ThalabTheme.darkSlate,
+                        ),
+                      ),
+                      selected: selected,
+                      selectedColor: ThalabTheme.foxOrange,
+                      backgroundColor: ThalabTheme.creamBackground,
+                      onSelected: (_) async {
+                        final prefs = await SharedPreferences.getInstance();
+                        setState(() => _beforeNotifMins[key] = mins);
+                        await prefs.setInt('prayer_notif_${key}_before', mins);
+                        await _syncNotificationsNow();
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'تنبيه الإقامة وأذكار بعد الصلاة:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThalabTheme.mutedSlate),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: afterOptions.map((mins) {
+                    final selected = afterVal == mins;
+                    return ChoiceChip(
+                      label: Text(
+                        mins == 0 ? 'إيقاف' : 'بعد $mins د',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: selected ? Colors.white : ThalabTheme.darkSlate,
+                        ),
+                      ),
+                      selected: selected,
+                      selectedColor: const Color(0xFF0F766E),
+                      backgroundColor: ThalabTheme.creamBackground,
+                      onSelected: (_) async {
+                        final prefs = await SharedPreferences.getInstance();
+                        setState(() => _afterNotifMins[key] = mins);
+                        await prefs.setInt('prayer_notif_${key}_after', mins);
+                        await _syncNotificationsNow();
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _StatusChoiceChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _StatusChoiceChip({
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.bold,
+          color: selected ? Colors.white : ThalabTheme.darkSlate,
+        ),
       ),
+      selected: selected,
+      selectedColor: color,
+      backgroundColor: ThalabTheme.creamBackground,
+      onSelected: (_) => onTap(),
     );
   }
 }
