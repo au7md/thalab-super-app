@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,16 +15,20 @@ class ThalabAudioTrack {
   final String id;
   final String title;
   final String subtitle;
+  final String folder;
   final String path;
   final int durationSeconds;
+  final int dateAdded;
   final String sourceType; // 'device', 'extracted', 'recording'
 
   const ThalabAudioTrack({
     required this.id,
     required this.title,
     required this.subtitle,
+    required this.folder,
     required this.path,
     required this.durationSeconds,
+    required this.dateAdded,
     required this.sourceType,
   });
 }
@@ -45,14 +50,20 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   late AnimationController _discController;
   final TextEditingController _searchController = TextEditingController();
 
-  int _selectedTab = 0;
+  int _selectedTab = 0; // 0: الكل, 1: المجلدات, 2: المفضلة, 3: قوائم التشغيل, 4: التسجيلات والمستخرج
   String _searchQuery = '';
+  String _sortBy = 'newest'; // 'newest', 'name', 'duration'
   bool _isLoading = true;
 
   List<ThalabAudioTrack> _allTracks = [];
   Set<String> _favoriteIds = {};
   Map<String, List<String>> _playlists = {};
   String? _selectedPlaylistName;
+  String? _selectedFolderName;
+
+  // وضع التحديد المتعدد بالضغط المطول
+  final Set<String> _selectedTrackIds = {};
+  bool get _isSelectionMode => _selectedTrackIds.isNotEmpty;
 
   int _currentIndex = -1;
   bool _isPlaying = false;
@@ -61,12 +72,15 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   double _playbackSpeed = 1.0;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  int _lastPersistedSec = -1;
 
   Timer? _sleepTimer;
-  int _sleepMinutesLeft = 0;
+  int _sleepSecondsLeft = 0;
+  String _activeRelaxLabel = '';
 
   static const List<String> _tabs = [
     'كل الصوتيات',
+    'المجلدات',
     'المفضلة',
     'قوائم التشغيل',
     'التسجيلات والمستخرج',
@@ -81,7 +95,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
       duration: const Duration(seconds: 14),
     );
     _bindPlayerStreams();
-    _loadAudioLibrary();
+    _loadAudioLibrary(restoreLastSession: true);
   }
 
   void _bindPlayerStreams() {
@@ -93,6 +107,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
         _discController.repeat();
       } else {
         _discController.stop();
+        _savePlaybackCheckpoint();
       }
       if (state.processingState == ProcessingState.completed) {
         _handleTrackCompleted();
@@ -100,7 +115,12 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     });
 
     _player.positionStream.listen((pos) {
-      if (mounted) setState(() => _position = pos);
+      if (!mounted) return;
+      setState(() => _position = pos);
+      if (pos.inSeconds != _lastPersistedSec && pos.inSeconds % 5 == 0) {
+        _lastPersistedSec = pos.inSeconds;
+        _savePlaybackCheckpoint();
+      }
     });
 
     _player.durationStream.listen((dur) {
@@ -110,6 +130,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
 
   @override
   void dispose() {
+    _savePlaybackCheckpoint();
     _sleepTimer?.cancel();
     _discController.dispose();
     _searchController.dispose();
@@ -117,7 +138,44 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     super.dispose();
   }
 
-  Future<void> _loadAudioLibrary() async {
+  Future<void> _savePlaybackCheckpoint() async {
+    if (_currentIndex < 0 || _currentIndex >= _allTracks.length) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_audio_path', _allTracks[_currentIndex].path);
+    await prefs.setInt('last_audio_pos_ms', _position.inMilliseconds);
+  }
+
+  Future<void> _restoreLastPlaybackSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastPath = prefs.getString('last_audio_path');
+    final lastPosMs = prefs.getInt('last_audio_pos_ms') ?? 0;
+    if (lastPath == null || lastPath.isEmpty || _allTracks.isEmpty) return;
+
+    final idx = _allTracks.indexWhere((t) => t.path == lastPath);
+    if (idx != -1 && mounted) {
+      final track = _allTracks[idx];
+      setState(() {
+        _currentIndex = idx;
+        _position = Duration(milliseconds: lastPosMs);
+      });
+      try {
+        await _player.setAudioSource(
+          AudioSource.file(
+            track.path,
+            tag: MediaItem(
+              id: track.id,
+              album: track.folder,
+              title: track.title,
+              artist: track.subtitle,
+            ),
+          ),
+          initialPosition: Duration(milliseconds: lastPosMs),
+        );
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _loadAudioLibrary({bool restoreLastSession = false}) async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     final savedFavs = prefs.getStringList('audio_favorite_ids') ?? [];
@@ -133,6 +191,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     }
 
     final List<ThalabAudioTrack> collected = [];
+    final Set<String> seenPaths = {};
     final dir = await getApplicationDocumentsDirectory();
 
     // 1. التسجيلات الصوتية المحلية
@@ -141,14 +200,17 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
       final files = recDir.listSync().whereType<File>().toList()
         ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
       for (final f in files) {
+        if (!seenPaths.add(f.path)) continue;
         final name = f.path.split('/').last.replaceAll('.m4a', '');
         collected.add(
           ThalabAudioTrack(
             id: f.path,
             title: name,
             subtitle: 'تسجيل صوتي • استوديو الثعلب',
+            folder: 'Thalab Recordings',
             path: f.path,
             durationSeconds: 0,
+            dateAdded: f.lastModifiedSync().millisecondsSinceEpoch ~/ 1000,
             sourceType: 'recording',
           ),
         );
@@ -161,36 +223,45 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
       final files = extDir.listSync().whereType<File>().toList()
         ..sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
       for (final f in files) {
+        if (!seenPaths.add(f.path)) continue;
         final name = f.path.split('/').last.replaceAll('.m4a', '');
         collected.add(
           ThalabAudioTrack(
             id: f.path,
             title: name,
             subtitle: 'مستخرج من فيديو • المعرض',
+            folder: 'Thalab Extracted',
             path: f.path,
             durationSeconds: 0,
+            dateAdded: f.lastModifiedSync().millisecondsSinceEpoch ~/ 1000,
             sourceType: 'extracted',
           ),
         );
       }
     }
 
-    // 3. جلب كل صوتيات وموسيقى الجهاز مباشرة من MediaStore
+    // 3. جلب صوتيات وموسيقى الجهاز من MediaStore (بما فيها Music/Thalab Recordings)
     try {
       final rawList = await _studioChannel.invokeMethod<List<dynamic>>('getDeviceAudios');
       if (rawList != null) {
         for (final item in rawList) {
           if (item is Map) {
             final path = item['path']?.toString() ?? '';
-            if (path.isEmpty) continue;
+            if (path.isEmpty || !seenPaths.add(path)) continue;
+            final folder = item['folder']?.toString() ?? 'ملفات صوتية';
+            final isThalabRec = folder == 'Thalab Recordings';
             collected.add(
               ThalabAudioTrack(
                 id: item['id']?.toString() ?? path,
                 title: item['title']?.toString() ?? 'ملف صوتي',
-                subtitle: item['artist']?.toString() ?? 'مكتبة الجهاز',
+                subtitle: isThalabRec
+                    ? 'تسجيلات الثعلب • Music'
+                    : (item['artist']?.toString() ?? folder),
+                folder: folder,
                 path: path,
                 durationSeconds: (item['durationSec'] as int?) ?? 0,
-                sourceType: 'device',
+                dateAdded: (item['dateAdded'] as int?) ?? 0,
+                sourceType: isThalabRec ? 'recording' : 'device',
               ),
             );
           }
@@ -205,30 +276,55 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
         _allTracks = collected;
         _isLoading = false;
       });
+      if (restoreLastSession) {
+        await _restoreLastPlaybackSession();
+      }
     }
+  }
+
+  Map<String, List<ThalabAudioTrack>> get _folderGroups {
+    final Map<String, List<ThalabAudioTrack>> groups = {};
+    for (final t in _allTracks) {
+      groups.putIfAbsent(t.folder, () => []).add(t);
+    }
+    return groups;
   }
 
   List<ThalabAudioTrack> get _filteredTracks {
     List<ThalabAudioTrack> base;
-    if (_selectedTab == 1) {
+    if (_selectedTab == 1 && _selectedFolderName != null) {
+      base = _allTracks.where((t) => t.folder == _selectedFolderName).toList();
+    } else if (_selectedTab == 2) {
       base = _allTracks.where((t) => _favoriteIds.contains(t.id)).toList();
-    } else if (_selectedTab == 2 && _selectedPlaylistName != null) {
+    } else if (_selectedTab == 3 && _selectedPlaylistName != null) {
       final ids = _playlists[_selectedPlaylistName!] ?? [];
       base = _allTracks.where((t) => ids.contains(t.id)).toList();
-    } else if (_selectedTab == 3) {
+    } else if (_selectedTab == 4) {
       base = _allTracks
           .where((t) => t.sourceType == 'recording' || t.sourceType == 'extracted')
           .toList();
     } else {
-      base = _allTracks;
+      base = List<ThalabAudioTrack>.from(_allTracks);
     }
 
     final q = _searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return base;
-    return base
-        .where((t) =>
-            t.title.toLowerCase().contains(q) || t.subtitle.toLowerCase().contains(q))
-        .toList();
+    if (q.isNotEmpty) {
+      base = base
+          .where((t) =>
+              t.title.toLowerCase().contains(q) ||
+              t.subtitle.toLowerCase().contains(q) ||
+              t.folder.toLowerCase().contains(q))
+          .toList();
+    }
+
+    if (_sortBy == 'name') {
+      base.sort((a, b) => a.title.compareTo(b.title));
+    } else if (_sortBy == 'duration') {
+      base.sort((a, b) => b.durationSeconds.compareTo(a.durationSeconds));
+    } else {
+      base.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
+    }
+    return base;
   }
 
   Future<void> _playTrackAt(int indexInAll) async {
@@ -236,9 +332,20 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     final track = _allTracks[indexInAll];
     try {
       setState(() => _currentIndex = indexInAll);
-      await _player.setFilePath(track.path);
+      await _player.setAudioSource(
+        AudioSource.file(
+          track.path,
+          tag: MediaItem(
+            id: track.id,
+            album: track.folder,
+            title: track.title,
+            artist: track.subtitle,
+          ),
+        ),
+      );
       await _player.setSpeed(_playbackSpeed);
       await _player.play();
+      _savePlaybackCheckpoint();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -293,6 +400,95 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
       }
     });
     await prefs.setStringList('audio_favorite_ids', _favoriteIds.toList());
+  }
+
+  void _toggleSelection(String id) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      if (_selectedTrackIds.contains(id)) {
+        _selectedTrackIds.remove(id);
+      } else {
+        _selectedTrackIds.add(id);
+      }
+    });
+  }
+
+  Future<void> _shareSelectedTracks() async {
+    final files = _allTracks
+        .where((t) => _selectedTrackIds.contains(t.id))
+        .map((t) => XFile(t.path))
+        .toList();
+    if (files.isEmpty) return;
+    await Share.shareXFiles(files);
+    setState(() => _selectedTrackIds.clear());
+  }
+
+  Future<void> _exportSelectedToMusicFolder() async {
+    final targets = _allTracks.where((t) => _selectedTrackIds.contains(t.id)).toList();
+    for (final t in targets) {
+      await _studioChannel.invokeMethod('exportToMusicFolder', {
+        'srcPath': t.path,
+        'title': t.title,
+        'subFolder': 'Thalab Recordings',
+      });
+    }
+    setState(() => _selectedTrackIds.clear());
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم حفظ ${targets.length} ملف في مجلد Music/Thalab Recordings ✓')),
+      );
+    }
+    await _loadAudioLibrary();
+  }
+
+  void _addSelectedToPlaylist() {
+    final ids = _selectedTrackIds.toList();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: ThalabTheme.cardSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('إضافة (${ids.length}) مقطع لقائمة تشغيل',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openCreatePlaylistDialog();
+                  },
+                  icon: const Icon(Icons.add_rounded, color: ThalabTheme.foxOrange),
+                  label: const Text('جديدة', style: TextStyle(color: ThalabTheme.foxOrange)),
+                ),
+              ],
+            ),
+            ..._playlists.keys.map((plName) => ListTile(
+                  leading: const Icon(Icons.queue_music_rounded, color: ThalabTheme.foxOrange),
+                  title: Text(plName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  onTap: () async {
+                    setState(() {
+                      for (final id in ids) {
+                        if (!_playlists[plName]!.contains(id)) {
+                          _playlists[plName]!.add(id);
+                        }
+                      }
+                      _selectedTrackIds.clear();
+                    });
+                    await _savePlaylists();
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                )),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _openAudioEditor(ThalabAudioTrack track) async {
@@ -494,24 +690,44 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     );
   }
 
-  void _startSleepTimer(int minutes) {
+  void _startRelaxOrSleepSession(int minutes, String label, {bool autoPlay = true}) {
     _sleepTimer?.cancel();
     if (minutes <= 0) {
-      setState(() => _sleepMinutesLeft = 0);
+      setState(() {
+        _sleepSecondsLeft = 0;
+        _activeRelaxLabel = '';
+      });
       return;
     }
-    setState(() => _sleepMinutesLeft = minutes);
-    _sleepTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+
+    setState(() {
+      _sleepSecondsLeft = minutes * 60;
+      _activeRelaxLabel = label;
+    });
+
+    if (autoPlay && !_isPlaying && _allTracks.isNotEmpty) {
+      final targetIdx = _currentIndex >= 0 ? _currentIndex : 0;
+      _playTrackAt(targetIdx);
+    }
+
+    _sleepTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      setState(() => _sleepMinutesLeft--);
-      if (_sleepMinutesLeft <= 0) {
+      setState(() => _sleepSecondsLeft--);
+      if (_sleepSecondsLeft <= 0) {
         timer.cancel();
+        _activeRelaxLabel = '';
         _player.pause();
       }
     });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم تفعيل "$label" ($minutes دقيقة) بنجاح ✓')),
+      );
+    }
   }
 
   void _openSleepTimerSheet() {
@@ -536,7 +752,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
               spacing: 10,
               runSpacing: 10,
               children: [0, 15, 30, 45, 60].map((mins) {
-                final active = _sleepMinutesLeft == mins;
+                final active = (_sleepSecondsLeft / 60).ceil() == mins &&
+                    (mins == 0 ? _sleepSecondsLeft == 0 : _sleepSecondsLeft > 0);
                 return ChoiceChip(
                   label: Text(
                     mins == 0 ? 'إيقاف المؤقت' : '$mins دقيقة',
@@ -548,7 +765,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                   selected: active,
                   selectedColor: ThalabTheme.foxOrange,
                   onSelected: (_) {
-                    _startSleepTimer(mins);
+                    _startRelaxOrSleepSession(mins, 'مؤقت النوم', autoPlay: false);
                     Navigator.pop(ctx);
                   },
                 );
@@ -577,7 +794,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
           final posMs = _position.inMilliseconds.toDouble().clamp(0.0, maxMs);
 
           return Padding(
-            padding: const EdgeInsets.fromLTRB(24, 18, 24, 34),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -597,8 +814,15 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                       icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
                       onPressed: () => Navigator.pop(ctx),
                     ),
-                    const Text('استوديو الصوت • الثعلب',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Column(
+                      children: [
+                        const Text('استوديو الصوت • الثعلب',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        Text(track.folder,
+                            style: const TextStyle(
+                                color: ThalabTheme.foxOrange, fontSize: 11)),
+                      ],
+                    ),
                     IconButton(
                       tooltip: 'قص وتحرير المقطع الصوتي',
                       icon: const Icon(Icons.content_cut_rounded,
@@ -610,43 +834,53 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
 
+                // الأسطوانة الدوارة المزدوجة الاحترافية
                 RotationTransition(
                   turns: _discController,
                   child: Container(
-                    width: 185,
-                    height: 185,
+                    width: 205,
+                    height: 205,
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [ThalabTheme.foxOrange, ThalabTheme.foxOrangeLight],
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: ThalabTheme.foxOrange.withOpacity(0.32),
-                          blurRadius: 24,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
+                      color: ThalabTheme.foxOrange.withOpacity(0.12),
+                      border: Border.all(
+                          color: ThalabTheme.foxOrange.withOpacity(0.35), width: 2),
                     ),
-                    child: Center(
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: const BoxDecoration(
-                          color: ThalabTheme.creamBackground,
-                          shape: BoxShape.circle,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [ThalabTheme.foxOrange, ThalabTheme.foxOrangeLight],
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
                         ),
-                        child: const Icon(Icons.music_note_rounded,
-                            color: ThalabTheme.foxOrange, size: 30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: ThalabTheme.foxOrange.withOpacity(0.32),
+                            blurRadius: 22,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 62,
+                          height: 62,
+                          decoration: const BoxDecoration(
+                            color: ThalabTheme.creamBackground,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.music_note_rounded,
+                              color: ThalabTheme.foxOrange, size: 30),
+                        ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 22),
 
                 Row(
                   children: [
@@ -658,7 +892,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                             track.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 17.5, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -715,8 +949,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     children: [
                       Text(_fmtDur(_position),
                           style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate)),
-                      if (_sleepMinutesLeft > 0)
-                        Text('مؤقت النوم: $_sleepMinutesLeft د',
+                      if (_sleepSecondsLeft > 0)
+                        Text('مؤقت نشط: ${_fmtSec(_sleepSecondsLeft)}',
                             style: const TextStyle(
                                 fontSize: 11,
                                 color: ThalabTheme.foxOrange,
@@ -728,6 +962,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                 ),
                 const SizedBox(height: 14),
 
+                // أزرار التحكم + تقديم/تأخير 10 ثوانٍ
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -738,6 +973,15 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                       ),
                       onPressed: () {
                         setState(() => _isShuffle = !_isShuffle);
+                        setSheetState(() {});
+                      },
+                    ),
+                    IconButton(
+                      iconSize: 30,
+                      icon: const Icon(Icons.replay_10_rounded),
+                      onPressed: () {
+                        final target = (_position.inSeconds - 10).clamp(0, 99999);
+                        _player.seek(Duration(seconds: target));
                         setSheetState(() {});
                       },
                     ),
@@ -755,8 +999,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                         setSheetState(() {});
                       },
                       child: Container(
-                        width: 66,
-                        height: 66,
+                        width: 68,
+                        height: 68,
                         decoration: const BoxDecoration(
                           color: ThalabTheme.foxOrange,
                           shape: BoxShape.circle,
@@ -764,7 +1008,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                         child: Icon(
                           _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                           color: Colors.white,
-                          size: 38,
+                          size: 40,
                         ),
                       ),
                     ),
@@ -773,6 +1017,14 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                       icon: const Icon(Icons.skip_next_rounded),
                       onPressed: () {
                         _playNext();
+                        setSheetState(() {});
+                      },
+                    ),
+                    IconButton(
+                      iconSize: 30,
+                      icon: const Icon(Icons.forward_10_rounded),
+                      onPressed: () {
+                        _player.seek(Duration(seconds: _position.inSeconds + 10));
                         setSheetState(() {});
                       },
                     ),
@@ -859,17 +1111,31 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.spa_rounded, color: ThalabTheme.foxOrange),
-                SizedBox(width: 8),
-                Text('وضع التركيز والاسترخاء السريع',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                const Row(
+                  children: [
+                    Icon(Icons.spa_rounded, color: ThalabTheme.foxOrange),
+                    SizedBox(width: 8),
+                    Text('وضع التركيز والاسترخاء السريع',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                if (_sleepSecondsLeft > 0)
+                  TextButton(
+                    onPressed: () {
+                      _startRelaxOrSleepSession(0, '');
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('إيقاف المؤقت',
+                        style: TextStyle(color: Colors.redAccent)),
+                  ),
               ],
             ),
             const SizedBox(height: 6),
             const Text(
-              'اختر وضعاً لتشغيل مؤقت تركيز هادئ مع إيقاف تلقائي للصوتيات:',
+              'يبدأ تشغيل صوتياتك تلقائياً مع مؤقت عد تنازلي لإيقاف الصوت بهدوء:',
               style: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate),
             ),
             const SizedBox(height: 16),
@@ -885,7 +1151,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                   title: 'جلسة تركيز (25 د)',
                   icon: Icons.bolt_rounded,
                   onTap: () {
-                    _startSleepTimer(25);
+                    _startRelaxOrSleepSession(25, 'جلسة تركيز');
                     Navigator.pop(ctx);
                   },
                 ),
@@ -893,7 +1159,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                   title: 'استماع قبل النوم (30 د)',
                   icon: Icons.nights_stay_rounded,
                   onTap: () {
-                    _startSleepTimer(30);
+                    _startRelaxOrSleepSession(30, 'استماع قبل النوم');
                     Navigator.pop(ctx);
                   },
                 ),
@@ -901,7 +1167,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                   title: 'قراءة هادئة (45 د)',
                   icon: Icons.menu_book_rounded,
                   onTap: () {
-                    _startSleepTimer(45);
+                    _startRelaxOrSleepSession(45, 'قراءة هادئة');
                     Navigator.pop(ctx);
                   },
                 ),
@@ -913,7 +1179,9 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                       _isShuffle = true;
                       _loopMode = LoopMode.all;
                     });
-                    if (_allTracks.isNotEmpty) _playTrackAt(0);
+                    if (_allTracks.isNotEmpty) {
+                      _playTrackAt(math.Random().nextInt(_allTracks.length));
+                    }
                     Navigator.pop(ctx);
                   },
                 ),
@@ -944,34 +1212,79 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     final hasActiveTrack = _currentIndex >= 0 && _currentIndex < _allTracks.length;
 
     return Scaffold(
-      appBar: AppBar(
-        leading: (_selectedTab == 2 && _selectedPlaylistName != null)
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => setState(() => _selectedPlaylistName = null),
-              )
-            : null,
-        title: Text(
-          (_selectedTab == 2 && _selectedPlaylistName != null)
-              ? _selectedPlaylistName!
-              : 'الموسيقى والصوتيات (${_allTracks.length})',
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'تحديث المكتبة',
-            icon: const Icon(Icons.refresh_rounded, color: ThalabTheme.foxOrange),
-            onPressed: _loadAudioLibrary,
-          ),
-          IconButton(
-            tooltip: 'مؤقت النوم',
-            icon: Icon(
-              Icons.bedtime_rounded,
-              color: _sleepMinutesLeft > 0 ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+      appBar: _isSelectionMode
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => setState(() => _selectedTrackIds.clear()),
+              ),
+              title: Text('تم تحديد ${_selectedTrackIds.length}'),
+              actions: [
+                IconButton(
+                  tooltip: 'نقل/حفظ في مجلد Music',
+                  icon: const Icon(Icons.drive_file_move_rounded,
+                      color: ThalabTheme.foxOrange),
+                  onPressed: _exportSelectedToMusicFolder,
+                ),
+                IconButton(
+                  tooltip: 'إضافة لقائمة تشغيل',
+                  icon: const Icon(Icons.playlist_add_rounded,
+                      color: ThalabTheme.foxOrange),
+                  onPressed: _addSelectedToPlaylist,
+                ),
+                IconButton(
+                  tooltip: 'مشاركة المحدد',
+                  icon: const Icon(Icons.share_rounded, color: ThalabTheme.foxOrange),
+                  onPressed: _shareSelectedTracks,
+                ),
+              ],
+            )
+          : AppBar(
+              leading: ((_selectedTab == 1 && _selectedFolderName != null) ||
+                      (_selectedTab == 3 && _selectedPlaylistName != null))
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      onPressed: () => setState(() {
+                        _selectedFolderName = null;
+                        _selectedPlaylistName = null;
+                      }),
+                    )
+                  : null,
+              title: Text(
+                (_selectedTab == 1 && _selectedFolderName != null)
+                    ? _selectedFolderName!
+                    : (_selectedTab == 3 && _selectedPlaylistName != null)
+                        ? _selectedPlaylistName!
+                        : 'الموسيقى والصوتيات (${_allTracks.length})',
+              ),
+              actions: [
+                PopupMenuButton<String>(
+                  tooltip: 'ترتيب الصوتيات',
+                  icon: const Icon(Icons.sort_rounded, color: ThalabTheme.foxOrange),
+                  onSelected: (v) => setState(() => _sortBy = v),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'newest', child: Text('الترتيب: الأحدث إضافة')),
+                    PopupMenuItem(value: 'name', child: Text('الترتيب: أبجدياً (أ - ي)')),
+                    PopupMenuItem(value: 'duration', child: Text('الترتيب: الأطول مدة')),
+                  ],
+                ),
+                IconButton(
+                  tooltip: 'تحديث المكتبة',
+                  icon: const Icon(Icons.refresh_rounded, color: ThalabTheme.foxOrange),
+                  onPressed: _loadAudioLibrary,
+                ),
+                IconButton(
+                  tooltip: 'مؤقت النوم',
+                  icon: Icon(
+                    Icons.bedtime_rounded,
+                    color: _sleepSecondsLeft > 0
+                        ? ThalabTheme.foxOrange
+                        : ThalabTheme.mutedSlate,
+                  ),
+                  onPressed: _openSleepTimerSheet,
+                ),
+              ],
             ),
-            onPressed: _openSleepTimerSheet,
-          ),
-        ],
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: ThalabTheme.foxOrange))
           : Column(
@@ -992,8 +1305,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                       Expanded(
                         child: _TopAudioActionCard(
                           title: 'وضع الاسترخاء',
-                          subtitle: _sleepMinutesLeft > 0
-                              ? 'مؤقت نشط: $_sleepMinutesLeft د'
+                          subtitle: _sleepSecondsLeft > 0
+                              ? '$_activeRelaxLabel • ${_fmtSec(_sleepSecondsLeft)}'
                               : 'مؤقت النوم والتركيز',
                           icon: Icons.spa_rounded,
                           onTap: _openFocusRelaxSheet,
@@ -1009,7 +1322,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     controller: _searchController,
                     onChanged: (v) => setState(() => _searchQuery = v),
                     decoration: InputDecoration(
-                      hintText: 'ابحث في الصوتيات والتسجيلات...',
+                      hintText: 'ابحث بالاسم أو المجلد أو التسجيل...',
                       hintStyle:
                           const TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate),
                       prefixIcon:
@@ -1062,6 +1375,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                         onSelected: (_) {
                           setState(() {
                             _selectedTab = idx;
+                            _selectedFolderName = null;
                             _selectedPlaylistName = null;
                           });
                         },
@@ -1072,194 +1386,249 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                 const SizedBox(height: 8),
 
                 Expanded(
-                  child: (_selectedTab == 2 && _selectedPlaylistName == null)
-                      ? _buildPlaylistsView()
-                      : visibleTracks.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Text(
-                                    'لا توجد ملفات صوتية مطابقة',
-                                    style: TextStyle(color: ThalabTheme.mutedSlate),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  OutlinedButton.icon(
-                                    onPressed: _loadAudioLibrary,
-                                    icon: const Icon(Icons.refresh_rounded,
-                                        color: ThalabTheme.foxOrange),
-                                    label: const Text('إعادة فحص صوتيات الجهاز',
-                                        style: TextStyle(color: ThalabTheme.foxOrange)),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : ListView.separated(
-                              padding: EdgeInsets.fromLTRB(
-                                  16, 4, 16, hasActiveTrack ? 175 : 115),
-                              itemCount: visibleTracks.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
-                              itemBuilder: (context, idx) {
-                                final track = visibleTracks[idx];
-                                final indexInAll =
-                                    _allTracks.indexWhere((t) => t.id == track.id);
-                                final isCurrent = indexInAll == _currentIndex;
-                                final isFav = _favoriteIds.contains(track.id);
-
-                                return InkWell(
-                                  borderRadius: BorderRadius.circular(18),
-                                  onTap: () => _playTrackAt(indexInAll),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: isCurrent
-                                          ? ThalabTheme.foxOrange.withOpacity(0.1)
-                                          : ThalabTheme.cardSurface,
-                                      borderRadius: BorderRadius.circular(18),
-                                      border: Border.all(
-                                        color: isCurrent
-                                            ? ThalabTheme.foxOrange
-                                            : ThalabTheme.softBorder,
+                  child: (_selectedTab == 1 && _selectedFolderName == null)
+                      ? _buildFoldersView()
+                      : (_selectedTab == 3 && _selectedPlaylistName == null)
+                          ? _buildPlaylistsView()
+                          : visibleTracks.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        'لا توجد ملفات صوتية في هذا القسم',
+                                        style: TextStyle(color: ThalabTheme.mutedSlate),
                                       ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 44,
-                                          height: 44,
-                                          decoration: BoxDecoration(
-                                            color: ThalabTheme.foxOrange.withOpacity(0.14),
-                                            borderRadius: BorderRadius.circular(14),
-                                          ),
-                                          child: Icon(
-                                            isCurrent && _isPlaying
-                                                ? Icons.graphic_eq_rounded
-                                                : track.sourceType == 'recording'
-                                                    ? Icons.mic_rounded
-                                                    : Icons.music_note_rounded,
-                                            color: ThalabTheme.foxOrange,
+                                      const SizedBox(height: 12),
+                                      OutlinedButton.icon(
+                                        onPressed: _loadAudioLibrary,
+                                        icon: const Icon(Icons.refresh_rounded,
+                                            color: ThalabTheme.foxOrange),
+                                        label: const Text('إعادة فحص صوتيات الجهاز',
+                                            style:
+                                                TextStyle(color: ThalabTheme.foxOrange)),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.separated(
+                                  padding: EdgeInsets.fromLTRB(
+                                      16, 4, 16, hasActiveTrack ? 175 : 115),
+                                  itemCount: visibleTracks.length,
+                                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                  itemBuilder: (context, idx) {
+                                    final track = visibleTracks[idx];
+                                    final indexInAll =
+                                        _allTracks.indexWhere((t) => t.id == track.id);
+                                    final isCurrent = indexInAll == _currentIndex;
+                                    final isFav = _favoriteIds.contains(track.id);
+                                    final isSelected = _selectedTrackIds.contains(track.id);
+
+                                    return InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onLongPress: () => _toggleSelection(track.id),
+                                      onTap: () {
+                                        if (_isSelectionMode) {
+                                          _toggleSelection(track.id);
+                                        } else {
+                                          _playTrackAt(indexInAll);
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? ThalabTheme.foxOrange.withOpacity(0.18)
+                                              : isCurrent
+                                                  ? ThalabTheme.foxOrange.withOpacity(0.1)
+                                                  : ThalabTheme.cardSurface,
+                                          borderRadius: BorderRadius.circular(18),
+                                          border: Border.all(
+                                            color: (isSelected || isCurrent)
+                                                ? ThalabTheme.foxOrange
+                                                : ThalabTheme.softBorder,
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                track.title,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13.5,
-                                                  color: isCurrent
-                                                      ? ThalabTheme.foxOrange
-                                                      : ThalabTheme.darkSlate,
-                                                ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 44,
+                                              height: 44,
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    ThalabTheme.foxOrange.withOpacity(0.14),
+                                                borderRadius: BorderRadius.circular(14),
                                               ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                '${track.subtitle} • ${_fmtSec(track.durationSeconds)}',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: ThalabTheme.mutedSlate,
-                                                ),
+                                              child: Icon(
+                                                isSelected
+                                                    ? Icons.check_circle_rounded
+                                                    : (isCurrent && _isPlaying)
+                                                        ? Icons.graphic_eq_rounded
+                                                        : track.sourceType == 'recording'
+                                                            ? Icons.mic_rounded
+                                                            : Icons.music_note_rounded,
+                                                color: ThalabTheme.foxOrange,
                                               ),
-                                            ],
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: Icon(
-                                            isFav
-                                                ? Icons.favorite_rounded
-                                                : Icons.favorite_border_rounded,
-                                            size: 20,
-                                            color: isFav
-                                                ? Colors.redAccent
-                                                : ThalabTheme.mutedSlate,
-                                          ),
-                                          onPressed: () => _toggleFavorite(track.id),
-                                        ),
-                                        PopupMenuButton<String>(
-                                          icon: const Icon(Icons.more_vert_rounded,
-                                              size: 20, color: ThalabTheme.mutedSlate),
-                                          onSelected: (val) {
-                                            if (val == 'trim') _openAudioEditor(track);
-                                            if (val == 'playlist') _openAddToPlaylistSheet(track);
-                                            if (val == 'rename') _renameTrack(track);
-                                            if (val == 'share') Share.shareXFiles([XFile(track.path)]);
-                                            if (val == 'delete') _deleteTrack(track);
-                                          },
-                                          itemBuilder: (_) => [
-                                            const PopupMenuItem(
-                                              value: 'trim',
-                                              child: Row(
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  Icon(Icons.content_cut_rounded,
-                                                      color: ThalabTheme.foxOrange, size: 19),
-                                                  SizedBox(width: 8),
-                                                  Text('قص وتحرير المقطع'),
+                                                  Text(
+                                                    track.title,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13.5,
+                                                      color: isCurrent
+                                                          ? ThalabTheme.foxOrange
+                                                          : ThalabTheme.darkSlate,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    '${track.folder} • ${_fmtSec(track.durationSeconds)}',
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      color: ThalabTheme.mutedSlate,
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
                                             ),
-                                            const PopupMenuItem(
-                                              value: 'playlist',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.playlist_add_rounded, size: 19),
-                                                  SizedBox(width: 8),
-                                                  Text('إضافة لقائمة تشغيل'),
-                                                ],
+                                            IconButton(
+                                              icon: Icon(
+                                                isFav
+                                                    ? Icons.favorite_rounded
+                                                    : Icons.favorite_border_rounded,
+                                                size: 20,
+                                                color: isFav
+                                                    ? Colors.redAccent
+                                                    : ThalabTheme.mutedSlate,
                                               ),
+                                              onPressed: () => _toggleFavorite(track.id),
                                             ),
-                                            if (track.sourceType != 'device')
-                                              const PopupMenuItem(
-                                                value: 'rename',
-                                                child: Row(
-                                                  children: [
-                                                    Icon(Icons.edit_rounded, size: 19),
-                                                    SizedBox(width: 8),
-                                                    Text('إعادة تسمية'),
-                                                  ],
+                                            PopupMenuButton<String>(
+                                              icon: const Icon(Icons.more_vert_rounded,
+                                                  size: 20,
+                                                  color: ThalabTheme.mutedSlate),
+                                              onSelected: (val) async {
+                                                if (val == 'trim') _openAudioEditor(track);
+                                                if (val == 'playlist') {
+                                                  _openAddToPlaylistSheet(track);
+                                                }
+                                                if (val == 'export') {
+                                                  await _studioChannel.invokeMethod(
+                                                      'exportToMusicFolder', {
+                                                    'srcPath': track.path,
+                                                    'title': track.title,
+                                                    'subFolder': 'Thalab Recordings',
+                                                  });
+                                                  if (context.mounted) {
+                                                    ScaffoldMessenger.of(context)
+                                                        .showSnackBar(
+                                                      const SnackBar(
+                                                          content: Text(
+                                                              'تم الحفظ في Music/Thalab Recordings ✓')),
+                                                    );
+                                                  }
+                                                }
+                                                if (val == 'rename') _renameTrack(track);
+                                                if (val == 'share') {
+                                                  Share.shareXFiles([XFile(track.path)]);
+                                                }
+                                                if (val == 'delete') _deleteTrack(track);
+                                              },
+                                              itemBuilder: (_) => [
+                                                const PopupMenuItem(
+                                                  value: 'trim',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.content_cut_rounded,
+                                                          color: ThalabTheme.foxOrange,
+                                                          size: 19),
+                                                      SizedBox(width: 8),
+                                                      Text('قص وتحرير المقطع'),
+                                                    ],
+                                                  ),
                                                 ),
-                                              ),
-                                            const PopupMenuItem(
-                                              value: 'share',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.share_rounded, size: 19),
-                                                  SizedBox(width: 8),
-                                                  Text('مشاركة'),
-                                                ],
-                                              ),
+                                                const PopupMenuItem(
+                                                  value: 'export',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.drive_file_move_rounded,
+                                                          color: ThalabTheme.foxOrange,
+                                                          size: 19),
+                                                      SizedBox(width: 8),
+                                                      Text('حفظ في مجلد Music'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: 'playlist',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.playlist_add_rounded,
+                                                          size: 19),
+                                                      SizedBox(width: 8),
+                                                      Text('إضافة لقائمة تشغيل'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                if (track.sourceType != 'device')
+                                                  const PopupMenuItem(
+                                                    value: 'rename',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(Icons.edit_rounded, size: 19),
+                                                        SizedBox(width: 8),
+                                                        Text('إعادة تسمية'),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                const PopupMenuItem(
+                                                  value: 'share',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.share_rounded, size: 19),
+                                                      SizedBox(width: 8),
+                                                      Text('مشاركة'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                if (track.sourceType != 'device')
+                                                  const PopupMenuItem(
+                                                    value: 'delete',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(Icons.delete_outline_rounded,
+                                                            color: Colors.redAccent,
+                                                            size: 19),
+                                                        SizedBox(width: 8),
+                                                        Text('حذف',
+                                                            style: TextStyle(
+                                                                color: Colors.redAccent)),
+                                                      ],
+                                                    ),
+                                                  ),
+                                              ],
                                             ),
-                                            if (track.sourceType != 'device')
-                                              const PopupMenuItem(
-                                                value: 'delete',
-                                                child: Row(
-                                                  children: [
-                                                    Icon(Icons.delete_outline_rounded,
-                                                        color: Colors.redAccent, size: 19),
-                                                    SizedBox(width: 8),
-                                                    Text('حذف',
-                                                        style: TextStyle(color: Colors.redAccent)),
-                                                  ],
-                                                ),
-                                              ),
                                           ],
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                                      ),
+                                    );
+                                  },
+                                ),
                 ),
               ],
             ),
+      // شريط التشغيل المصغر المستمر (يبقى ظاهراً لمتابعة التشغيل من حيث توقفت)
       bottomSheet: hasActiveTrack
           ? GestureDetector(
               onTap: _openFullPlayerSheet,
@@ -1332,6 +1701,45 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     );
   }
 
+  Widget _buildFoldersView() {
+    final folders = _folderGroups.keys.toList();
+    if (folders.isEmpty) {
+      return const Center(
+        child: Text('لا توجد مجلدات صوتية', style: TextStyle(color: ThalabTheme.mutedSlate)),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 130),
+      itemCount: folders.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, idx) {
+        final folder = folders[idx];
+        final count = _folderGroups[folder]!.length;
+        return Container(
+          decoration: BoxDecoration(
+            color: ThalabTheme.cardSurface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: ThalabTheme.softBorder),
+          ),
+          child: ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: ThalabTheme.foxOrange.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.folder_rounded, color: ThalabTheme.foxOrange),
+            ),
+            title: Text(folder, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('$count ملف صوتي'),
+            trailing: const Icon(Icons.chevron_right_rounded, color: ThalabTheme.mutedSlate),
+            onTap: () => setState(() => _selectedFolderName = folder),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildPlaylistsView() {
     final names = _playlists.keys.toList();
     return ListView(
@@ -1391,7 +1799,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
 }
 
 // =========================================================================
-// استوديو مسجل الصوت المتكامل (موجات حية + علامات مرجعية + قائمة التسجيلات + القص الفوري)
+// استوديو مسجل الصوت الاحترافي (عداد زمني حي + إشعار تحكم خارجي + حفظ في Music)
 // =========================================================================
 class _ProVoiceRecorderScreen extends StatefulWidget {
   const _ProVoiceRecorderScreen();
@@ -1410,8 +1818,8 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
 
   bool _isRecording = false;
   bool _isPaused = false;
-  int _elapsedMs = 0;
-  Timer? _timer;
+  final Stopwatch _stopwatch = Stopwatch();
+  Timer? _uiTimer;
   final List<double> _waveBars = List<double>.filled(30, 0.18);
   final List<int> _bookmarksSec = [];
   List<File> _savedRecordings = [];
@@ -1420,6 +1828,37 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
   void initState() {
     super.initState();
     _loadSavedRecordings();
+    _studioChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onRecNotificationAction') {
+        final action = call.arguments?.toString() ?? '';
+        if (!mounted) return;
+        if (action == 'paused') {
+          _stopwatch.stop();
+          setState(() => _isPaused = true);
+        } else if (action == 'resumed') {
+          _stopwatch.start();
+          setState(() => _isPaused = false);
+        } else if (action.startsWith('stopped')) {
+          _uiTimer?.cancel();
+          _stopwatch.stop();
+          _stopwatch.reset();
+          setState(() {
+            _isRecording = false;
+            _isPaused = false;
+          });
+          await _loadSavedRecordings();
+        } else if (action == 'cancelled') {
+          _uiTimer?.cancel();
+          _stopwatch.stop();
+          _stopwatch.reset();
+          setState(() {
+            _isRecording = false;
+            _isPaused = false;
+          });
+        }
+      }
+    });
+
     _previewPlayer.playerStateStream.listen((st) {
       if (mounted) {
         setState(() {
@@ -1434,7 +1873,8 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _uiTimer?.cancel();
+    _stopwatch.stop();
     _previewPlayer.dispose();
     super.dispose();
   }
@@ -1472,23 +1912,36 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
         'تسجيل_${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}-${now.minute.toString().padLeft(2, '0')}-${now.second.toString().padLeft(2, '0')}';
     final path = '${recDir.path}/$label.m4a';
 
-    final ok = await _studioChannel.invokeMethod<bool>('startRecord', {'path': path}) ?? false;
+    final ok = await _studioChannel.invokeMethod<bool>('startRecord', {
+          'path': path,
+          'title': label,
+        }) ??
+        false;
     if (ok && mounted) {
+      _stopwatch.reset();
+      _stopwatch.start();
       setState(() {
         _isRecording = true;
         _isPaused = false;
-        _elapsedMs = 0;
         _bookmarksSec.clear();
       });
-      _timer = Timer.periodic(const Duration(milliseconds: 120), (t) async {
-        if (!mounted || _isPaused) return;
-        final amp = await _studioChannel.invokeMethod<double>('getAmplitude') ?? 0.2;
+      _uiTimer?.cancel();
+      _uiTimer = Timer.periodic(const Duration(milliseconds: 100), (t) async {
         if (!mounted) return;
-        setState(() {
-          _elapsedMs += 120;
-          _waveBars.removeAt(0);
-          _waveBars.add(amp);
-        });
+        if (!_isPaused) {
+          double amp = 0.22;
+          try {
+            amp = await _studioChannel.invokeMethod<double>('getAmplitude') ?? 0.22;
+          } catch (_) {}
+          if (mounted) {
+            setState(() {
+              _waveBars.removeAt(0);
+              _waveBars.add(amp);
+            });
+          }
+        } else {
+          setState(() {});
+        }
       });
     }
   }
@@ -1497,48 +1950,52 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
     if (!_isRecording) return;
     if (_isPaused) {
       await _studioChannel.invokeMethod('resumeRecord');
+      _stopwatch.start();
       setState(() => _isPaused = false);
     } else {
       await _studioChannel.invokeMethod('pauseRecord');
+      _stopwatch.stop();
       setState(() => _isPaused = true);
     }
   }
 
   Future<void> _stopAndSave() async {
-    _timer?.cancel();
+    _uiTimer?.cancel();
+    _stopwatch.stop();
     final savedPath = await _studioChannel.invokeMethod<String>('stopRecord');
+    _stopwatch.reset();
     if (mounted) {
       setState(() {
         _isRecording = false;
         _isPaused = false;
       });
       await _loadSavedRecordings();
-      if (savedPath != null && mounted) {
+      if (savedPath != null && savedPath.isNotEmpty && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حفظ التسجيل بنجاح — يمكنك قصّه أو مشاركته بالأسفل ✓')),
+          const SnackBar(
+            content: Text('تم حفظ التسجيل في مجلد الهاتف Music/Thalab Recordings ✓'),
+          ),
         );
       }
     }
   }
 
   Future<void> _discardCurrentRecording() async {
-    _timer?.cancel();
-    final path = await _studioChannel.invokeMethod<String>('stopRecord');
-    if (path != null) {
-      final f = File(path);
-      if (await f.exists()) await f.delete();
-    }
+    _uiTimer?.cancel();
+    _stopwatch.stop();
+    _stopwatch.reset();
+    await _studioChannel.invokeMethod('cancelRecord');
     if (mounted) {
       setState(() {
         _isRecording = false;
         _isPaused = false;
-        _elapsedMs = 0;
         _bookmarksSec.clear();
       });
     }
   }
 
-  String _fmtMs(int ms) {
+  String _fmtStopwatch() {
+    final ms = _stopwatch.elapsedMilliseconds;
     final totalSec = ms ~/ 1000;
     final m = (totalSec ~/ 60).toString().padLeft(2, '0');
     final s = (totalSec % 60).toString().padLeft(2, '0');
@@ -1552,7 +2009,6 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
       appBar: AppBar(title: const Text('استوديو التسجيل وتحرير الصوت')),
       body: Column(
         children: [
-          // لوحة التسجيل العلوية
           Container(
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             padding: const EdgeInsets.all(20),
@@ -1571,7 +2027,9 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                   ),
                   child: Text(
                     _isRecording
-                        ? (_isPaused ? 'متوقف مؤقتاً' : '● جاري التسجيل الصوتي الحي')
+                        ? (_isPaused
+                            ? 'متوقف مؤقتاً • تحكم من الإشعارات'
+                            : '● جاري التسجيل والحفظ في مجلد Music')
                         : 'جاهز للتسجيل بجودة عالية (AAC / M4A)',
                     style: const TextStyle(
                       color: ThalabTheme.foxOrange,
@@ -1582,23 +2040,22 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  _fmtMs(_elapsedMs),
+                  _fmtStopwatch(),
                   style: const TextStyle(
-                    fontSize: 42,
+                    fontSize: 44,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.5,
                   ),
                 ),
                 const SizedBox(height: 14),
 
-                // الموجات الصوتية التفاعلية الحقيقية
                 SizedBox(
                   height: 54,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: _waveBars.map((val) {
                       return AnimatedContainer(
-                        duration: const Duration(milliseconds: 100),
+                        duration: const Duration(milliseconds: 90),
                         margin: const EdgeInsets.symmetric(horizontal: 2),
                         width: 4,
                         height: _isRecording && !_isPaused ? (52 * val).clamp(8.0, 52.0) : 10,
@@ -1621,7 +2078,8 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                         .map((s) => Chip(
                               avatar: const Icon(Icons.flag_rounded,
                                   size: 14, color: ThalabTheme.foxOrange),
-                              label: Text('${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}',
+                              label: Text(
+                                  '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}',
                                   style: const TextStyle(fontSize: 11)),
                             ))
                         .toList(),
@@ -1629,7 +2087,6 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                 ],
                 const SizedBox(height: 18),
 
-                // أزرار التحكم بالتسجيل (إلغاء | إيقاف مؤقت | تسجيل/حفظ | علامة مرجعية)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -1683,7 +2140,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                             color: ThalabTheme.foxOrange, size: 28),
                         onPressed: () {
                           HapticFeedback.selectionClick();
-                          setState(() => _bookmarksSec.add(_elapsedMs ~/ 1000));
+                          setState(() => _bookmarksSec.add(_stopwatch.elapsed.inSeconds));
                         },
                       ),
                   ],
@@ -1692,7 +2149,6 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
             ),
           ),
 
-          // قائمة التسجيلات المحفوظة مع أزرار القص الفوري والحذف والمشاركة
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
             child: Row(
@@ -1703,8 +2159,8 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
                 ),
                 const Text(
-                  'اضغط مقص للتحرير وقص الأطراف',
-                  style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                  'تُحفظ تلقائياً في Music/Thalab Recordings',
+                  style: TextStyle(color: ThalabTheme.foxOrange, fontSize: 10.5),
                 ),
               ],
             ),
@@ -1762,7 +2218,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                               ),
                             ),
                             IconButton(
-                              tooltip: 'قص أطراف أو حذف مقطع',
+                              tooltip: 'استوديو القص والتحرير',
                               icon: const Icon(Icons.content_cut_rounded,
                                   color: ThalabTheme.foxOrange, size: 21),
                               onPressed: () async {
@@ -1808,7 +2264,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
 }
 
 // =========================================================================
-// استوديو قص وتحرير الصوتيات (قص الأطراف + حذف/استبعاد مقطع من المنتصف)
+// استوديو قص وتحرير الصوتيات المُعاد هيكلته (ضبط دقيق بالثانية + معاينة + حفظ في Music)
 // =========================================================================
 class AudioTrimmerStudioScreen extends StatefulWidget {
   final String filePath;
@@ -1832,7 +2288,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
   bool _isReady = false;
   bool _isPlaying = false;
   bool _isProcessing = false;
-  String _editMode = 'keep'; // 'keep' = قص الأطراف (الإبقاء على المحدد), 'cut' = حذف المقطع المحدد من المنتصف
+  String _editMode = 'keep'; // 'keep' = قص الأطراف, 'cut' = حذف المقطع المحدد من المنتصف
 
   double _totalSec = 10.0;
   double _startSec = 0.0;
@@ -1880,7 +2336,8 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
   String _fmt(double s) {
     final m = (s ~/ 60).toString().padLeft(2, '0');
     final rem = (s.toInt() % 60).toString().padLeft(2, '0');
-    return '$m:$rem';
+    final tenth = ((s * 10).toInt() % 10);
+    return '$m:$rem.$tenth';
   }
 
   Future<void> _applyAudioEdit({required bool overwriteOriginal}) async {
@@ -1893,8 +2350,8 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
       final outDir = Directory('${dir.path}/voice_recordings');
       if (!await outDir.exists()) await outDir.create(recursive: true);
 
-      final tempOut =
-          '${outDir.path}/${widget.initialTitle}_معدل_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final outTitle = '${widget.initialTitle}_معدل_${DateTime.now().millisecondsSinceEpoch}';
+      final tempOut = '${outDir.path}/$outTitle.m4a';
 
       final ok = await _studioChannel.invokeMethod<bool>('processAudioEdit', {
             'srcPath': widget.filePath,
@@ -1909,13 +2366,24 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
         if (overwriteOriginal && await srcFile.exists()) {
           await srcFile.delete();
           await File(tempOut).rename(widget.filePath);
+          await _studioChannel.invokeMethod('exportToMusicFolder', {
+            'srcPath': widget.filePath,
+            'title': widget.initialTitle,
+            'subFolder': 'Thalab Recordings',
+          });
+        } else {
+          await _studioChannel.invokeMethod('exportToMusicFolder', {
+            'srcPath': tempOut,
+            'title': outTitle,
+            'subFolder': 'Thalab Recordings',
+          });
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                 _editMode == 'keep'
-                    ? 'تم قص أطراف الصوت وحفظه بنجاح ✓'
+                    ? 'تم قص أطراف الصوت وحفظه في مجلد Music بنجاح ✓'
                     : 'تم حذف المقطع المحدد ودمج الصوت بنجاح ✓',
               ),
             ),
@@ -1936,14 +2404,20 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedDuration = (_endSec - _startSec).clamp(0.0, _totalSec);
+    final resultDuration =
+        _editMode == 'keep' ? selectedDuration : (_totalSec - selectedDuration);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('قص وتحرير المقطع الصوتي')),
+      appBar: AppBar(title: const Text('استوديو قص وتحرير الصوت')),
       body: !_isReady
           ? const Center(child: CircularProgressIndicator(color: ThalabTheme.foxOrange))
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // بطاقة معلومات الملف والوضع
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -1953,71 +2427,82 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                     ),
                     child: Column(
                       children: [
-                        Text(
-                          widget.initialTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: ThalabTheme.foxOrange.withOpacity(0.14),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(Icons.graphic_eq_rounded,
+                                  color: ThalabTheme.foxOrange),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.initialTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold, fontSize: 15),
+                                  ),
+                                  Text(
+                                    'المدة الأصلية: ${_fmt(_totalSec)}  •  الناتج: ${_fmt(resultDuration)}',
+                                    style: const TextStyle(
+                                        color: ThalabTheme.mutedSlate, fontSize: 11.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 16),
 
-                        // اختيار وضع القص: قص الأطراف أو حذف مقطع من المنتصف
+                        // اختيار العملية (قص الأطراف / حذف مقطع من المنتصف)
                         Row(
                           children: [
                             Expanded(
-                              child: ChoiceChip(
-                                label: const Center(
-                                  child: Text('قص الأطراف (إبقاء المحدد)',
-                                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                                ),
+                              child: _EditModeTile(
+                                title: 'قص الأطراف',
+                                subtitle: 'إبقاء المحدد فقط',
+                                icon: Icons.content_cut_rounded,
                                 selected: _editMode == 'keep',
-                                selectedColor: ThalabTheme.foxOrange,
-                                labelStyle: TextStyle(
-                                  color: _editMode == 'keep' ? Colors.white : ThalabTheme.darkSlate,
-                                ),
-                                onSelected: (_) => setState(() => _editMode = 'keep'),
+                                activeColor: ThalabTheme.foxOrange,
+                                onTap: () => setState(() => _editMode = 'keep'),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Expanded(
-                              child: ChoiceChip(
-                                label: const Center(
-                                  child: Text('حذف المقطع المحدد',
-                                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                                ),
+                              child: _EditModeTile(
+                                title: 'حذف مقطع',
+                                subtitle: 'إزالة الجزء المحدد',
+                                icon: Icons.auto_fix_high_rounded,
                                 selected: _editMode == 'cut',
-                                selectedColor: Colors.redAccent,
-                                labelStyle: TextStyle(
-                                  color: _editMode == 'cut' ? Colors.white : ThalabTheme.darkSlate,
-                                ),
-                                onSelected: (_) => setState(() => _editMode = 'cut'),
+                                activeColor: Colors.redAccent,
+                                onTap: () => setState(() => _editMode = 'cut'),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 18),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('البداية: ${_fmt(_startSec)}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                            Text(
-                              _editMode == 'keep'
-                                  ? 'المتبقي: ${_fmt(_endSec - _startSec)}'
-                                  : 'المحذوف: ${_fmt(_endSec - _startSec)}',
-                              style: TextStyle(
-                                color: _editMode == 'keep'
-                                    ? ThalabTheme.foxOrange
-                                    : Colors.redAccent,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12.5,
-                              ),
-                            ),
-                            Text('النهاية: ${_fmt(_endSec)}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                          ],
-                        ),
+                  // بطاقة الخط الزمني والضبط الدقيق
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: ThalabTheme.cardSurface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: ThalabTheme.softBorder),
+                    ),
+                    child: Column(
+                      children: [
                         RangeSlider(
                           values: RangeValues(_startSec, _endSec),
                           min: 0.0,
@@ -2035,40 +2520,93 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                         ),
                         const SizedBox(height: 8),
 
+                        // أزرار ضبط البداية والنهاية بالثانية (-0.5s / +0.5s)
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            IconButton(
-                              iconSize: 44,
-                              icon: Icon(
-                                _isPlaying
-                                    ? Icons.pause_circle_filled_rounded
-                                    : Icons.play_circle_filled_rounded,
-                                color: ThalabTheme.foxOrange,
+                            Expanded(
+                              child: _FineTuneTimeBox(
+                                label: 'نقطة البداية',
+                                timeText: _fmt(_startSec),
+                                onMinus: () {
+                                  setState(() => _startSec =
+                                      (_startSec - 0.5).clamp(0.0, _endSec - 0.2));
+                                },
+                                onPlus: () {
+                                  setState(() => _startSec =
+                                      (_startSec + 0.5).clamp(0.0, _endSec - 0.2));
+                                },
                               ),
-                              onPressed: () {
-                                if (_isPlaying) {
-                                  _player.pause();
-                                } else {
-                                  _player.seek(
-                                      Duration(milliseconds: (_startSec * 1000).toInt()));
-                                  _player.play();
-                                }
-                              },
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'معاينة (${_fmt(_currentSec)})',
-                              style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 12),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _FineTuneTimeBox(
+                                label: 'نقطة النهاية',
+                                timeText: _fmt(_endSec),
+                                onMinus: () {
+                                  setState(() => _endSec =
+                                      (_endSec - 0.5).clamp(_startSec + 0.2, _totalSec));
+                                },
+                                onPlus: () {
+                                  setState(() => _endSec =
+                                      (_endSec + 0.5).clamp(_startSec + 0.2, _totalSec));
+                                },
+                              ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // زر المعاينة الصوتية
+                        GestureDetector(
+                          onTap: () {
+                            if (_isPlaying) {
+                              _player.pause();
+                            } else {
+                              _player.seek(
+                                  Duration(milliseconds: (_startSec * 1000).toInt()));
+                              _player.play();
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 22, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: ThalabTheme.foxOrange.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _isPlaying
+                                      ? Icons.pause_circle_filled_rounded
+                                      : Icons.play_circle_filled_rounded,
+                                  color: ThalabTheme.foxOrange,
+                                  size: 28,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _isPlaying
+                                      ? 'إيقاف المعاينة (${_fmt(_currentSec)})'
+                                      : 'معاينة المقطع المحدد',
+                                  style: const TextStyle(
+                                    color: ThalabTheme.foxOrange,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 22),
+
                   if (_isProcessing)
-                    const CircularProgressIndicator(color: ThalabTheme.foxOrange)
+                    const Center(
+                        child: CircularProgressIndicator(color: ThalabTheme.foxOrange))
                   else
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2077,23 +2615,23 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: ThalabTheme.foxOrange,
                             foregroundColor: Colors.white,
-                            minimumSize: const Size(0, 50),
+                            minimumSize: const Size(0, 52),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16)),
+                                borderRadius: BorderRadius.circular(18)),
                           ),
                           onPressed: () => _applyAudioEdit(overwriteOriginal: false),
                           icon: const Icon(Icons.save_as_rounded),
-                          label: const Text('حفظ كنسخة جديدة في المكتبة',
+                          label: const Text('حفظ كنسخة جديدة في مجلد Music',
                               style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                         if (widget.filePath.contains('voice_recordings')) ...[
                           const SizedBox(height: 10),
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(0, 48),
+                              minimumSize: const Size(0, 50),
                               side: const BorderSide(color: ThalabTheme.foxOrange),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16)),
+                                  borderRadius: BorderRadius.circular(18)),
                             ),
                             onPressed: () => _applyAudioEdit(overwriteOriginal: true),
                             icon: const Icon(Icons.check_circle_outline_rounded,
@@ -2109,6 +2647,110 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _EditModeTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool selected;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  const _EditModeTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.selected,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? activeColor.withOpacity(0.12) : ThalabTheme.creamBackground,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? activeColor : ThalabTheme.softBorder,
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: selected ? activeColor : ThalabTheme.mutedSlate, size: 22),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12.5,
+                color: selected ? activeColor : ThalabTheme.darkSlate,
+              ),
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 10.5, color: ThalabTheme.mutedSlate),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FineTuneTimeBox extends StatelessWidget {
+  final String label;
+  final String timeText;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+
+  const _FineTuneTimeBox({
+    required this.label,
+    required this.timeText,
+    required this.onMinus,
+    required this.onPlus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: ThalabTheme.creamBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ThalabTheme.softBorder),
+      ),
+      child: Column(
+        children: [
+          Text(label, style: const TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              InkWell(
+                onTap: onMinus,
+                child: const Icon(Icons.remove_circle_outline_rounded,
+                    color: ThalabTheme.foxOrange, size: 22),
+              ),
+              Text(timeText,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              InkWell(
+                onTap: onPlus,
+                child: const Icon(Icons.add_circle_outline_rounded,
+                    color: ThalabTheme.foxOrange, size: 22),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
