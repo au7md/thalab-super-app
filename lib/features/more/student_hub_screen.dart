@@ -77,7 +77,7 @@ class _StudyGoalsTab extends StatefulWidget {
 }
 
 class _StudyGoalsTabState extends State<_StudyGoalsTab> {
-  List> _subjects = [];
+  List<Map<String, dynamic>> _subjects = [];
 
   @override
   void initState() {
@@ -89,7 +89,8 @@ class _StudyGoalsTabState extends State<_StudyGoalsTab> {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('student_subjects_json');
     if (raw != null && raw.isNotEmpty) {
-      setState(() => _subjects = List>.from(jsonDecode(raw)));
+      setState(() =>
+          _subjects = List<Map<String, dynamic>>.from(jsonDecode(raw)));
     }
   }
 
@@ -423,7 +424,7 @@ class _GpaCalculatorTab extends StatefulWidget {
 }
 
 class _GpaCalculatorTabState extends State<_GpaCalculatorTab> {
-  final List> _courses = [
+  final List<Map<String, dynamic>> _courses = [
     {'name': 'مادة 1', 'credits': 3, 'grade': 4.0},
     {'name': 'مادة 2', 'credits': 3, 'grade': 3.7},
   ];
