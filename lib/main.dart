@@ -26,7 +26,7 @@ Future<void> main() async {
     androidNotificationOngoing: true,
     androidShowNotificationBadge: true,
   );
-  await NotificationService.init();
+  await RafiqNotificationsService.instance.init();
   runApp(const ThalabApp());
 }
 
