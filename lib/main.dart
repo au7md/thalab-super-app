@@ -15,6 +15,7 @@ import 'features/rafiq/quran_screen.dart';
 import 'features/rafiq/qibla_screen.dart';
 import 'features/rafiq/hijri_events_screen.dart';
 import 'features/media/gallery_screen.dart';
+import 'features/music/music_studio_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -912,20 +913,15 @@ class MediaTab extends StatelessWidget {
 }
 
 // =========================================================================
-// 4. تبويب الموسيقى
+// 4. تبويب الموسيقى والصوتيات المتكامل
 // =========================================================================
 class MusicTab extends StatelessWidget {
   const MusicTab({super.key});
+
   @override
-  Widget build(BuildContext context) => _SectionGridTemplate(
-        title: 'الموسيقى والصوتيات',
-        items: [
-          _GridToolItem('كل الصوتيات', Icons.library_music_rounded, null),
-          _GridToolItem('قوائم التشغيل', Icons.queue_music_rounded, null),
-          _GridToolItem('مسجل الصوت', Icons.mic_rounded, null),
-          _GridToolItem('وضع الاسترخاء', Icons.spa_rounded, null),
-        ],
-      );
+  Widget build(BuildContext context) {
+    return const MusicStudioScreen(initialTabIndex: 0);
+  }
 }
 
 // =========================================================================
