@@ -30,7 +30,7 @@ jobs:
       - name: Initialize Android & Permissions
         run: |
           flutter create --platforms=android --org com.au7md --project-name thalab_app .
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"\/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
           sed -i 's/compileOptions {/compileOptions {\n        isCoreLibraryDesugaringEnabled = true/' android/app/build.gradle.kts
           cat << 'EOF' >> android/app/build.gradle.kts
 
