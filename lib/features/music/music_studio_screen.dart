@@ -1,3 +1,5 @@
+// lib/features/music/music_studio_screen.dart
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -18,7 +20,7 @@ class ThalabAudioTrack {
   final String path;
   final int durationSeconds;
   final int dateAdded;
-  final String sourceType; // 'device', 'extracted', 'recording'
+  final String sourceType;
 
   const ThalabAudioTrack({
     required this.id,
@@ -49,9 +51,9 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   late AnimationController _discController;
   final TextEditingController _searchController = TextEditingController();
 
-  int _selectedTab = 0; // 0: الكل, 1: المجلدات, 2: المفضلة, 3: قوائم التشغيل, 4: التسجيلات والمستخرج
+  int _selectedTab = 0;
   String _searchQuery = '';
-  String _sortBy = 'newest'; // 'newest', 'name', 'duration'
+  String _sortBy = 'newest';
   bool _isLoading = true;
 
   List<ThalabAudioTrack> _allTracks = [];
@@ -60,7 +62,6 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   String? _selectedPlaylistName;
   String? _selectedFolderName;
 
-  // وضع التحديد المتعدد بالضغط المطول
   final Set<String> _selectedTrackIds = {};
   bool get _isSelectionMode => _selectedTrackIds.isNotEmpty;
 
@@ -126,6 +127,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
           'title': track.title,
           'subtitle': track.subtitle,
           'isPlaying': playing,
+          'durationMs': _duration.inMilliseconds,
+          'positionMs': _position.inMilliseconds,
         });
       }
       if (state.processingState == ProcessingState.completed) {
@@ -203,7 +206,6 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     final Set<String> seenPaths = {};
     final dir = await getApplicationDocumentsDirectory();
 
-    // 1. التسجيلات الصوتية المحلية
     final recDir = Directory('${dir.path}/voice_recordings');
     if (await recDir.exists()) {
       final files = recDir.listSync().whereType<File>().toList()
@@ -226,7 +228,6 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
       }
     }
 
-    // 2. الصوتيات المستخرجة من الفيديوهات
     final extDir = Directory('${dir.path}/extracted_audios');
     if (await extDir.exists()) {
       final files = extDir.listSync().whereType<File>().toList()
@@ -249,7 +250,6 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
       }
     }
 
-    // 3. جلب صوتيات وموسيقى الجهاز من MediaStore (بما فيها Music/Thalab Recordings)
     try {
       final rawList = await _studioChannel.invokeMethod<List<dynamic>>('getDeviceAudios');
       if (rawList != null) {
@@ -835,7 +835,6 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                 ),
                 const SizedBox(height: 18),
 
-                // الأسطوانة الدوارة المزدوجة الاحترافية
                 RotationTransition(
                   turns: _discController,
                   child: Container(
@@ -961,7 +960,6 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                 ),
                 const SizedBox(height: 14),
 
-                // أزرار التحكم + تقديم/تأخير 10 ثوانٍ
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -1631,7 +1629,6 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                 ),
               ],
             ),
-      // شريط التشغيل المصغر المستمر (يبقى ظاهراً لمتابعة التشغيل من حيث توقفت)
       bottomSheet: hasActiveTrack
           ? GestureDetector(
               onTap: _openFullPlayerSheet,
@@ -1802,7 +1799,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
 }
 
 // =========================================================================
-// استوديو مسجل الصوت الاحترافي (عداد زمني حي + إشعار تحكم خارجي + حفظ في Music)
+// المسجل الصوتي الاحترافي (عداد فوري + موجة حية + تاريخ ووقت كل تسجيل)
 // =========================================================================
 class _ProVoiceRecorderScreen extends StatefulWidget {
   const _ProVoiceRecorderScreen();
@@ -1823,7 +1820,8 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
   bool _isPaused = false;
   final Stopwatch _stopwatch = Stopwatch();
   Timer? _uiTimer;
-  final List<double> _waveBars = List<double>.filled(30, 0.18);
+  Timer? _ampTimer;
+  final List<double> _waveBars = List<double>.filled(32, 0.16);
   final List<int> _bookmarksSec = [];
   List<File> _savedRecordings = [];
 
@@ -1831,37 +1829,6 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
   void initState() {
     super.initState();
     _loadSavedRecordings();
-    _studioChannel.setMethodCallHandler((call) async {
-      if (call.method == 'onRecNotificationAction') {
-        final action = call.arguments?.toString() ?? '';
-        if (!mounted) return;
-        if (action == 'paused') {
-          _stopwatch.stop();
-          setState(() => _isPaused = true);
-        } else if (action == 'resumed') {
-          _stopwatch.start();
-          setState(() => _isPaused = false);
-        } else if (action.startsWith('stopped')) {
-          _uiTimer?.cancel();
-          _stopwatch.stop();
-          _stopwatch.reset();
-          setState(() {
-            _isRecording = false;
-            _isPaused = false;
-          });
-          await _loadSavedRecordings();
-        } else if (action == 'cancelled') {
-          _uiTimer?.cancel();
-          _stopwatch.stop();
-          _stopwatch.reset();
-          setState(() {
-            _isRecording = false;
-            _isPaused = false;
-          });
-        }
-      }
-    });
-
     _previewPlayer.playerStateStream.listen((st) {
       if (mounted) {
         setState(() {
@@ -1877,6 +1844,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
   @override
   void dispose() {
     _uiTimer?.cancel();
+    _ampTimer?.cancel();
     _stopwatch.stop();
     _previewPlayer.dispose();
     super.dispose();
@@ -1920,6 +1888,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
           'title': label,
         }) ??
         false;
+
     if (ok && mounted) {
       _stopwatch.reset();
       _stopwatch.start();
@@ -1928,22 +1897,26 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
         _isPaused = false;
         _bookmarksSec.clear();
       });
+
       _uiTimer?.cancel();
-      _uiTimer = Timer.periodic(const Duration(milliseconds: 100), (t) async {
-        if (!mounted) return;
-        if (!_isPaused) {
-          double amp = 0.22;
-          try {
-            amp = await _studioChannel.invokeMethod<double>('getAmplitude') ?? 0.22;
-          } catch (_) {}
-          if (mounted) {
-            setState(() {
-              _waveBars.removeAt(0);
-              _waveBars.add(amp);
-            });
-          }
-        } else {
+      _uiTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+        if (mounted && _isRecording && !_isPaused) {
           setState(() {});
+        }
+      });
+
+      _ampTimer?.cancel();
+      _ampTimer = Timer.periodic(const Duration(milliseconds: 120), (_) async {
+        if (!mounted || !_isRecording || _isPaused) return;
+        double amp = 0.25;
+        try {
+          amp = await _studioChannel.invokeMethod<double>('getAmplitude') ?? 0.25;
+        } catch (_) {}
+        if (mounted && _isRecording && !_isPaused) {
+          setState(() {
+            _waveBars.removeAt(0);
+            _waveBars.add(amp.clamp(0.12, 1.0));
+          });
         }
       });
     }
@@ -1964,6 +1937,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
 
   Future<void> _stopAndSave() async {
     _uiTimer?.cancel();
+    _ampTimer?.cancel();
     _stopwatch.stop();
     final savedPath = await _studioChannel.invokeMethod<String>('stopRecord');
     _stopwatch.reset();
@@ -1985,6 +1959,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
 
   Future<void> _discardCurrentRecording() async {
     _uiTimer?.cancel();
+    _ampTimer?.cancel();
     _stopwatch.stop();
     _stopwatch.reset();
     await _studioChannel.invokeMethod('cancelRecord');
@@ -2004,6 +1979,15 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
     final s = (totalSec % 60).toString().padLeft(2, '0');
     final tenths = (ms % 1000) ~/ 100;
     return '$m:$s.$tenths';
+  }
+
+  String _formatFileDate(File f) {
+    final dt = f.lastModifiedSync();
+    final d =
+        '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
+    final t =
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return '$d • $t';
   }
 
   @override
@@ -2030,9 +2014,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                   ),
                   child: Text(
                     _isRecording
-                        ? (_isPaused
-                            ? 'متوقف مؤقتاً • تحكم من الإشعارات'
-                            : '● جاري التسجيل والحفظ في مجلد Music')
+                        ? (_isPaused ? 'متوقف مؤقتاً' : '● جاري التسجيل والحفظ في Music')
                         : 'جاهز للتسجيل بجودة عالية (AAC / M4A)',
                     style: const TextStyle(
                       color: ThalabTheme.foxOrange,
@@ -2051,7 +2033,6 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-
                 SizedBox(
                   height: 54,
                   child: Row(
@@ -2061,7 +2042,8 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                         duration: const Duration(milliseconds: 90),
                         margin: const EdgeInsets.symmetric(horizontal: 2),
                         width: 4,
-                        height: _isRecording && !_isPaused ? (52 * val).clamp(8.0, 52.0) : 10,
+                        height:
+                            _isRecording && !_isPaused ? (52 * val).clamp(8.0, 52.0) : 10,
                         decoration: BoxDecoration(
                           color: _isRecording
                               ? ThalabTheme.foxOrange
@@ -2072,7 +2054,6 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                     }).toList(),
                   ),
                 ),
-
                 if (_bookmarksSec.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Wrap(
@@ -2089,7 +2070,6 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                   ),
                 ],
                 const SizedBox(height: 18),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -2151,7 +2131,6 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
               ],
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
             child: Column(
@@ -2194,7 +2173,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                           _playingRecPath == file.path && _isPreviewPlaying;
 
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
                           color: ThalabTheme.cardSurface,
                           borderRadius: BorderRadius.circular(18),
@@ -2208,7 +2187,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                                     ? Icons.pause_circle_filled_rounded
                                     : Icons.play_circle_filled_rounded,
                                 color: ThalabTheme.foxOrange,
-                                size: 34,
+                                size: 36,
                               ),
                               onPressed: () async {
                                 if (isThisPlaying) {
@@ -2221,12 +2200,23 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                               },
                             ),
                             Expanded(
-                              child: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 13),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _formatFileDate(file),
+                                    style: const TextStyle(
+                                        color: ThalabTheme.mutedSlate, fontSize: 11),
+                                  ),
+                                ],
                               ),
                             ),
                             IconButton(
@@ -2276,7 +2266,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
 }
 
 // =========================================================================
-// استوديو قص وتحرير الصوتيات (الموجة الصوتية + Trim / Remove + تقديم/تأخير 3 ثوانٍ)
+// استوديو التحرير بالسحب المباشر على الموجة + تنفيذ فوري للمعاينة
 // =========================================================================
 class AudioTrimmerStudioScreen extends StatefulWidget {
   final String filePath;
@@ -2300,27 +2290,35 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
   bool _isReady = false;
   bool _isPlaying = false;
   bool _isProcessing = false;
-  String _editMode = 'keep'; // 'keep' = Trim (إبقاء المحدد), 'cut' = Remove (حذف المحدد)
+
+  late String _workingPath;
+  bool _hasEdits = false;
 
   double _totalSec = 10.0;
   double _startSec = 0.0;
   double _endSec = 10.0;
   double _currentSec = 0.0;
+  String? _draggingHandle; // 'start' | 'end' | null
 
-  late final List<double> _waveHeights;
+  late List<double> _waveHeights;
 
   @override
   void initState() {
     super.initState();
-    final rng = math.Random(widget.initialTitle.hashCode);
-    _waveHeights = List<double>.generate(48, (_) => 0.2 + rng.nextDouble() * 0.8);
-    _initAudio();
+    _workingPath = widget.filePath;
+    _generateWave();
+    _initAudio(_workingPath);
   }
 
-  Future<void> _initAudio() async {
-    await _player.setFilePath(widget.filePath);
+  void _generateWave() {
+    final rng = math.Random(_workingPath.hashCode);
+    _waveHeights = List<double>.generate(52, (_) => 0.18 + rng.nextDouble() * 0.82);
+  }
+
+  Future<void> _initAudio(String path) async {
+    await _player.setFilePath(path);
     final dur = _player.duration ?? const Duration(seconds: 10);
-    final secs = (dur.inMilliseconds / 1000.0).clamp(1.0, double.infinity);
+    final secs = (dur.inMilliseconds / 1000.0).clamp(0.5, double.infinity);
 
     _player.playerStateStream.listen((st) {
       if (mounted) setState(() => _isPlaying = st.playing);
@@ -2328,7 +2326,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
     _player.positionStream.listen((pos) {
       if (!mounted) return;
       final cur = pos.inMilliseconds / 1000.0;
-      if (_editMode == 'keep' && cur >= _endSec && _isPlaying) {
+      if (cur >= _endSec && _isPlaying) {
         _player.seek(Duration(milliseconds: (_startSec * 1000).toInt()));
       }
       setState(() => _currentSec = cur.clamp(0.0, _totalSec));
@@ -2337,7 +2335,9 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
     if (mounted) {
       setState(() {
         _totalSec = secs;
+        _startSec = 0.0;
         _endSec = secs;
+        _currentSec = 0.0;
         _isReady = true;
       });
     }
@@ -2356,62 +2356,76 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
     return '$m:$rem.$hundredths';
   }
 
-  Future<void> _applyAudioEdit({required bool overwriteOriginal}) async {
+  Future<void> _applyInstantEdit(String mode) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
     try {
       await _player.stop();
-      final srcFile = File(widget.filePath);
-      final dir = await getApplicationDocumentsDirectory();
-      final outDir = Directory('${dir.path}/voice_recordings');
-      if (!await outDir.exists()) await outDir.create(recursive: true);
-
-      final outTitle = '${widget.initialTitle}_معدل_${DateTime.now().millisecondsSinceEpoch}';
-      final tempOut = '${outDir.path}/$outTitle.m4a';
+      final tempDir = await getTemporaryDirectory();
+      final nextTemp =
+          '${tempDir.path}/edit_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
       final ok = await _studioChannel.invokeMethod<bool>('processAudioEdit', {
-            'srcPath': widget.filePath,
-            'dstPath': tempOut,
-            'mode': _editMode,
+            'srcPath': _workingPath,
+            'dstPath': nextTemp,
+            'mode': mode, // 'keep' or 'cut'
             'startMs': (_startSec * 1000).toInt(),
             'endMs': (_endSec * 1000).toInt(),
           }) ??
           false;
 
-      if (ok) {
-        if (overwriteOriginal && await srcFile.exists()) {
-          await srcFile.delete();
-          await File(tempOut).rename(widget.filePath);
-          await _studioChannel.invokeMethod('exportToMusicFolder', {
-            'srcPath': widget.filePath,
-            'title': widget.initialTitle,
-            'subFolder': 'Thalab Recordings',
-          });
-        } else {
-          await _studioChannel.invokeMethod('exportToMusicFolder', {
-            'srcPath': tempOut,
-            'title': outTitle,
-            'subFolder': 'Thalab Recordings',
-          });
-        }
+      if (ok && mounted) {
+        _workingPath = nextTemp;
+        _hasEdits = true;
+        _generateWave();
+        await _initAudio(_workingPath);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                _editMode == 'keep'
-                    ? 'تم قص الصوت وحفظه في مجلد Music/Thalab Recordings ✓'
-                    : 'تم حذف الجزء المحدد ودمج الصوت بنجاح ✓',
-              ),
+              content: Text(mode == 'keep'
+                  ? 'تم قص الأطراف للمعاينة — اضغط حفظ عند الانتهاء'
+                  : 'تم حذف الجزء المحدد للمعاينة — اضغط حفظ عند الانتهاء'),
             ),
           );
-          Navigator.pop(context);
         }
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر معالجة هذا التنسيق، جرب ملف M4A أو MP3')),
+          const SnackBar(content: Text('تعذر تنفيذ التعديل على هذا التنسيق')),
         );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _saveFinalFile() async {
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+    try {
+      await _player.stop();
+      final dir = await getApplicationDocumentsDirectory();
+      final outDir = Directory('${dir.path}/voice_recordings');
+      if (!await outDir.exists()) await outDir.create(recursive: true);
+
+      final outTitle =
+          '${widget.initialTitle}_معدل_${DateTime.now().millisecondsSinceEpoch}';
+      final finalPath = '${outDir.path}/$outTitle.m4a';
+      await File(_workingPath).copy(finalPath);
+
+      await _studioChannel.invokeMethod('exportToMusicFolder', {
+        'srcPath': finalPath,
+        'title': outTitle,
+        'subFolder': 'Thalab Recordings',
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('تم حفظ الملف النهائي في Music/Thalab Recordings ✓')),
+        );
+        Navigator.pop(context);
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
@@ -2420,9 +2434,9 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progressRatio = (_currentSec / _totalSec).clamp(0.0, 1.0);
     final startRatio = (_startSec / _totalSec).clamp(0.0, 1.0);
     final endRatio = (_endSec / _totalSec).clamp(0.0, 1.0);
+    final progressRatio = (_currentSec / _totalSec).clamp(0.0, 1.0);
 
     return Scaffold(
       appBar: AppBar(
@@ -2435,12 +2449,14 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
         title: const Text('تحرير وقص الصوت'),
         actions: [
           TextButton(
-            onPressed: _isProcessing ? null : () => _applyAudioEdit(overwriteOriginal: false),
-            child: const Text('حفظ',
-                style: TextStyle(
-                    color: ThalabTheme.foxOrange,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15)),
+            onPressed: _isProcessing ? null : _saveFinalFile,
+            child: Text(
+              _hasEdits ? 'حفظ ✓' : 'حفظ',
+              style: const TextStyle(
+                  color: ThalabTheme.foxOrange,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15),
+            ),
           ),
         ],
       ),
@@ -2448,177 +2464,202 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
           ? const Center(child: CircularProgressIndicator(color: ThalabTheme.foxOrange))
           : Column(
               children: [
-                const SizedBox(height: 12),
-                // منطقة الموجة الصوتية التفاعلية مع مؤشر التشغيل الأحمر
-                Container(
-                  height: 170,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: ThalabTheme.darkSlate,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: List.generate(_waveHeights.length, (i) {
-                          final barRatio = i / _waveHeights.length;
-                          final inRange = barRatio >= startRatio && barRatio <= endRatio;
-                          final barColor = inRange
-                              ? (_editMode == 'keep'
-                                  ? ThalabTheme.foxOrange
-                                  : Colors.redAccent)
-                              : Colors.white24;
-                          return Container(
-                            width: 3.5,
-                            height: 110 * _waveHeights[i],
-                            decoration: BoxDecoration(
-                              color: barColor,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          );
-                        }),
-                      ),
-                      Align(
-                        alignment: Alignment(-1.0 + (progressRatio * 2.0), 0),
-                        child: Container(
-                          width: 2.5,
-                          height: 140,
-                          color: Colors.redAccent,
-                        ),
-                      ),
+                      Text('البداية: ${_fmtPrecise(_startSec)}',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: ThalabTheme.foxOrange)),
+                      const Text('اسحب المقابض على الموجة مباشرة',
+                          style: TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
+                      Text('النهاية: ${_fmtPrecise(_endSec)}',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: ThalabTheme.foxOrange)),
                     ],
                   ),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 8),
 
-                // العداد الزمني الدقيق واسم الملف
-                Text(
-                  _fmtPrecise(_currentSec),
-                  style: const TextStyle(
-                    fontSize: 38,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    widget.initialTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: ThalabTheme.mutedSlate,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ),
-                const Spacer(),
-
-                // شريط التحديد الزمني مع الضبط الدقيق
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      RangeSlider(
-                        values: RangeValues(_startSec, _endSec),
-                        min: 0.0,
-                        max: _totalSec,
-                        activeColor: _editMode == 'keep'
-                            ? ThalabTheme.foxOrange
-                            : Colors.redAccent,
-                        onChanged: (vals) {
-                          setState(() {
-                            _startSec = vals.start;
-                            _endSec = vals.end;
-                          });
-                          _player.seek(Duration(milliseconds: (vals.start * 1000).toInt()));
-                        },
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth - 32;
+                    return GestureDetector(
+                      onHorizontalDragStart: (d) {
+                        final ratio = (d.localPosition.dx / width).clamp(0.0, 1.0);
+                        final distStart = (ratio - startRatio).abs();
+                        final distEnd = (ratio - endRatio).abs();
+                        _draggingHandle = distStart <= distEnd ? 'start' : 'end';
+                      },
+                      onHorizontalDragUpdate: (d) {
+                        final ratio = (d.localPosition.dx / width).clamp(0.0, 1.0);
+                        final sec = ratio * _totalSec;
+                        setState(() {
+                          if (_draggingHandle == 'start') {
+                            _startSec = sec.clamp(0.0, _endSec - 0.3);
+                          } else if (_draggingHandle == 'end') {
+                            _endSec = sec.clamp(_startSec + 0.3, _totalSec);
+                          }
+                        });
+                      },
+                      onHorizontalDragEnd: (_) {
+                        _draggingHandle = null;
+                        _player.seek(Duration(milliseconds: (_startSec * 1000).toInt()));
+                      },
+                      child: Container(
+                        height: 190,
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: ThalabTheme.darkSlate,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
                           children: [
-                            Text('البداية: ${_fmtPrecise(_startSec)}',
-                                style: const TextStyle(
-                                    fontSize: 11.5, color: ThalabTheme.mutedSlate)),
-                            Text('النهاية: ${_fmtPrecise(_endSec)}',
-                                style: const TextStyle(
-                                    fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: List.generate(_waveHeights.length, (i) {
+                                final barRatio = i / _waveHeights.length;
+                                final inRange =
+                                    barRatio >= startRatio && barRatio <= endRatio;
+                                return Container(
+                                  width: 3.5,
+                                  height: 125 * _waveHeights[i],
+                                  decoration: BoxDecoration(
+                                    color: inRange
+                                        ? ThalabTheme.foxOrange
+                                        : Colors.white24,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                );
+                              }),
+                            ),
+                            // مقبض البداية
+                            Align(
+                              alignment: Alignment(-1.0 + (startRatio * 2.0), 0),
+                              child: Container(
+                                width: 4,
+                                height: 155,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                            // مقبض النهاية
+                            Align(
+                              alignment: Alignment(-1.0 + (endRatio * 2.0), 0),
+                              child: Container(
+                                width: 4,
+                                height: 155,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                            // مؤشر التشغيل الأحمر
+                            Align(
+                              alignment: Alignment(-1.0 + (progressRatio * 2.0), 0),
+                              child: Container(
+                                width: 2.5,
+                                height: 160,
+                                color: Colors.redAccent,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 26),
 
-                // شريط التحكم السفلي: Remove | -3s | Play/Pause | +3s | Trim
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 30),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _StudioBottomAction(
-                        icon: Icons.delete_sweep_rounded,
-                        label: 'Remove',
-                        active: _editMode == 'cut',
-                        activeColor: Colors.redAccent,
-                        onTap: () => setState(() => _editMode = 'cut'),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.replay_5_rounded, size: 30),
-                        onPressed: () {
-                          final t = (_currentSec - 3).clamp(0.0, _totalSec);
-                          _player.seek(Duration(milliseconds: (t * 1000).toInt()));
-                        },
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          if (_isPlaying) {
-                            _player.pause();
-                          } else {
-                            _player.seek(
-                                Duration(milliseconds: (_startSec * 1000).toInt()));
-                            _player.play();
-                          }
-                        },
-                        child: Container(
-                          width: 68,
-                          height: 68,
-                          decoration: const BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 38,
+                Text(
+                  _fmtPrecise(_currentSec),
+                  style: const TextStyle(
+                      fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'المدة الحالية: ${_fmtPrecise(_totalSec)}',
+                  style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 13),
+                ),
+                const Spacer(),
+
+                if (_isProcessing)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 40),
+                    child: CircularProgressIndicator(color: ThalabTheme.foxOrange),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 34),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _StudioBottomAction(
+                          icon: Icons.delete_sweep_rounded,
+                          label: 'حذف المحدد',
+                          active: true,
+                          activeColor: Colors.redAccent,
+                          onTap: () => _applyInstantEdit('cut'),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.replay_5_rounded, size: 30),
+                          onPressed: () {
+                            final t = (_currentSec - 3).clamp(0.0, _totalSec);
+                            _player.seek(Duration(milliseconds: (t * 1000).toInt()));
+                          },
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            if (_isPlaying) {
+                              _player.pause();
+                            } else {
+                              _player.seek(
+                                  Duration(milliseconds: (_startSec * 1000).toInt()));
+                              _player.play();
+                            }
+                          },
+                          child: Container(
+                            width: 68,
+                            height: 68,
+                            decoration: const BoxDecoration(
+                              color: Colors.redAccent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 38,
+                            ),
                           ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.forward_5_rounded, size: 30),
-                        onPressed: () {
-                          final t = (_currentSec + 3).clamp(0.0, _totalSec);
-                          _player.seek(Duration(milliseconds: (t * 1000).toInt()));
-                        },
-                      ),
-                      _StudioBottomAction(
-                        icon: Icons.content_cut_rounded,
-                        label: 'Trim',
-                        active: _editMode == 'keep',
-                        activeColor: ThalabTheme.foxOrange,
-                        onTap: () => setState(() => _editMode = 'keep'),
-                      ),
-                    ],
+                        IconButton(
+                          icon: const Icon(Icons.forward_5_rounded, size: 30),
+                          onPressed: () {
+                            final t = (_currentSec + 3).clamp(0.0, _totalSec);
+                            _player.seek(Duration(milliseconds: (t * 1000).toInt()));
+                          },
+                        ),
+                        _StudioBottomAction(
+                          icon: Icons.content_cut_rounded,
+                          label: 'قص الأطراف',
+                          active: true,
+                          activeColor: ThalabTheme.foxOrange,
+                          onTap: () => _applyInstantEdit('keep'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
     );
