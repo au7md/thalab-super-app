@@ -96,22 +96,24 @@ jobs:
 
               private val actionReceiver = object : BroadcastReceiver() {
                   override fun onReceive(context: Context?, intent: Intent?) {
-                      when (intent?.action) {
-                          "THALAB_REC_PAUSE_RESUME" -> {
-                              if (isRecPaused) resumeRecordingInternal() else pauseRecordingInternal()
-                              studioChannel?.invokeMethod("onRecNotificationAction", if (isRecPaused) "paused" else "resumed")
+                      runOnUiThread {
+                          when (intent?.action) {
+                              "THALAB_REC_PAUSE_RESUME" -> {
+                                  if (isRecPaused) resumeRecordingInternal() else pauseRecordingInternal()
+                                  studioChannel?.invokeMethod("onRecNotificationAction", if (isRecPaused) "paused" else "resumed")
+                              }
+                              "THALAB_REC_STOP_SAVE" -> {
+                                  val saved = stopAndExportRecordingInternal()
+                                  studioChannel?.invokeMethod("onRecNotificationAction", "stopped:$saved")
+                              }
+                              "THALAB_REC_CANCEL" -> {
+                                  cancelRecordingInternal()
+                                  studioChannel?.invokeMethod("onRecNotificationAction", "cancelled")
+                              }
+                              "THALAB_MEDIA_PREV" -> studioChannel?.invokeMethod("onMediaAction", "prev")
+                              "THALAB_MEDIA_PLAY_PAUSE" -> studioChannel?.invokeMethod("onMediaAction", "play_pause")
+                              "THALAB_MEDIA_NEXT" -> studioChannel?.invokeMethod("onMediaAction", "next")
                           }
-                          "THALAB_REC_STOP_SAVE" -> {
-                              val saved = stopAndExportRecordingInternal()
-                              studioChannel?.invokeMethod("onRecNotificationAction", "stopped:$saved")
-                          }
-                          "THALAB_REC_CANCEL" -> {
-                              cancelRecordingInternal()
-                              studioChannel?.invokeMethod("onRecNotificationAction", "cancelled")
-                          }
-                          "THALAB_MEDIA_PREV" -> studioChannel?.invokeMethod("onMediaAction", "prev")
-                          "THALAB_MEDIA_PLAY_PAUSE" -> studioChannel?.invokeMethod("onMediaAction", "play_pause")
-                          "THALAB_MEDIA_NEXT" -> studioChannel?.invokeMethod("onMediaAction", "next")
                       }
                   }
               }
@@ -162,7 +164,9 @@ jobs:
                               val title = call.argument<String>("title") ?: "ملف صوتي"
                               val subtitle = call.argument<String>("subtitle") ?: "الثعلب"
                               val isPlaying = call.argument<Boolean>("isPlaying") ?: false
-                              showMediaNotification(title, subtitle, isPlaying)
+                              val durationMs = (call.argument<Int>("durationMs") ?: 0).toLong()
+                              val positionMs = (call.argument<Int>("positionMs") ?: 0).toLong()
+                              showMediaNotification(title, subtitle, isPlaying, durationMs, positionMs)
                               result.success(true)
                           }
                           "hideMediaNotification" -> {
@@ -321,22 +325,29 @@ jobs:
               private fun initMediaSession() {
                   mediaSession = MediaSession(this, "ThalabMediaSession").apply {
                       setCallback(object : MediaSession.Callback() {
-                          override fun onPlay() { studioChannel?.invokeMethod("onMediaAction", "play_pause") }
-                          override fun onPause() { studioChannel?.invokeMethod("onMediaAction", "play_pause") }
-                          override fun onSkipToNext() { studioChannel?.invokeMethod("onMediaAction", "next") }
-                          override fun onSkipToPrevious() { studioChannel?.invokeMethod("onMediaAction", "prev") }
+                          override fun onPlay() { runOnUiThread { studioChannel?.invokeMethod("onMediaAction", "play_pause") } }
+                          override fun onPause() { runOnUiThread { studioChannel?.invokeMethod("onMediaAction", "play_pause") } }
+                          override fun onSkipToNext() { runOnUiThread { studioChannel?.invokeMethod("onMediaAction", "next") } }
+                          override fun onSkipToPrevious() { runOnUiThread { studioChannel?.invokeMethod("onMediaAction", "prev") } }
                       })
                       isActive = false
                   }
               }
 
-              private fun showMediaNotification(title: String, subtitle: String, isPlaying: Boolean) {
+              private fun showMediaNotification(
+                  title: String,
+                  subtitle: String,
+                  isPlaying: Boolean,
+                  durationMs: Long,
+                  positionMs: Long
+              ) {
                   val session = mediaSession ?: return
                   session.isActive = true
                   session.setMetadata(
                       MediaMetadata.Builder()
                           .putString(MediaMetadata.METADATA_KEY_TITLE, title)
                           .putString(MediaMetadata.METADATA_KEY_ARTIST, subtitle)
+                          .putLong(MediaMetadata.METADATA_KEY_DURATION, durationMs)
                           .build()
                   )
                   session.setPlaybackState(
@@ -344,12 +355,14 @@ jobs:
                           .setActions(
                               PlaybackState.ACTION_PLAY or
                               PlaybackState.ACTION_PAUSE or
+                              PlaybackState.ACTION_PLAY_PAUSE or
                               PlaybackState.ACTION_SKIP_TO_NEXT or
                               PlaybackState.ACTION_SKIP_TO_PREVIOUS
                           )
                           .setState(
                               if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
-                              0L, 1.0f
+                              positionMs,
+                              if (isPlaying) 1.0f else 0.0f
                           )
                           .build()
                   )
