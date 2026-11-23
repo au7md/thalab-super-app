@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:adhan/adhan.dart';
 
 class RafiqNotificationsService {
   RafiqNotificationsService._();
@@ -65,6 +66,39 @@ class RafiqNotificationsService {
       await androidImplementation?.requestNotificationsPermission();
     } catch (e) {
       debugPrint('Permission request error: $e');
+    }
+  }
+
+  /// الدالة المطلوبة من main.dart و prayer_times_screen.dart
+  Future<void> syncAllScheduledNotifications({
+    required double lat,
+    required double lng,
+    required CalculationParameters params,
+  }) async {
+    await init();
+    await cancelAll(); // مسح القديم قبل الجدولة
+
+    final coords = Coordinates(lat, lng);
+    final date = DateComponents.from(DateTime.now());
+    final pt = PrayerTimes(coords, date, params);
+
+    final prayers = [
+      ('الفجر', pt.fajr),
+      ('الظهر', pt.dhuhr),
+      ('العصر', pt.asr),
+      ('المغرب', pt.maghrib),
+      ('العشاء', pt.isha),
+    ];
+
+    int idCounter = 100;
+    for (final p in prayers) {
+      if (p.$2.isAfter(DateTime.now())) {
+        await schedulePrayerNotification(
+          id: idCounter++,
+          prayerName: p.$1,
+          scheduledTime: p.$2,
+        );
+      }
     }
   }
 
