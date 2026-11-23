@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'رقم الإصدار (مثال: v1.5.1)'
+        description: 'رقم الإصدار (مثال: v1.6.0)'
         required: true
-        default: 'v1.5.1'
+        default: 'v1.6.0'
 
 jobs:
   build:
@@ -30,7 +30,9 @@ jobs:
       - name: Initialize Android & Permissions
         run: |
           flutter create --platforms=android --org com.au7md --project-name thalab_app .
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"\/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"\/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:name=".MainActivity"/android:name="com.ryanheise.audioservice.AudioServiceActivity"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<\/application>/        <service android:name="com.ryanheise.audioservice.AudioService" android:foregroundServiceType="mediaPlayback" android:exported="true">\n            <intent-filter>\n                <action android:name="android.media.browse.MediaBrowserService" \/>\n            <\/intent-filter>\n        <\/service>\n        <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver" android:exported="true">\n            <intent-filter>\n                <action android:name="android.intent.action.MEDIA_BUTTON" \/>\n            <\/intent-filter>\n        <\/receiver>\n    <\/application>/' android/app/src/main/AndroidManifest.xml
           sed -i 's/compileOptions {/compileOptions {\n        isCoreLibraryDesugaringEnabled = true/' android/app/build.gradle.kts
           cat << 'EOF' >> android/app/build.gradle.kts
 
@@ -52,7 +54,14 @@ jobs:
           package com.au7md.thalab_app
 
           import android.Manifest
+          import android.app.NotificationChannel
+          import android.app.NotificationManager
+          import android.app.PendingIntent
+          import android.content.BroadcastReceiver
+          import android.content.ContentValues
           import android.content.Context
+          import android.content.Intent
+          import android.content.IntentFilter
           import android.content.pm.PackageManager
           import android.media.AudioManager
           import android.media.MediaCodec
@@ -61,23 +70,64 @@ jobs:
           import android.media.MediaMuxer
           import android.media.MediaRecorder
           import android.os.Build
+          import android.os.Environment
           import android.provider.MediaStore
           import androidx.core.app.ActivityCompat
+          import androidx.core.app.NotificationCompat
           import androidx.core.content.ContextCompat
-          import io.flutter.embedding.android.FlutterActivity
+          import com.ryanheise.audioservice.AudioServiceActivity
           import io.flutter.embedding.engine.FlutterEngine
           import io.flutter.plugin.common.MethodChannel
           import java.io.File
+          import java.io.FileInputStream
           import java.nio.ByteBuffer
           import java.util.ArrayList
           import java.util.HashMap
 
-          class MainActivity : FlutterActivity() {
+          class MainActivity : AudioServiceActivity() {
               private var mediaRecorder: MediaRecorder? = null
               private var currentRecordPath: String? = null
+              private var currentRecordTitle: String? = null
+              private var isRecPaused: Boolean = false
+              private var studioChannel: MethodChannel? = null
+
+              private val recActionReceiver = object : BroadcastReceiver() {
+                  override fun onReceive(context: Context?, intent: Intent?) {
+                      when (intent?.action) {
+                          "THALAB_REC_PAUSE_RESUME" -> {
+                              if (isRecPaused) {
+                                  resumeRecordingInternal()
+                              } else {
+                                  pauseRecordingInternal()
+                              }
+                              studioChannel?.invokeMethod("onRecNotificationAction", if (isRecPaused) "paused" else "resumed")
+                          }
+                          "THALAB_REC_STOP_SAVE" -> {
+                              val saved = stopAndExportRecordingInternal()
+                              studioChannel?.invokeMethod("onRecNotificationAction", "stopped:$saved")
+                          }
+                          "THALAB_REC_CANCEL" -> {
+                              cancelRecordingInternal()
+                              studioChannel?.invokeMethod("onRecNotificationAction", "cancelled")
+                          }
+                      }
+                  }
+              }
 
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
+                  createRecNotificationChannel()
+
+                  val filter = IntentFilter().apply {
+                      addAction("THALAB_REC_PAUSE_RESUME")
+                      addAction("THALAB_REC_STOP_SAVE")
+                      addAction("THALAB_REC_CANCEL")
+                  }
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                      registerReceiver(recActionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                  } else {
+                      registerReceiver(recActionReceiver, filter)
+                  }
 
                   MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.au7md.thalab_app/system_volume")
                       .setMethodCallHandler { call, result ->
@@ -98,134 +148,277 @@ jobs:
                           }
                       }
 
-                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.au7md.thalab_app/audio_studio")
-                      .setMethodCallHandler { call, result ->
-                          when (call.method) {
-                              "getDeviceAudios" -> {
-                                  val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                      Manifest.permission.READ_MEDIA_AUDIO
-                                  } else {
-                                      Manifest.permission.READ_EXTERNAL_STORAGE
-                                  }
-                                  if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
-                                      ActivityCompat.requestPermissions(this, arrayOf(perm), 402)
-                                      result.success(ArrayList<Any>())
-                                      return@setMethodCallHandler
-                                  }
-                                  val list = ArrayList<HashMap<String, Any>>()
-                                  val projection = arrayOf(
-                                      MediaStore.Audio.Media._ID,
-                                      MediaStore.Audio.Media.TITLE,
-                                      MediaStore.Audio.Media.ARTIST,
-                                      MediaStore.Audio.Media.DATA,
-                                      MediaStore.Audio.Media.DURATION
-                                  )
-                                  val cursor = contentResolver.query(
-                                      MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                                      projection,
-                                      "${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.DURATION} > 1000",
-                                      null,
-                                      "${MediaStore.Audio.Media.DATE_ADDED} DESC"
-                                  )
-                                  cursor?.use { c ->
-                                      val idCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-                                      val titleCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-                                      val artistCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-                                      val dataCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-                                      val durCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-                                      while (c.moveToNext()) {
-                                          val path = c.getString(dataCol) ?: continue
-                                          if (!File(path).exists()) continue
-                                          val title = c.getString(titleCol) ?: File(path).nameWithoutExtension
-                                          val artist = c.getString(artistCol) ?: "مكتبة الجهاز"
-                                          val durMs = c.getLong(durCol)
-                                          val item = HashMap<String, Any>()
-                                          item["id"] = c.getLong(idCol).toString()
-                                          item["title"] = title
-                                          item["artist"] = if (artist == "<unknown>") "ملف صوتي" else artist
-                                          item["path"] = path
-                                          item["durationSec"] = (durMs / 1000L).toInt()
-                                          list.add(item)
-                                      }
-                                  }
-                                  result.success(list)
+                  val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.au7md.thalab_app/audio_studio")
+                  studioChannel = channel
+                  channel.setMethodCallHandler { call, result ->
+                      when (call.method) {
+                          "getDeviceAudios" -> {
+                              val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                  Manifest.permission.READ_MEDIA_AUDIO
+                              } else {
+                                  Manifest.permission.READ_EXTERNAL_STORAGE
                               }
-                              "hasRecordPermission" -> {
-                                  val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                                  if (!granted) {
-                                      ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 401)
-                                  }
-                                  result.success(granted)
+                              if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+                                  ActivityCompat.requestPermissions(this, arrayOf(perm), 402)
+                                  result.success(ArrayList<Any>())
+                                  return@setMethodCallHandler
                               }
-                              "startRecord" -> {
-                                  val path = call.argument<String>("path") ?: ""
-                                  try {
-                                      mediaRecorder?.release()
-                                      val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                          MediaRecorder(this)
-                                      } else {
-                                          @Suppress("DEPRECATION")
-                                          MediaRecorder()
-                                      }
-                                      recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
-                                      recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                                      recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                                      recorder.setAudioEncodingBitRate(128000)
-                                      recorder.setAudioSamplingRate(44100)
-                                      recorder.setOutputFile(path)
-                                      recorder.prepare()
-                                      recorder.start()
-                                      mediaRecorder = recorder
-                                      currentRecordPath = path
-                                      result.success(true)
-                                  } catch (e: Exception) {
-                                      result.error("REC_ERR", e.message, null)
+                              val list = ArrayList<HashMap<String, Any>>()
+                              val projection = arrayOf(
+                                  MediaStore.Audio.Media._ID,
+                                  MediaStore.Audio.Media.TITLE,
+                                  MediaStore.Audio.Media.ARTIST,
+                                  MediaStore.Audio.Media.DATA,
+                                  MediaStore.Audio.Media.DURATION,
+                                  MediaStore.Audio.Media.DATE_ADDED
+                              )
+                              val cursor = contentResolver.query(
+                                  MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                                  projection,
+                                  "${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.DURATION} > 1000",
+                                  null,
+                                  "${MediaStore.Audio.Media.DATE_ADDED} DESC"
+                              )
+                              cursor?.use { c ->
+                                  val idCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                                  val titleCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                                  val artistCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                                  val dataCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+                                  val durCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                                  val dateCol = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
+                                  while (c.moveToNext()) {
+                                      val path = c.getString(dataCol) ?: continue
+                                      val fileObj = File(path)
+                                      if (!fileObj.exists()) continue
+                                      val title = c.getString(titleCol) ?: fileObj.nameWithoutExtension
+                                      val artist = c.getString(artistCol) ?: "مكتبة الجهاز"
+                                      val durMs = c.getLong(durCol)
+                                      val folderName = fileObj.parentFile?.name ?: "ملفات صوتية"
+                                      val item = HashMap<String, Any>()
+                                      item["id"] = c.getLong(idCol).toString()
+                                      item["title"] = title
+                                      item["artist"] = if (artist == "<unknown>") folderName else artist
+                                      item["folder"] = folderName
+                                      item["path"] = path
+                                      item["durationSec"] = (durMs / 1000L).toInt()
+                                      item["dateAdded"] = c.getLong(dateCol)
+                                      list.add(item)
                                   }
                               }
-                              "getAmplitude" -> {
-                                  try {
-                                      val amp = mediaRecorder?.maxAmplitude ?: 0
-                                      result.success((amp / 32767.0).coerceIn(0.08, 1.0))
-                                  } catch (_: Exception) {
-                                      result.success(0.15)
-                                  }
-                              }
-                              "pauseRecord" -> {
-                                  try {
-                                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) mediaRecorder?.pause()
-                                      result.success(true)
-                                  } catch (_: Exception) { result.success(false) }
-                              }
-                              "resumeRecord" -> {
-                                  try {
-                                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) mediaRecorder?.resume()
-                                      result.success(true)
-                                  } catch (_: Exception) { result.success(false) }
-                              }
-                              "stopRecord" -> {
-                                  try {
-                                      mediaRecorder?.stop()
-                                      mediaRecorder?.release()
-                                  } catch (_: Exception) {}
-                                  mediaRecorder = null
-                                  result.success(currentRecordPath)
-                              }
-                              "processAudioEdit" -> {
-                                  val srcPath = call.argument<String>("srcPath") ?: ""
-                                  val dstPath = call.argument<String>("dstPath") ?: ""
-                                  val mode = call.argument<String>("mode") ?: "keep"
-                                  val startMs = (call.argument<Int>("startMs") ?: 0).toLong()
-                                  val endMs = (call.argument<Int>("endMs") ?: 0).toLong()
-                                  try {
-                                      editAudioTrack(srcPath, dstPath, mode, startMs * 1000L, endMs * 1000L)
-                                      result.success(true)
-                                  } catch (e: Exception) {
-                                      result.error("EDIT_ERR", e.message, null)
-                                  }
-                              }
-                              else -> result.notImplemented()
+                              result.success(list)
                           }
+                          "hasRecordPermission" -> {
+                              val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                              if (!granted) {
+                                  ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 401)
+                              }
+                              result.success(granted)
+                          }
+                          "startRecord" -> {
+                              val path = call.argument<String>("path") ?: ""
+                              val title = call.argument<String>("title") ?: "تسجيل الثعلب"
+                              try {
+                                  mediaRecorder?.release()
+                                  val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                      MediaRecorder(this)
+                                  } else {
+                                      @Suppress("DEPRECATION")
+                                      MediaRecorder()
+                                  }
+                                  recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+                                  recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                                  recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                                  recorder.setAudioEncodingBitRate(128000)
+                                  recorder.setAudioSamplingRate(44100)
+                                  recorder.setOutputFile(path)
+                                  recorder.prepare()
+                                  recorder.start()
+                                  mediaRecorder = recorder
+                                  currentRecordPath = path
+                                  currentRecordTitle = title
+                                  isRecPaused = false
+                                  showRecordingNotification(title, false)
+                                  result.success(true)
+                              } catch (e: Exception) {
+                                  result.error("REC_ERR", e.message, null)
+                              }
+                          }
+                          "getAmplitude" -> {
+                              try {
+                                  val amp = mediaRecorder?.maxAmplitude ?: 0
+                                  result.success((amp / 32767.0).coerceIn(0.08, 1.0))
+                              } catch (_: Exception) {
+                                  result.success(0.15)
+                              }
+                          }
+                          "pauseRecord" -> {
+                              pauseRecordingInternal()
+                              result.success(true)
+                          }
+                          "resumeRecord" -> {
+                              resumeRecordingInternal()
+                              result.success(true)
+                          }
+                          "stopRecord" -> {
+                              val saved = stopAndExportRecordingInternal()
+                              result.success(saved)
+                          }
+                          "cancelRecord" -> {
+                              cancelRecordingInternal()
+                              result.success(true)
+                          }
+                          "exportToMusicFolder" -> {
+                              val srcPath = call.argument<String>("srcPath") ?: ""
+                              val title = call.argument<String>("title") ?: "Thalab_Audio"
+                              val subFolder = call.argument<String>("subFolder") ?: "Thalab Recordings"
+                              val exportedPath = saveAudioToPublicMusic(srcPath, title, subFolder)
+                              result.success(exportedPath)
+                          }
+                          "processAudioEdit" -> {
+                              val srcPath = call.argument<String>("srcPath") ?: ""
+                              val dstPath = call.argument<String>("dstPath") ?: ""
+                              val mode = call.argument<String>("mode") ?: "keep"
+                              val startMs = (call.argument<Int>("startMs") ?: 0).toLong()
+                              val endMs = (call.argument<Int>("endMs") ?: 0).toLong()
+                              try {
+                                  editAudioTrack(srcPath, dstPath, mode, startMs * 1000L, endMs * 1000L)
+                                  result.success(true)
+                              } catch (e: Exception) {
+                                  result.error("EDIT_ERR", e.message, null)
+                              }
+                          }
+                          else -> result.notImplemented()
                       }
+                  }
+              }
+
+              private fun pauseRecordingInternal() {
+                  try {
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                          mediaRecorder?.pause()
+                          isRecPaused = true
+                          showRecordingNotification(currentRecordTitle ?: "تسجيل الثعلب", true)
+                      }
+                  } catch (_: Exception) {}
+              }
+
+              private fun resumeRecordingInternal() {
+                  try {
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                          mediaRecorder?.resume()
+                          isRecPaused = false
+                          showRecordingNotification(currentRecordTitle ?: "تسجيل الثعلب", false)
+                      }
+                  } catch (_: Exception) {}
+              }
+
+              private fun stopAndExportRecordingInternal(): String {
+                  try {
+                      mediaRecorder?.stop()
+                      mediaRecorder?.release()
+                  } catch (_: Exception) {}
+                  mediaRecorder = null
+                  isRecPaused = false
+                  dismissRecordingNotification()
+                  val src = currentRecordPath ?: return ""
+                  val title = currentRecordTitle ?: File(src).nameWithoutExtension
+                  val exported = saveAudioToPublicMusic(src, title, "Thalab Recordings")
+                  return exported.ifEmpty { src }
+              }
+
+              private fun cancelRecordingInternal() {
+                  try {
+                      mediaRecorder?.stop()
+                      mediaRecorder?.release()
+                  } catch (_: Exception) {}
+                  mediaRecorder = null
+                  isRecPaused = false
+                  dismissRecordingNotification()
+                  currentRecordPath?.let { File(it).delete() }
+                  currentRecordPath = null
+              }
+
+              private fun saveAudioToPublicMusic(srcPath: String, title: String, subFolder: String): String {
+                  val srcFile = File(srcPath)
+                  if (!srcFile.exists()) return ""
+                  val cleanName = if (title.endsWith(".m4a")) title else "$title.m4a"
+                  return try {
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                          val values = ContentValues().apply {
+                              put(MediaStore.Audio.Media.DISPLAY_NAME, cleanName)
+                              put(MediaStore.Audio.Media.TITLE, title)
+                              put(MediaStore.Audio.Media.MIME_TYPE, "audio/mp4")
+                              put(MediaStore.Audio.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MUSIC}/$subFolder")
+                              put(MediaStore.Audio.Media.IS_MUSIC, 1)
+                          }
+                          val uri = contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+                          if (uri != null) {
+                              contentResolver.openOutputStream(uri)?.use { out ->
+                                  FileInputStream(srcFile).use { input -> input.copyTo(out) }
+                              }
+                          }
+                          "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)}/$subFolder/$cleanName"
+                      } else {
+                          val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), subFolder)
+                          if (!dir.exists()) dir.mkdirs()
+                          val dst = File(dir, cleanName)
+                          srcFile.copyTo(dst, overwrite = true)
+                          dst.absolutePath
+                      }
+                  } catch (_: Exception) {
+                      srcPath
+                  }
+              }
+
+              private fun createRecNotificationChannel() {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      val channel = NotificationChannel(
+                          "thalab_voice_rec_channel",
+                          "مسجل صوت الثعلب",
+                          NotificationManager.IMPORTANCE_LOW
+                      )
+                      val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                      nm.createNotificationChannel(channel)
+                  }
+              }
+
+              private fun showRecordingNotification(title: String, paused: Boolean) {
+                  val openIntent = Intent(this, MainActivity::class.java)
+                  val openPending = PendingIntent.getActivity(
+                      this, 10, openIntent,
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+
+                  val pauseIntent = PendingIntent.getBroadcast(
+                      this, 11, Intent("THALAB_REC_PAUSE_RESUME").setPackage(packageName),
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+                  val stopIntent = PendingIntent.getBroadcast(
+                      this, 12, Intent("THALAB_REC_STOP_SAVE").setPackage(packageName),
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+                  val cancelIntent = PendingIntent.getBroadcast(
+                      this, 13, Intent("THALAB_REC_CANCEL").setPackage(packageName),
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+
+                  val builder = NotificationCompat.Builder(this, "thalab_voice_rec_channel")
+                      .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                      .setContentTitle(if (paused) "التسجيل متوقف مؤقتاً • الثعلب" else "جاري التسجيل الصوتي • الثعلب")
+                      .setContentText(title)
+                      .setOngoing(true)
+                      .setContentIntent(openPending)
+                      .addAction(0, if (paused) "استئناف" else "إيقاف مؤقت", pauseIntent)
+                      .addAction(0, "حفظ وإنهاء", stopIntent)
+                      .addAction(0, "إلغاء", cancelIntent)
+
+                  val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                  nm.notify(9091, builder.build())
+              }
+
+              private fun dismissRecordingNotification() {
+                  val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                  nm.cancel(9091)
               }
 
               private fun editAudioTrack(
@@ -303,6 +496,11 @@ jobs:
                   muxer.stop()
                   muxer.release()
                   extractor.release()
+              }
+
+              override fun onDestroy() {
+                  try { unregisterReceiver(recActionReceiver) } catch (_: Exception) {}
+                  super.onDestroy()
               }
           }
           EOF
