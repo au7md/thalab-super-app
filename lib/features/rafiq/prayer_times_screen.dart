@@ -165,10 +165,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     _calculatePrayerTimes();
 
     if (_prayerTimes != null) {
-      await RafiqNotificationsService.syncAllScheduledNotifications(
+      final params = CalculationMethod.egyptian.getParameters();
+      params.madhab = Madhab.shafi;
+      await RafiqNotificationsService.instance.syncAllScheduledNotifications(
         lat: lat,
         lng: lng,
-        params: CalculationMethod.egyptian.getParameters(),
+        params: params,
       );
     }
   }
