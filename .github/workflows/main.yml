@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'رقم الإصدار (مثال: v1.6.0)'
+        description: 'رقم الإصدار (مثال: v1.6.2)'
         required: true
-        default: 'v1.6.0'
+        default: 'v1.6.2'
 
 jobs:
   build:
@@ -30,8 +30,7 @@ jobs:
       - name: Initialize Android & Permissions
         run: |
           flutter create --platforms=android --org com.au7md --project-name thalab_app .
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"\/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
-          sed -i 's/<\/application>/        <service android:name="com.ryanheise.audioservice.AudioService" android:foregroundServiceType="mediaPlayback" android:exported="true">\n            <intent-filter>\n                <action android:name="android.media.browse.MediaBrowserService" \/>\n            <\/intent-filter>\n        <\/service>\n        <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver" android:exported="true">\n            <intent-filter>\n                <action android:name="android.intent.action.MEDIA_BUTTON" \/>\n            <\/intent-filter>\n        <\/receiver>\n    <\/application>/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"\/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"\/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"\/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"\/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"\/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"\/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"\/>\n    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
           sed -i 's/compileOptions {/compileOptions {\n        isCoreLibraryDesugaringEnabled = true/' android/app/build.gradle.kts
           cat << 'EOF' >> android/app/build.gradle.kts
 
@@ -53,6 +52,7 @@ jobs:
           package com.au7md.thalab_app
 
           import android.Manifest
+          import android.app.Notification
           import android.app.NotificationChannel
           import android.app.NotificationManager
           import android.app.PendingIntent
@@ -66,8 +66,11 @@ jobs:
           import android.media.MediaCodec
           import android.media.MediaExtractor
           import android.media.MediaFormat
+          import android.media.MediaMetadata
           import android.media.MediaMuxer
           import android.media.MediaRecorder
+          import android.media.session.MediaSession
+          import android.media.session.PlaybackState
           import android.os.Build
           import android.os.Environment
           import android.provider.MediaStore
@@ -89,16 +92,13 @@ jobs:
               private var currentRecordTitle: String? = null
               private var isRecPaused: Boolean = false
               private var studioChannel: MethodChannel? = null
+              private var mediaSession: MediaSession? = null
 
-              private val recActionReceiver = object : BroadcastReceiver() {
+              private val actionReceiver = object : BroadcastReceiver() {
                   override fun onReceive(context: Context?, intent: Intent?) {
                       when (intent?.action) {
                           "THALAB_REC_PAUSE_RESUME" -> {
-                              if (isRecPaused) {
-                                  resumeRecordingInternal()
-                              } else {
-                                  pauseRecordingInternal()
-                              }
+                              if (isRecPaused) resumeRecordingInternal() else pauseRecordingInternal()
                               studioChannel?.invokeMethod("onRecNotificationAction", if (isRecPaused) "paused" else "resumed")
                           }
                           "THALAB_REC_STOP_SAVE" -> {
@@ -109,23 +109,30 @@ jobs:
                               cancelRecordingInternal()
                               studioChannel?.invokeMethod("onRecNotificationAction", "cancelled")
                           }
+                          "THALAB_MEDIA_PREV" -> studioChannel?.invokeMethod("onMediaAction", "prev")
+                          "THALAB_MEDIA_PLAY_PAUSE" -> studioChannel?.invokeMethod("onMediaAction", "play_pause")
+                          "THALAB_MEDIA_NEXT" -> studioChannel?.invokeMethod("onMediaAction", "next")
                       }
                   }
               }
 
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
-                  createRecNotificationChannel()
+                  createNotificationChannels()
+                  initMediaSession()
 
                   val filter = IntentFilter().apply {
                       addAction("THALAB_REC_PAUSE_RESUME")
                       addAction("THALAB_REC_STOP_SAVE")
                       addAction("THALAB_REC_CANCEL")
+                      addAction("THALAB_MEDIA_PREV")
+                      addAction("THALAB_MEDIA_PLAY_PAUSE")
+                      addAction("THALAB_MEDIA_NEXT")
                   }
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                      registerReceiver(recActionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                      registerReceiver(actionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
                   } else {
-                      registerReceiver(recActionReceiver, filter)
+                      registerReceiver(actionReceiver, filter)
                   }
 
                   MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.au7md.thalab_app/system_volume")
@@ -151,6 +158,19 @@ jobs:
                   studioChannel = channel
                   channel.setMethodCallHandler { call, result ->
                       when (call.method) {
+                          "updateMediaNotification" -> {
+                              val title = call.argument<String>("title") ?: "ملف صوتي"
+                              val subtitle = call.argument<String>("subtitle") ?: "الثعلب"
+                              val isPlaying = call.argument<Boolean>("isPlaying") ?: false
+                              showMediaNotification(title, subtitle, isPlaying)
+                              result.success(true)
+                          }
+                          "hideMediaNotification" -> {
+                              val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                              nm.cancel(9092)
+                              mediaSession?.isActive = false
+                              result.success(true)
+                          }
                           "getDeviceAudios" -> {
                               val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                   Manifest.permission.READ_MEDIA_AUDIO
@@ -207,11 +227,18 @@ jobs:
                               result.success(list)
                           }
                           "hasRecordPermission" -> {
-                              val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                              if (!granted) {
-                                  ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 401)
+                              val perms = mutableListOf(Manifest.permission.RECORD_AUDIO)
+                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                  perms.add(Manifest.permission.POST_NOTIFICATIONS)
                               }
-                              result.success(granted)
+                              val recGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                              if (!recGranted) {
+                                  ActivityCompat.requestPermissions(this, perms.toTypedArray(), 401)
+                              } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                  ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                  ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 403)
+                              }
+                              result.success(recGranted)
                           }
                           "startRecord" -> {
                               val path = call.argument<String>("path") ?: ""
@@ -289,6 +316,85 @@ jobs:
                           else -> result.notImplemented()
                       }
                   }
+              }
+
+              private fun initMediaSession() {
+                  mediaSession = MediaSession(this, "ThalabMediaSession").apply {
+                      setCallback(object : MediaSession.Callback() {
+                          override fun onPlay() { studioChannel?.invokeMethod("onMediaAction", "play_pause") }
+                          override fun onPause() { studioChannel?.invokeMethod("onMediaAction", "play_pause") }
+                          override fun onSkipToNext() { studioChannel?.invokeMethod("onMediaAction", "next") }
+                          override fun onSkipToPrevious() { studioChannel?.invokeMethod("onMediaAction", "prev") }
+                      })
+                      isActive = false
+                  }
+              }
+
+              private fun showMediaNotification(title: String, subtitle: String, isPlaying: Boolean) {
+                  val session = mediaSession ?: return
+                  session.isActive = true
+                  session.setMetadata(
+                      MediaMetadata.Builder()
+                          .putString(MediaMetadata.METADATA_KEY_TITLE, title)
+                          .putString(MediaMetadata.METADATA_KEY_ARTIST, subtitle)
+                          .build()
+                  )
+                  session.setPlaybackState(
+                      PlaybackState.Builder()
+                          .setActions(
+                              PlaybackState.ACTION_PLAY or
+                              PlaybackState.ACTION_PAUSE or
+                              PlaybackState.ACTION_SKIP_TO_NEXT or
+                              PlaybackState.ACTION_SKIP_TO_PREVIOUS
+                          )
+                          .setState(
+                              if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
+                              0L, 1.0f
+                          )
+                          .build()
+                  )
+
+                  val openPending = PendingIntent.getActivity(
+                      this, 20, Intent(this, MainActivity::class.java),
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+                  val prevPending = PendingIntent.getBroadcast(
+                      this, 21, Intent("THALAB_MEDIA_PREV").setPackage(packageName),
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+                  val playPausePending = PendingIntent.getBroadcast(
+                      this, 22, Intent("THALAB_MEDIA_PLAY_PAUSE").setPackage(packageName),
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+                  val nextPending = PendingIntent.getBroadcast(
+                      this, 23, Intent("THALAB_MEDIA_NEXT").setPackage(packageName),
+                      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                  )
+
+                  val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      Notification.Builder(this, "thalab_media_channel")
+                  } else {
+                      @Suppress("DEPRECATION")
+                      Notification.Builder(this)
+                  }
+
+                  builder.setSmallIcon(android.R.drawable.ic_media_play)
+                      .setContentTitle(title)
+                      .setContentText(subtitle)
+                      .setContentIntent(openPending)
+                      .setOngoing(isPlaying)
+                      .setVisibility(Notification.VISIBILITY_PUBLIC)
+                      .addAction(Notification.Action.Builder(android.R.drawable.ic_media_previous, "السابق", prevPending).build())
+                      .addAction(Notification.Action.Builder(
+                          if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                          if (isPlaying) "إيقاف" else "تشغيل", playPausePending).build())
+                      .addAction(Notification.Action.Builder(android.R.drawable.ic_media_next, "التالي", nextPending).build())
+                      .setStyle(Notification.MediaStyle()
+                          .setMediaSession(session.sessionToken)
+                          .setShowActionsInCompactView(0, 1, 2))
+
+                  val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                  nm.notify(9092, builder.build())
               }
 
               private fun pauseRecordingInternal() {
@@ -369,25 +475,23 @@ jobs:
                   }
               }
 
-              private fun createRecNotificationChannel() {
+              private fun createNotificationChannels() {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      val channel = NotificationChannel(
-                          "thalab_voice_rec_channel",
-                          "مسجل صوت الثعلب",
-                          NotificationManager.IMPORTANCE_LOW
-                      )
                       val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                      nm.createNotificationChannel(channel)
+                      nm.createNotificationChannel(
+                          NotificationChannel("thalab_voice_rec_channel", "مسجل صوت الثعلب", NotificationManager.IMPORTANCE_HIGH)
+                      )
+                      nm.createNotificationChannel(
+                          NotificationChannel("thalab_media_channel", "مشغل صوتيات الثعلب", NotificationManager.IMPORTANCE_LOW)
+                      )
                   }
               }
 
               private fun showRecordingNotification(title: String, paused: Boolean) {
-                  val openIntent = Intent(this, MainActivity::class.java)
                   val openPending = PendingIntent.getActivity(
-                      this, 10, openIntent,
+                      this, 10, Intent(this, MainActivity::class.java),
                       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                   )
-
                   val pauseIntent = PendingIntent.getBroadcast(
                       this, 11, Intent("THALAB_REC_PAUSE_RESUME").setPackage(packageName),
                       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -405,6 +509,7 @@ jobs:
                       .setSmallIcon(android.R.drawable.ic_btn_speak_now)
                       .setContentTitle(if (paused) "التسجيل متوقف مؤقتاً • الثعلب" else "جاري التسجيل الصوتي • الثعلب")
                       .setContentText(title)
+                      .setPriority(NotificationCompat.PRIORITY_HIGH)
                       .setOngoing(true)
                       .setContentIntent(openPending)
                       .addAction(0, if (paused) "استئناف" else "إيقاف مؤقت", pauseIntent)
@@ -498,7 +603,8 @@ jobs:
               }
 
               override fun onDestroy() {
-                  try { unregisterReceiver(recActionReceiver) } catch (_: Exception) {}
+                  try { unregisterReceiver(actionReceiver) } catch (_: Exception) {}
+                  mediaSession?.release()
                   super.onDestroy()
               }
           }
