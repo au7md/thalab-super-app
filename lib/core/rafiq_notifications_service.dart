@@ -69,14 +69,26 @@ class RafiqNotificationsService {
     }
   }
 
-  /// الدالة المطلوبة من main.dart و prayer_times_screen.dart
-  Future<void> syncAllScheduledNotifications({
+  /// جسر Static لحل الاستدعاء المباشر في main.dart و prayer_times_screen.dart
+  static Future<void> syncAllScheduledNotifications({
+    required double lat,
+    required double lng,
+    required CalculationParameters params,
+  }) async {
+    await instance._syncAllScheduledNotificationsInternal(
+      lat: lat,
+      lng: lng,
+      params: params,
+    );
+  }
+
+  Future<void> _syncAllScheduledNotificationsInternal({
     required double lat,
     required double lng,
     required CalculationParameters params,
   }) async {
     await init();
-    await cancelAll(); // مسح القديم قبل الجدولة
+    await cancelAll();
 
     final coords = Coordinates(lat, lng);
     final date = DateComponents.from(DateTime.now());
