@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version_tag:
-        description: 'رقم الإصدار (مثال: v1.4.0)'
+        description: 'رقم الإصدار (مثال: v1.4.1)'
         required: true
-        default: 'v1.4.0'
+        default: 'v1.4.1'
 
 jobs:
   build:
@@ -44,6 +44,20 @@ jobs:
               plugins.withId("com.android.library") {
                   extensions.configure<com.android.build.gradle.LibraryExtension> {
                       compileSdk = 35
+                      compileOptions {
+                          sourceCompatibility = JavaVersion.VERSION_11
+                          targetCompatibility = JavaVersion.VERSION_11
+                      }
+                  }
+              }
+              tasks.configureEach {
+                  if (name.contains("Kotlin")) {
+                      try {
+                          val getOptions = javaClass.getMethod("getKotlinOptions")
+                          val options = getOptions.invoke(this)
+                          val setTarget = options.javaClass.getMethod("setJvmTarget", String::class.java)
+                          setTarget.invoke(options, "11")
+                      } catch (_: Exception) {}
                   }
               }
           }
