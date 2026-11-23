@@ -44,21 +44,40 @@ jobs:
               plugins.withId("com.android.library") {
                   extensions.configure<com.android.build.gradle.LibraryExtension> {
                       compileSdk = 35
-                      compileOptions {
-                          sourceCompatibility = JavaVersion.VERSION_17
-                          targetCompatibility = JavaVersion.VERSION_17
-                      }
                   }
               }
-              tasks.configureEach {
-                  if (name.contains("Kotlin")) {
-                      try {
-                          val getOptions = javaClass.getMethod("getKotlinOptions")
-                          val options = getOptions.invoke(this)
-                          val setTarget = options.javaClass.getMethod("setJvmTarget", String::class.java)
-                          setTarget.invoke(options, "17")
-                      } catch (_: Exception) {}
-                  }
+          }
+          EOF
+          cat << 'EOF' > android/app/src/main/kotlin/com/au7md/thalab_app/MainActivity.kt
+          package com.au7md.thalab_app
+
+          import android.content.Context
+          import android.media.AudioManager
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+
+          class MainActivity : FlutterActivity() {
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.au7md.thalab_app/system_volume")
+                      .setMethodCallHandler { call, result ->
+                          val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                          val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                          when (call.method) {
+                              "getVolume" -> {
+                                  val cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                  result.success(if (maxVol > 0) cur.toDouble() / maxVol.toDouble() else 0.5)
+                              }
+                              "setVolume" -> {
+                                  val vol = (call.argument<Double>("volume") ?: 0.5).coerceIn(0.0, 1.0)
+                                  val target = (vol * maxVol).toInt().coerceIn(0, maxVol)
+                                  audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+                                  result.success(null)
+                              }
+                              else -> result.notImplemented()
+                          }
+                      }
               }
           }
           EOF
