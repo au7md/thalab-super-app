@@ -840,7 +840,8 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: ThalabTheme.cardSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text('الانتقال السريع لصفحة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('الانتقال السريع لصفحة',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: pageCtrl,
           keyboardType: TextInputType.number,
@@ -1198,8 +1199,6 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
     final isBookmarked = _bookmarks.contains(_currentPage.toString());
     final isCompleted = _completedPages.contains(_currentPage.toString());
 
-    // في الوضع النهاري (الفاتح): خلفية ورق كريمي دافئ (#FFFDF7) حتى يظهر الحبر الأسود بوضوح تام
-    // وفي الوضع الليلي: خلفية داكنة مريحة (#141312) مع عكس ألوان الحبر للأبيض
     final Color paperBg = _isNightPaper
         ? const Color(0xFF141312)
         : const Color(0xFFFFFDF7);
@@ -1590,6 +1589,20 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
 // =========================================================================
 // محرك البحث الذكي في القرآن الكريم
 // =========================================================================
+class _QuranSearchMatch {
+  final String type;
+  final String title;
+  final String subtitle;
+  final int page;
+
+  const _QuranSearchMatch({
+    required this.type,
+    required this.title,
+    required this.subtitle,
+    required this.page,
+  });
+}
+
 class _QuranSmartSearchDelegate extends SearchDelegate<void> {
   final ValueChanged<int> onSelectPage;
 
@@ -1657,17 +1670,19 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
       );
     }
 
-    final List> matches = [];
+    final List<_QuranSearchMatch> matches = [];
 
     for (int s = 1; s <= 114; s++) {
       final surahAr = quran.getSurahNameArabic(s);
       if (_normalizeArabic(surahAr).contains(normQuery)) {
-        matches.add({
-          'type': 'surah',
-          'title': 'سورة $surahAr',
-          'subtitle': 'صفحة ${quran.getSurahPages(s).first} • ${quran.getVerseCount(s)} آية',
-          'page': quran.getSurahPages(s).first,
-        });
+        matches.add(
+          _QuranSearchMatch(
+            type: 'surah',
+            title: 'سورة $surahAr',
+            subtitle: 'صفحة ${quran.getSurahPages(s).first} • ${quran.getVerseCount(s)} آية',
+            page: quran.getSurahPages(s).first,
+          ),
+        );
       }
     }
 
@@ -1676,12 +1691,14 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
       for (int v = 1; v <= count && matches.length < 35; v++) {
         final verse = quran.getVerse(s, v, verseEndSymbol: false);
         if (_normalizeArabic(verse).contains(normQuery)) {
-          matches.add({
-            'type': 'verse',
-            'title': 'سورة ${quran.getSurahNameArabic(s)} • آية $v',
-            'subtitle': verse,
-            'page': quran.getPageNumber(s, v),
-          });
+          matches.add(
+            _QuranSearchMatch(
+              type: 'verse',
+              title: 'سورة ${quran.getSurahNameArabic(s)} • آية $v',
+              subtitle: verse,
+              page: quran.getPageNumber(s, v),
+            ),
+          );
         }
       }
     }
@@ -1702,7 +1719,7 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
           borderRadius: BorderRadius.circular(18),
           onTap: () {
             close(context, null);
-            onSelectPage(item['page'] as int);
+            onSelectPage(item.page);
           },
           child: Container(
             padding: const EdgeInsets.all(14),
@@ -1714,7 +1731,7 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
             child: Row(
               children: [
                 Icon(
-                  item['type'] == 'surah' ? Icons.menu_book_rounded : Icons.format_quote_rounded,
+                  item.type == 'surah' ? Icons.menu_book_rounded : Icons.format_quote_rounded,
                   color: ThalabTheme.foxOrange,
                 ),
                 const SizedBox(width: 12),
@@ -1722,11 +1739,11 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item['title'] as String,
+                      Text(item.title,
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       const SizedBox(height: 2),
                       Text(
-                        item['subtitle'] as String,
+                        item.subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 12),
@@ -1735,7 +1752,7 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
                   ),
                 ),
                 Text(
-                  'ص ${item['page']}',
+                  'ص ${item.page}',
                   style: const TextStyle(color: ThalabTheme.foxOrange, fontWeight: FontWeight.bold),
                 ),
               ],
