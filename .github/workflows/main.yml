@@ -69,6 +69,8 @@ jobs:
           import io.flutter.plugin.common.MethodChannel
           import java.io.File
           import java.nio.ByteBuffer
+          import java.util.ArrayList
+          import java.util.HashMap
 
           class MainActivity : FlutterActivity() {
               private var mediaRecorder: MediaRecorder? = null
@@ -107,10 +109,10 @@ jobs:
                                   }
                                   if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
                                       ActivityCompat.requestPermissions(this, arrayOf(perm), 402)
-                                      result.success(emptyList>())
+                                      result.success(ArrayList<Any>())
                                       return@setMethodCallHandler
                                   }
-                                  val list = mutableListOf>()
+                                  val list = ArrayList<HashMap<String, Any>>()
                                   val projection = arrayOf(
                                       MediaStore.Audio.Media._ID,
                                       MediaStore.Audio.Media.TITLE,
@@ -137,15 +139,13 @@ jobs:
                                           val title = c.getString(titleCol) ?: File(path).nameWithoutExtension
                                           val artist = c.getString(artistCol) ?: "مكتبة الجهاز"
                                           val durMs = c.getLong(durCol)
-                                          list.add(
-                                              mapOf(
-                                                  "id" to c.getLong(idCol).toString(),
-                                                  "title" to title,
-                                                  "artist" to if (artist == "<unknown>") "ملف صوتي" else artist,
-                                                  "path" to path,
-                                                  "durationSec" to (durMs / 1000L).toInt()
-                                              )
-                                          )
+                                          val item = HashMap<String, Any>()
+                                          item["id"] = c.getLong(idCol).toString()
+                                          item["title"] = title
+                                          item["artist"] = if (artist == "<unknown>") "ملف صوتي" else artist
+                                          item["path"] = path
+                                          item["durationSec"] = (durMs / 1000L).toInt()
+                                          list.add(item)
                                       }
                                   }
                                   result.success(list)
