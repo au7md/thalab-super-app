@@ -7,7 +7,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:video_player/video_player.dart';
-import 'package:volume_controller/volume_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -434,6 +433,9 @@ class _CinematicVideoPage extends StatefulWidget {
 }
 
 class _CinematicVideoPageState extends State<_CinematicVideoPage> {
+  static const MethodChannel _volumeChannel =
+      MethodChannel('com.au7md.thalab_app/system_volume');
+
   VideoPlayerController? _controller;
   bool _isReady = false;
   bool _isLandscape = false;
@@ -454,10 +456,9 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
 
   Future<void> _initVolume() async {
     try {
-      VolumeController().showSystemUI = false;
-      final vol = await VolumeController().getVolume();
-      if (mounted) {
-        setState(() => _currentVolume = vol);
+      final vol = await _volumeChannel.invokeMethod<double>('getVolume');
+      if (mounted && vol != null) {
+        setState(() => _currentVolume = vol.clamp(0.0, 1.0));
       }
     } catch (_) {}
   }
@@ -547,7 +548,7 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
       _showVolumeHud = true;
     });
     try {
-      VolumeController().setVolume(nextVol, showSystemUI: false);
+      _volumeChannel.invokeMethod('setVolume', {'volume': nextVol});
     } catch (_) {}
   }
 
