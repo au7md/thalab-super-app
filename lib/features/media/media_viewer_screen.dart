@@ -220,7 +220,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   ),
                   _ViewerActionBtn(
                     icon: currentAsset.type == AssetType.video
-                        ? Icons.movie_edit_rounded
+                        ? Icons.content_cut_rounded
                         : Icons.tune_rounded,
                     label: currentAsset.type == AssetType.video ? 'قص واستخراج' : 'تحرير الصورة',
                     color: ThalabTheme.foxOrangeLight,
