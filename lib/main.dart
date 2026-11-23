@@ -16,6 +16,7 @@ import 'features/rafiq/qibla_screen.dart';
 import 'features/rafiq/hijri_events_screen.dart';
 import 'features/media/gallery_screen.dart';
 import 'features/music/music_studio_screen.dart';
+import 'features/more/more_hub_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -338,7 +339,6 @@ class _RafiqTabState extends State<RafiqTab> {
     final now = DateTime.now();
     final pt = _prayerTimes;
 
-    // 1. أذكار ما بعد الصلاة (خلال 30 دقيقة من أذان أي فرض)
     if (pt != null) {
       final fardList = [
         ('الفجر', pt.fajr),
@@ -362,7 +362,6 @@ class _RafiqTabState extends State<RafiqTab> {
       }
     }
 
-    // 2. حسب فترة اليوم مع خلفية مناسبة لجو الذكر
     final hour = now.hour;
     if (hour >= 4 && hour < 7) {
       return (
@@ -523,7 +522,6 @@ class _RafiqTabState extends State<RafiqTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 115),
       children: [
-        // 1. العنوان العلوي + زر مركز الإشعارات
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -539,8 +537,6 @@ class _RafiqTabState extends State<RafiqTab> {
           ],
         ),
         const SizedBox(height: 10),
-
-        // 2. ويدجت عداد الصلاة الحي في القمة (أعلى عنصر)
         InkWell(
           borderRadius: BorderRadius.circular(24),
           onTap: () => _open(const PrayerTimesScreen()),
@@ -654,8 +650,6 @@ class _RafiqTabState extends State<RafiqTab> {
           ),
         ),
         const SizedBox(height: 12),
-
-        // 3. ويدجت الذكر التلقائي المستقل بخلفية ديناميكية تناسب كل ذكر ووقته
         InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: () => _open(AdhkarScreen(initialTabIndex: timely.tabIndex)),
@@ -739,8 +733,6 @@ class _RafiqTabState extends State<RafiqTab> {
           ),
         ),
         const SizedBox(height: 14),
-
-        // 4. الشبكة الأساسية المتكاملة (8 بطاقات مرتبة في 4 صفوف)
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -911,100 +903,9 @@ class MusicTab extends StatelessWidget {
 // =========================================================================
 class MoreToolsTab extends StatelessWidget {
   const MoreToolsTab({super.key});
-  @override
-  Widget build(BuildContext context) => _SectionGridTemplate(
-        title: 'المزيد من الأدوات',
-        items: [
-          _GridToolItem('مدير الملفات', Icons.folder_rounded, null),
-          _GridToolItem('التنظيف الذكي', Icons.cleaning_services_rounded, null),
-          _GridToolItem('صور إلى PDF', Icons.picture_as_pdf_rounded, null),
-          _GridToolItem('الخزنة السرية', Icons.lock_rounded, null),
-          _GridToolItem('الآلة الحاسبة', Icons.calculate_rounded, null),
-          _GridToolItem('سلة المحذوفات', Icons.delete_outline_rounded, null),
-          _GridToolItem('الإعدادات', Icons.settings_rounded, null),
-          _GridToolItem('حول التطبيق', Icons.info_outline_rounded, null),
-        ],
-      );
-}
-
-class _GridToolItem {
-  final String label;
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  _GridToolItem(this.label, this.icon, this.onTap);
-}
-
-class _SectionGridTemplate extends StatelessWidget {
-  final String title;
-  final List<_GridToolItem> items;
-
-  const _SectionGridTemplate({required this.title, required this.items});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
-      children: [
-        Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 18),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 14,
-            crossAxisSpacing: 14,
-            childAspectRatio: 0.90,
-          ),
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return InkWell(
-              borderRadius: BorderRadius.circular(24),
-              onTap: item.onTap ??
-                  () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('قسم "${item.label}" جاهز للدمج في الدفعة القادمة'),
-                        duration: const Duration(seconds: 1),
-                        backgroundColor: ThalabTheme.darkSlate,
-                      ),
-                    );
-                  },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(
-                  color: ThalabTheme.cardSurface,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: ThalabTheme.foxOrange.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(item.icon, color: ThalabTheme.foxOrange, size: 28),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      item.label,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
+    return const MoreHubScreen();
   }
 }
