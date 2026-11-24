@@ -694,14 +694,16 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                                 size: 21,
                                               ),
                                               const SizedBox(width: 8),
-                                              Text(
-                                                isDone
-                                                    ? 'اكتمل الذكر (${item.count}/${item.count})'
-                                                    : 'اضغط للتسبيح • المتبقي: $remaining',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 14.5,
-                                                  fontWeight: FontWeight.bold,
+                                              Flexible(
+                                                child: Text(
+                                                  isDone
+                                                      ? 'اكتمل الذكر (${item.count}/${item.count})'
+                                                      : 'اضغط للتسبيح • المتبقي: $remaining',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14.5,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ),
                                             ],
