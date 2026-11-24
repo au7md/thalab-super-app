@@ -557,8 +557,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                     _selectedCategory == 4
                                         ? 'لا توجد صور أو فيديوهات في المفضلة بعد'
                                         : 'لا توجد وسائط في هذا القسم',
-                                    style: const TextStyle(
-                                      color: ThalabTheme.mutedSlate,
+                                    style: TextStyle(
+                                      color: ThalabTheme.mutedText(context),
                                       fontSize: 14,
                                     ),
                                   ),
@@ -592,10 +592,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'لعرض صورك وفيديوهاتك وتنظيم الألبومات وتحريرها مباشرة داخل تطبيق الثعلب، يرجى منح صلاحية الوصول للوسائط.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 13, height: 1.5),
+              style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -688,7 +688,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                           ),
                           Text(
                             '$count عنصر',
-                            style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                            style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 11),
                           ),
                         ],
                       ),
@@ -825,7 +825,7 @@ class _MiniStatChip extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               '$label: ',
-              style: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+              style: TextStyle(fontSize: 12, color: ThalabTheme.mutedText(context)),
             ),
             Text(
               count,
