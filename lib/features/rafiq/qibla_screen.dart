@@ -334,6 +334,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                             activeColor:
                                 isAligned ? const Color(0xFF1B8A5A) : ThalabTheme.foxOrange,
                             textColor: _textColor,
+                            mutedColor: ThalabTheme.mutedText(context),
                           ),
                         ),
                       ),
@@ -444,10 +445,10 @@ class _QiblaScreenState extends State<QiblaScreen> {
                       ),
                     ),
 
-                  const Text(
+                  Text(
                     'ضع الهاتف أفقياً بعيداً عن المعادن وأدِره حتى ينطبق رمز الكعبة مع المؤشر العلوي ويهتز الهاتف',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate, height: 1.5),
+                    style: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedText(context), height: 1.5),
                   ),
                 ],
               ),
@@ -489,7 +490,7 @@ class _QiblaInfoTile extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+              Text(label, style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context))),
               Text(
                 value,
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
@@ -506,11 +507,13 @@ class _CompassDialPainter extends CustomPainter {
   final double headingDeg;
   final Color activeColor;
   final Color textColor;
+  final Color mutedColor;
 
   _CompassDialPainter({
     required this.headingDeg,
     required this.activeColor,
     required this.textColor,
+    required this.mutedColor,
   });
 
   @override
@@ -531,7 +534,7 @@ class _CompassDialPainter extends CustomPainter {
           ? Colors.redAccent
           : isMajor
               ? activeColor
-              : ThalabTheme.mutedSlate.withOpacity(0.35);
+              : mutedColor.withOpacity(0.35);
       tickPaint.strokeWidth = isMajor ? 2.6 : 1.3;
 
       final outerR = radius - 10;
