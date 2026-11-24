@@ -124,7 +124,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -185,7 +185,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       extendBody: true,
       appBar: (_chromeVisible && !_isScreenLocked)
           ? AppBar(
-              backgroundColor: Colors.black.withOpacity(0.45),
+              backgroundColor: Colors.black.withOpacity(0.55),
               elevation: 0,
               iconTheme: const IconThemeData(color: Colors.white),
               title: Text(
@@ -193,11 +193,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 style: const TextStyle(color: Colors.white, fontSize: 14.5),
               ),
               actions: [
-                IconButton(
-                  tooltip: 'مشاركة',
-                  icon: const Icon(Icons.share_outlined, color: Colors.white),
-                  onPressed: () => _shareCurrent(currentAsset),
-                ),
                 IconButton(
                   tooltip: isFav ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
                   icon: Icon(
@@ -212,6 +207,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   color: const Color(0xFF1F1F1F),
                   onSelected: (val) {
                     if (val == 'edit') _openEditor(currentAsset);
+                    if (val == 'share') _shareCurrent(currentAsset);
                     if (val == 'info') _showMediaDetails(currentAsset);
                     if (val == 'delete') _deleteCurrent(currentAsset);
                   },
@@ -234,6 +230,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                                 : 'قص وتحرير الصورة',
                             style: const TextStyle(color: Colors.white),
                           ),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'share',
+                      child: Row(
+                        children: [
+                          Icon(Icons.share_outlined, color: Colors.white70, size: 20),
+                          SizedBox(width: 10),
+                          Text('مشاركة', style: TextStyle(color: Colors.white)),
                         ],
                       ),
                     ),
@@ -321,21 +327,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             ),
         ],
       ),
-      // شريط تحرير سريع نظيف للصور فقط (لأن الفيديو يملك مشغله السينمائي الكامل)
       bottomNavigationBar: (_chromeVisible &&
               !_isScreenLocked &&
               currentAsset.type == AssetType.image)
           ? Container(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.85),
-                    Colors.black.withOpacity(0.0),
-                  ],
-                ),
+                color: Colors.black.withOpacity(0.75),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white12),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -347,6 +348,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     onTap: () => _openEditor(currentAsset),
                   ),
                   _ViewerActionBtn(
+                    icon: Icons.share_outlined,
+                    label: 'مشاركة',
+                    color: Colors.white,
+                    onTap: () => _shareCurrent(currentAsset),
+                  ),
+                  _ViewerActionBtn(
                     icon: Icons.info_outline_rounded,
                     label: 'التفاصيل',
                     color: Colors.white,
@@ -355,7 +362,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   _ViewerActionBtn(
                     icon: Icons.delete_outline_rounded,
                     label: 'حذف',
-                    color: Colors.white70,
+                    color: Colors.redAccent,
                     onTap: () => _deleteCurrent(currentAsset),
                   ),
                 ],
@@ -399,7 +406,7 @@ class _IntegratedPhotoPage extends StatelessWidget {
 }
 
 // =========================================================================
-// مشغل الفيديو السينمائي المتكامل (إيماءة رفع/خفض الصوت + أزرار ±10ث + تدوير)
+// مشغل الفيديو السينمائي المتكامل
 // =========================================================================
 class _CinematicVideoPage extends StatefulWidget {
   final AssetEntity asset;
@@ -442,7 +449,6 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
   bool _isZoomFill = false;
   double _playbackSpeed = 1.0;
 
-  // التحكم الحقيقي بصوت الجهاز عبر إيماءة السحب العمودي
   double _currentVolume = 0.5;
   bool _showVolumeHud = false;
   String _seekHudText = '';
@@ -589,7 +595,6 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // عرض الفيديو
           SizedBox.expand(
             child: FittedBox(
               fit: _isZoomFill ? BoxFit.cover : BoxFit.contain,
@@ -601,7 +606,6 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
             ),
           ),
 
-          // تدرج خفيف عند ظهور القوائم لوضوح الأزرار
           if (widget.chromeVisible && !widget.isLocked)
             IgnorePointer(
               child: Container(
@@ -620,7 +624,6 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
               ),
             ),
 
-          // مؤشر مستوى الصوت الحي عند السحب العمودي
           if (_showVolumeHud)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -667,7 +670,6 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
               ),
             ),
 
-          // مؤشر القفز ±10 ثوانٍ
           if (_seekHudText.isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -685,7 +687,6 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
               ),
             ),
 
-          // لوحة التحكم السينمائية السفلية (كما في الصورة المرجعية 3 وأفضل)
           if (widget.chromeVisible && !widget.isLocked)
             Positioned(
               left: 14,
@@ -694,7 +695,6 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // شريط أدوات علوي مصغر (سرعة التشغيل + تحرير/قص + ملء الشاشة + قفل)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
@@ -733,7 +733,6 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
                   ),
                   const SizedBox(height: 10),
 
-                  // شريط التقديم الزمني + الوقت الحالي + الكلي + زر تدوير الشاشة
                   Row(
                     children: [
                       Text(
@@ -782,7 +781,6 @@ class _CinematicVideoPageState extends State<_CinematicVideoPage> {
                   ),
                   const SizedBox(height: 8),
 
-                  // صف الأزرار الخمسة الكبار: تراجع 10ث | السابق | تشغيل/إيقاف كبير | التالي | تقديم 10ث
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -894,12 +892,12 @@ class _PillChip extends StatelessWidget {
 }
 
 // =========================================================================
-// إطار القص التفاعلي ذو الـ 8 مقابض (مشترك للصور والفيديو بدقة عالية)
+// إطار القص التفاعلي ذو الـ 8 مقابض
 // =========================================================================
 class _InteractiveCropFrame extends StatefulWidget {
   final Widget child;
-  final Rect normalizedRect; // القيم بين 0.0 و 1.0
-  final double? lockedAspectRatio; // null = قص حر Custom
+  final Rect normalizedRect;
+  final double? lockedAspectRatio;
   final ValueChanged<Rect> onRectChanged;
 
   const _InteractiveCropFrame({
@@ -961,9 +959,9 @@ class _InteractiveCropFrameState extends State<_InteractiveCropFrame> {
         );
 
         return Stack(
+          clipBehavior: Clip.none,
           children: [
             Positioned.fill(child: widget.child),
-            // التعتيم خارج منطقة القص
             Positioned.fill(
               child: IgnorePointer(
                 child: CustomPaint(
@@ -971,7 +969,6 @@ class _InteractiveCropFrameState extends State<_InteractiveCropFrame> {
                 ),
               ),
             ),
-            // تحريك إطار القص بالكامل بالسحب من المنتصف
             Positioned.fromRect(
               rect: rect,
               child: GestureDetector(
@@ -988,7 +985,6 @@ class _InteractiveCropFrameState extends State<_InteractiveCropFrame> {
                 child: Container(color: Colors.transparent),
               ),
             ),
-            // مقابض الزوايا والأضلاع الـ 8
             _buildHandle(rect.left, rect.top, (d) => _updateEdge(dLeft: d.dx / w, dTop: d.dy / h)),
             _buildHandle(rect.right, rect.top, (d) => _updateEdge(dRight: d.dx / w, dTop: d.dy / h)),
             _buildHandle(rect.left, rect.bottom, (d) => _updateEdge(dLeft: d.dx / w, dBottom: d.dy / h)),
@@ -1005,16 +1001,16 @@ class _InteractiveCropFrameState extends State<_InteractiveCropFrame> {
 
   Widget _buildHandle(double x, double y, ValueChanged<Offset> onDrag) {
     return Positioned(
-      left: x - 18,
-      top: y - 18,
-      width: 36,
-      height: 36,
+      left: x - 20,
+      top: y - 20,
+      width: 40,
+      height: 40,
       child: GestureDetector(
         onPanUpdate: (details) => onDrag(details.delta),
         child: Center(
           child: Container(
-            width: 14,
-            height: 14,
+            width: 15,
+            height: 15,
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
@@ -1040,14 +1036,12 @@ class _CropMaskPainter extends CustomPainter {
     final mask = Path.combine(PathOperation.difference, outer, inner);
     canvas.drawPath(mask, dimPaint);
 
-    // حدود الإطار الأبيض
     final borderPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawRect(cropRect, borderPaint);
 
-    // شبكة التثليث الذهبية (Rule of Thirds)
     final gridPaint = Paint()
       ..color = Colors.white38
       ..strokeWidth = 0.8;
@@ -1073,7 +1067,7 @@ class _CropMaskPainter extends CustomPainter {
 }
 
 // =========================================================================
-// استوديو تحرير الصور المتكامل (قص بالأطراف + مسطرة تدوير + إضاءة + فلاتر)
+// استوديو تحرير الصور المتكامل
 // =========================================================================
 class _ProPhotoEditorScreen extends StatefulWidget {
   final File imageFile;
@@ -1085,16 +1079,16 @@ class _ProPhotoEditorScreen extends StatefulWidget {
 
 class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
   final GlobalKey _captureKey = GlobalKey();
-  int _activeToolTab = 0; // 0: قص وتدوير, 1: الإضاءة والألوان, 2: فلاتر
+  int _activeToolTab = 0;
   Rect _cropRect = const Rect.fromLTWH(0, 0, 1, 1);
   int _aspectIndex = 0;
   double _fineAngleDeg = 0.0;
   int _quarterTurns = 0;
   bool _flipH = false;
 
-  double _brightness = 0.0; // -0.4 to 0.4
-  double _contrast = 1.0; // 0.6 to 1.5
-  double _saturation = 1.0; // 0.0 to 1.8
+  double _brightness = 0.0;
+  double _contrast = 1.0;
+  double _saturation = 1.0;
   int _filterIdx = 0;
   bool _isSaving = false;
 
@@ -1102,8 +1096,21 @@ class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
   static const List<double?> _aspectValues = [null, null, 1.0, 4 / 3, 3 / 4, 16 / 9];
   static const List<String> _filterNames = ['أصلي', 'دافئ', 'سينمائي', 'أبيض وأسود', 'حيوي'];
 
+  void _resetAll() {
+    setState(() {
+      _cropRect = const Rect.fromLTWH(0, 0, 1, 1);
+      _aspectIndex = 0;
+      _fineAngleDeg = 0.0;
+      _quarterTurns = 0;
+      _flipH = false;
+      _brightness = 0.0;
+      _contrast = 1.0;
+      _saturation = 1.0;
+      _filterIdx = 0;
+    });
+  }
+
   List<double> _buildCombinedMatrix() {
-    // مصفوفة السطوع والتباين والتشبع + الفلتر المختار
     final b = _brightness * 255.0;
     final c = _contrast;
     final t = (1.0 - c) * 128.0 + b;
@@ -1122,7 +1129,6 @@ class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
     }
 
     if (_filterIdx == 3) {
-      // أبيض وأسود
       return [
         0.33 * c, 0.59 * c, 0.11 * c, 0, t,
         0.33 * c, 0.59 * c, 0.11 * c, 0, t,
@@ -1148,7 +1154,6 @@ class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
           _captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary != null) {
         final ui.Image fullImg = await boundary.toImage(pixelRatio: 2.5);
-        // اقتصاص المنطقة المحددة بإطار القص بدقة البكسل
         final srcRect = Rect.fromLTWH(
           _cropRect.left * fullImg.width,
           _cropRect.top * fullImg.height,
@@ -1196,6 +1201,11 @@ class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
         title: const Text('استوديو تحرير الصورة',
             style: TextStyle(color: Colors.white, fontSize: 16)),
         actions: [
+          IconButton(
+            tooltip: 'إعادة ضبط',
+            icon: const Icon(Icons.restore_rounded, color: Colors.white70),
+            onPressed: _resetAll,
+          ),
           TextButton.icon(
             onPressed: _isSaving ? null : _saveCroppedAndEdited,
             icon: const Icon(Icons.check_rounded, color: ThalabTheme.foxOrange),
@@ -1212,10 +1222,9 @@ class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
       ),
       body: Column(
         children: [
-          // منطقة المعاينة والقص التفاعلي
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
               child: Center(
                 child: _InteractiveCropFrame(
                   normalizedRect: _cropRect,
@@ -1244,7 +1253,6 @@ class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
             ),
           ),
 
-          // لوحة الأدوات السفلية المنظمة
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 26),
             decoration: const BoxDecoration(
@@ -1255,7 +1263,6 @@ class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (_activeToolTab == 0) ...[
-                  // عرض زاوية التدوير الدقيقة + مسطرة الانزلاق
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1377,7 +1384,6 @@ class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                // شريط التبديل بين الأقسام الثلاثة
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -1411,7 +1417,7 @@ class _ProPhotoEditorScreenState extends State<_ProPhotoEditorScreen> {
 }
 
 // =========================================================================
-// استوديو تحرير الفيديو المتكامل (قص أطراف الفيديو + شريط قص زمني تفاعلي + استخراج صوت)
+// استوديو تحرير الفيديو المتكامل
 // =========================================================================
 class _ProVideoStudioScreen extends StatefulWidget {
   final File videoFile;
@@ -1424,12 +1430,11 @@ class _ProVideoStudioScreen extends StatefulWidget {
 class _ProVideoStudioScreenState extends State<_ProVideoStudioScreen> {
   late VideoPlayerController _controller;
   bool _ready = false;
-  int _studioTab = 0; // 0: قص زمني (Trim), 1: قص أطراف الفيديو (Crop)
+  int _studioTab = 0;
   double _startSec = 0.0;
   double _endSec = 10.0;
   double _totalSec = 10.0;
 
-  // إعدادات قص أطراف الفيديو وتدويره (مثل الصورة 2)
   Rect _videoCropRect = const Rect.fromLTWH(0, 0, 1, 1);
   int _aspectIdx = 0;
   double _videoAngleDeg = 0.0;
@@ -1541,10 +1546,9 @@ class _ProVideoStudioScreenState extends State<_ProVideoStudioScreen> {
           ? const Center(child: CircularProgressIndicator(color: ThalabTheme.foxOrange))
           : Column(
               children: [
-                // معاينة الفيديو مع إطار قص الأطراف التفاعلي عند اختيار تبويب قص الأطراف
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
                     child: Center(
                       child: AspectRatio(
                         aspectRatio: _controller.value.aspectRatio == 0
@@ -1579,7 +1583,6 @@ class _ProVideoStudioScreenState extends State<_ProVideoStudioScreen> {
                   ),
                 ),
 
-                // شريط تشغيل سريع أسفل الفيديو مباشرة
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                   child: Row(
@@ -1615,7 +1618,6 @@ class _ProVideoStudioScreenState extends State<_ProVideoStudioScreen> {
                   ),
                 ),
 
-                // لوحة التحكم السفلية (التايم لاين التفاعلي أو قص الأطراف)
                 Container(
                   padding: const EdgeInsets.fromLTRB(18, 14, 18, 26),
                   decoration: const BoxDecoration(
@@ -1626,7 +1628,6 @@ class _ProVideoStudioScreenState extends State<_ProVideoStudioScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (_studioTab == 0) ...[
-                        // بطاقة التوقيت النظيفة
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -1651,7 +1652,6 @@ class _ProVideoStudioScreenState extends State<_ProVideoStudioScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // شريط التايم لاين التفاعلي بمقبضي سحب ومؤشر تشغيل حي
                         _FilmstripTimelineTrimmer(
                           totalSeconds: _totalSec,
                           startSeconds: _startSec,
@@ -1684,7 +1684,6 @@ class _ProVideoStudioScreenState extends State<_ProVideoStudioScreen> {
                           ),
                         ),
                       ] else ...[
-                        // تبويب قص أطراف الفيديو وتدويره (مثل الصورة 2)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -1762,7 +1761,6 @@ class _ProVideoStudioScreenState extends State<_ProVideoStudioScreen> {
                         ),
                       ],
                       const SizedBox(height: 14),
-                      // التبديل بين قص المدة وقص الأطراف
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
@@ -1789,9 +1787,6 @@ class _ProVideoStudioScreenState extends State<_ProVideoStudioScreen> {
   }
 }
 
-// =========================================================================
-// شريط التايم لاين التفاعلي لقص الفيديو (Filmstrip Timeline Trimmer)
-// =========================================================================
 class _FilmstripTimelineTrimmer extends StatelessWidget {
   final double totalSeconds;
   final double startSeconds;
@@ -1824,7 +1819,6 @@ class _FilmstripTimelineTrimmer extends StatelessWidget {
           child: Stack(
             alignment: Alignment.centerLeft,
             children: [
-              // خلفية الشريط مع خطوط إطارات الفيلم
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: handleW),
                 height: 46,
@@ -1841,7 +1835,6 @@ class _FilmstripTimelineTrimmer extends StatelessWidget {
                 ),
               ),
 
-              // الإطار البرتقالي للمنطقة المحددة
               Positioned(
                 left: startX,
                 width: (endX - startX + handleW * 2).clamp(handleW * 2, w),
@@ -1855,7 +1848,6 @@ class _FilmstripTimelineTrimmer extends StatelessWidget {
                 ),
               ),
 
-              // مؤشر التشغيل الأبيض المتحرك
               Positioned(
                 left: playheadX.clamp(handleW, w - handleW),
                 child: Container(
@@ -1869,7 +1861,6 @@ class _FilmstripTimelineTrimmer extends StatelessWidget {
                 ),
               ),
 
-              // مقبض البداية الأيسر
               Positioned(
                 left: startX,
                 width: handleW + 8,
@@ -1891,7 +1882,6 @@ class _FilmstripTimelineTrimmer extends StatelessWidget {
                 ),
               ),
 
-              // مقبض النهاية الأيمن
               Positioned(
                 left: endX + handleW - 8,
                 width: handleW + 8,
