@@ -636,8 +636,9 @@ jobs:
           }
           EOF
           sudo apt-get update && sudo apt-get install -y imagemagick
-          convert assets/images/app_logo.png -resize 192x192 PNG32:/tmp/ic_launcher.png
+          convert assets/images/app_logo.png -resize 192x192^ -gravity center -extent 192x192 \( +clone -threshold -1 -negate -fill white -draw "circle 96,96 96,0" \) -alpha off -compose copy_opacity -composite PNG32:/tmp/ic_launcher.png
           for dir in android/app/src/main/res/mipmap-*; do cp /tmp/ic_launcher.png "$dir/ic_launcher.png"; done
+          sed -i 's/@android:color\/white/#FFF8F0/g; s/@android:color\/black/#FFF8F0/g' android/app/src/main/res/drawable*/launch_background.xml || true
           flutter pub get
 
       - name: Build Release APK (arm64)
