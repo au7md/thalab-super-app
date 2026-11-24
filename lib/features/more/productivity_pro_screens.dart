@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
+import '../../core/daily_progress.dart';
 import '../rafiq/adhkar_screen.dart';
 import '../rafiq/quran_screen.dart';
 
@@ -37,8 +38,12 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
 
   Future<void> _loadStats() async {
     final prefs = await SharedPreferences.getInstance();
+    final todayKey = DailyProgress.dateKey(DateTime.now());
+    final count = prefs.getString('pomodoro_count_date') == todayKey
+        ? (prefs.getInt('pomodoro_count') ?? 0)
+        : 0;
     if (mounted) {
-      setState(() => _completedToday = prefs.getInt('pomodoro_count') ?? 0);
+      setState(() => _completedToday = count);
     }
   }
 
@@ -84,6 +89,12 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
           setState(() => _isRunning = false);
           if (_isWorkMode) {
             final prefs = await SharedPreferences.getInstance();
+            // تصفير عدّاد جلسات اليوم عند تغيّر التاريخ
+            final todayKey = DailyProgress.dateKey(DateTime.now());
+            if (prefs.getString('pomodoro_count_date') != todayKey) {
+              _completedToday = 0;
+              await prefs.setString('pomodoro_count_date', todayKey);
+            }
             setState(() => _completedToday++);
             await prefs.setInt('pomodoro_count', _completedToday);
             _selectBreakMinutes(_selectedBreakMin);
@@ -689,8 +700,13 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('thalab_habits_v2_json');
     if (raw != null && raw.isNotEmpty) {
-      setState(() =>
-          _habits = List<Map<String, dynamic>>.from(jsonDecode(raw)));
+      final loaded = List<Map<String, dynamic>>.from(jsonDecode(raw));
+      // إنجاز الأمس لا يُحسب اليوم: نُظهر الصح فقط لما أُنجز بتاريخ اليوم.
+      final todayKey = DailyProgress.dateKey(DateTime.now());
+      for (final h in loaded) {
+        h['done'] = h['done'] == true && h['done_date'] == todayKey;
+      }
+      setState(() => _habits = loaded);
     } else {
       _habits = [
         {'title': 'أذكار الصباح والمساء', 'done': false, 'route': 'adhkar'},
@@ -816,7 +832,15 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
                       activeColor: ThalabTheme.foxOrange,
                       value: done,
                       onChanged: (v) {
-                        setState(() => _habits[i]['done'] = v ?? false);
+                        final checked = v ?? false;
+                        setState(() {
+                          _habits[i]['done'] = checked;
+                          // ختم تاريخ الإنجاز حتى تُحسب عادات "اليوم" صح
+                          // وتبدأ كل عادة من جديد في اليوم التالي.
+                          _habits[i]['done_date'] = checked
+                              ? DailyProgress.dateKey(DateTime.now())
+                              : null;
+                        });
                         _saveHabits();
                       },
                     ),
