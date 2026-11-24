@@ -1,11 +1,17 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme.dart';
 import 'media_viewer_screen.dart';
+
+enum _GallerySortType { newest, oldest, nameAsc, nameDesc }
 
 class GalleryScreen extends StatefulWidget {
   final int initialCategoryIndex; // 0: الكل, 1: الصور, 2: الفيديوهات, 3: الألبومات, 4: المفضلة
@@ -20,6 +26,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
   int _gridColumns = 3;
   bool _isLoading = true;
   bool _hasPermission = false;
+  bool _isExportingPdf = false;
+  _GallerySortType _sortType = _GallerySortType.newest;
 
   List<AssetEntity> _allAssets = [];
   List<AssetPathEntity> _albums = [];
@@ -30,6 +38,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
   bool _isSelectionMode = false;
   final Set<String> _selectedAssetIds = {};
   final Map<String, Uint8List?> _thumbCache = {};
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardBg => Theme.of(context).cardColor;
+  Color get _innerBg => Theme.of(context).scaffoldBackgroundColor;
+  Color get _borderColor => _isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
+  Color get _textColor => _isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
 
   static const List<String> _categories = [
     'الكل',
@@ -51,6 +65,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     final prefs = await SharedPreferences.getInstance();
     final savedFavs = prefs.getStringList('gallery_favorite_ids') ?? [];
     final savedCols = prefs.getInt('gallery_grid_cols') ?? 3;
+    final savedSortIdx = prefs.getInt('gallery_sort_type') ?? 0;
 
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
     if (!ps.isAuth && !ps.hasAccess) {
@@ -58,6 +73,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
         setState(() {
           _favoriteIds = savedFavs.toSet();
           _gridColumns = savedCols;
+          _sortType = _GallerySortType.values[savedSortIdx.clamp(0, _GallerySortType.values.length - 1)];
           _hasPermission = false;
           _isLoading = false;
         });
@@ -90,6 +106,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
       setState(() {
         _favoriteIds = savedFavs.toSet();
         _gridColumns = savedCols;
+        _sortType = _GallerySortType.values[savedSortIdx.clamp(0, _GallerySortType.values.length - 1)];
         _hasPermission = true;
         _albums = paths;
         _allAssets = loadedAssets;
@@ -117,18 +134,112 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   List<AssetEntity> get _displayedAssets {
+    List<AssetEntity> baseList;
     if (_selectedCategory == 3 && _selectedAlbum != null) {
-      return _albumAssets;
+      baseList = List<AssetEntity>.from(_albumAssets);
+    } else {
+      switch (_selectedCategory) {
+        case 1:
+          baseList = _allAssets.where((a) => a.type == AssetType.image).toList();
+          break;
+        case 2:
+          baseList = _allAssets.where((a) => a.type == AssetType.video).toList();
+          break;
+        case 4:
+          baseList = _allAssets.where((a) => _favoriteIds.contains(a.id)).toList();
+          break;
+        default:
+          baseList = List<AssetEntity>.from(_allAssets);
+      }
     }
-    switch (_selectedCategory) {
-      case 1:
-        return _allAssets.where((a) => a.type == AssetType.image).toList();
-      case 2:
-        return _allAssets.where((a) => a.type == AssetType.video).toList();
-      case 4:
-        return _allAssets.where((a) => _favoriteIds.contains(a.id)).toList();
-      default:
-        return _allAssets;
+
+    switch (_sortType) {
+      case _GallerySortType.newest:
+        baseList.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
+        break;
+      case _GallerySortType.oldest:
+        baseList.sort((a, b) => a.createDateTime.compareTo(b.createDateTime));
+        break;
+      case _GallerySortType.nameAsc:
+        baseList.sort((a, b) => (a.title ?? '').toLowerCase().compareTo((b.title ?? '').toLowerCase()));
+        break;
+      case _GallerySortType.nameDesc:
+        baseList.sort((a, b) => (b.title ?? '').toLowerCase().compareTo((a.title ?? '').toLowerCase()));
+        break;
+    }
+
+    return baseList;
+  }
+
+  bool get _onlyImagesSelected {
+    if (_selectedAssetIds.isEmpty) return false;
+    final selected = _displayedAssets.where((a) => _selectedAssetIds.contains(a.id));
+    return selected.isNotEmpty && selected.every((a) => a.type == AssetType.image);
+  }
+
+  Future<void> _exportSelectedImagesToPdf() async {
+    if (_isExportingPdf) return;
+    final selected = _displayedAssets
+        .where((a) => _selectedAssetIds.contains(a.id) && a.type == AssetType.image)
+        .toList();
+    if (selected.isEmpty) return;
+
+    setState(() => _isExportingPdf = true);
+    try {
+      final pdf = pw.Document();
+      for (final asset in selected) {
+        final bytes = await asset.originBytes;
+        if (bytes != null) {
+          final image = pw.MemoryImage(bytes);
+          pdf.addPage(
+            pw.Page(
+              pageFormat: PdfPageFormat.a4,
+              margin: const pw.EdgeInsets.all(16),
+              build: (_) => pw.Center(
+                child: pw.Image(image, fit: pw.BoxFit.contain),
+              ),
+            ),
+          );
+        }
+      }
+
+      Directory targetDir;
+      final downloadDir = Directory('/storage/emulated/0/Download');
+      if (Platform.isAndroid && await downloadDir.exists()) {
+        targetDir = downloadDir;
+      } else {
+        targetDir = await getApplicationDocumentsDirectory();
+      }
+
+      final fileName = 'Thalab_Images_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final file = File('${targetDir.path}/$fileName');
+      await file.writeAsBytes(await pdf.save());
+
+      if (mounted) {
+        setState(() {
+          _isSelectionMode = false;
+          _selectedAssetIds.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تم حفظ ملف PDF في: ${file.path}'),
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'مشاركة',
+              textColor: ThalabTheme.foxOrange,
+              onPressed: () => Share.shareXFiles([XFile(file.path)]),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر إنشاء ملف PDF: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExportingPdf = false);
     }
   }
 
@@ -266,6 +377,18 @@ class _GalleryScreenState extends State<GalleryScreen> {
         ),
         actions: [
           if (_isSelectionMode) ...[
+            if (_onlyImagesSelected)
+              IconButton(
+                tooltip: 'تحويل إلى PDF',
+                icon: _isExportingPdf
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: ThalabTheme.foxOrange),
+                      )
+                    : const Icon(Icons.picture_as_pdf_rounded, color: ThalabTheme.foxOrange),
+                onPressed: _isExportingPdf ? null : _exportSelectedImagesToPdf,
+              ),
             IconButton(
               tooltip: 'إضافة للمفضلة',
               icon: const Icon(Icons.favorite_rounded, color: Colors.redAccent),
@@ -282,6 +405,35 @@ class _GalleryScreenState extends State<GalleryScreen> {
               onPressed: _deleteSelectedAssets,
             ),
           ] else ...[
+            PopupMenuButton<_GallerySortType>(
+              tooltip: 'ترتيب الوسائط',
+              icon: const Icon(Icons.sort_rounded, color: ThalabTheme.foxOrange),
+              color: _cardBg,
+              initialValue: _sortType,
+              onSelected: (val) async {
+                setState(() => _sortType = val);
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setInt('gallery_sort_type', val.index);
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: _GallerySortType.newest,
+                  child: Text('الأحدث أولاً'),
+                ),
+                PopupMenuItem(
+                  value: _GallerySortType.oldest,
+                  child: Text('الأقدم أولاً'),
+                ),
+                PopupMenuItem(
+                  value: _GallerySortType.nameAsc,
+                  child: Text('الاسم أبجدياً (أ - ي)'),
+                ),
+                PopupMenuItem(
+                  value: _GallerySortType.nameDesc,
+                  child: Text('الاسم أبجدياً (ي - أ)'),
+                ),
+              ],
+            ),
             IconButton(
               tooltip: 'تغيير حجم العرض',
               icon: Icon(
@@ -309,15 +461,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
               ? _buildPermissionPlaceholder()
               : Column(
                   children: [
-                    // شريط الاختصارات والإحصائيات الموجزة
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: ThalabTheme.cardSurface,
+                          color: _cardBg,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: ThalabTheme.softBorder),
+                          border: Border.all(color: _borderColor),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -331,7 +482,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                 _selectedAlbum = null;
                               }),
                             ),
-                            Container(width: 1, height: 22, color: ThalabTheme.softBorder),
+                            Container(width: 1, height: 22, color: _borderColor),
                             _MiniStatChip(
                               icon: Icons.videocam_rounded,
                               label: 'الفيديو',
@@ -341,7 +492,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                 _selectedAlbum = null;
                               }),
                             ),
-                            Container(width: 1, height: 22, color: ThalabTheme.softBorder),
+                            Container(width: 1, height: 22, color: _borderColor),
                             _MiniStatChip(
                               icon: Icons.favorite_rounded,
                               label: 'المفضلة',
@@ -356,7 +507,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       ),
                     ),
 
-                    // شريط التبويبات الأفقية
                     SizedBox(
                       height: 42,
                       child: ListView.separated(
@@ -372,16 +522,16 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.bold,
-                                color: selected ? Colors.white : ThalabTheme.darkSlate,
+                                color: selected ? Colors.white : _textColor,
                               ),
                             ),
                             selected: selected,
                             selectedColor: ThalabTheme.foxOrange,
-                            backgroundColor: ThalabTheme.cardSurface,
+                            backgroundColor: _cardBg,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(18),
                               side: BorderSide(
-                                color: selected ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                                color: selected ? ThalabTheme.foxOrange : _borderColor,
                               ),
                             ),
                             onSelected: (_) {
@@ -398,7 +548,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // محتوى المعرض (ألبومات أو شبكة وسائط موحدة)
                     Expanded(
                       child: (_selectedCategory == 3 && _selectedAlbum == null)
                           ? _buildAlbumsGrid()
@@ -490,9 +639,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
               onTap: () => _openAlbum(album),
               child: Container(
                 decoration: BoxDecoration(
-                  color: ThalabTheme.cardSurface,
+                  color: _cardBg,
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: ThalabTheme.softBorder),
+                  border: Border.all(color: _borderColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -508,7 +657,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                 : null;
                             if (firstAsset == null) {
                               return Container(
-                                color: ThalabTheme.creamBackground,
+                                color: _innerBg,
                                 child: const Icon(Icons.folder_rounded,
                                     size: 42, color: ThalabTheme.foxOrange),
                               );
@@ -517,7 +666,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               future: _getThumb(firstAsset),
                               builder: (context, thumbSnap) {
                                 if (thumbSnap.data == null) {
-                                  return Container(color: ThalabTheme.creamBackground);
+                                  return Container(color: _innerBg);
                                 }
                                 return Image.memory(thumbSnap.data!, fit: BoxFit.cover);
                               },
@@ -587,7 +736,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   future: _getThumb(asset),
                   builder: (context, snapshot) {
                     if (snapshot.data == null) {
-                      return Container(color: ThalabTheme.softBorder.withOpacity(0.4));
+                      return Container(color: _borderColor.withOpacity(0.4));
                     }
                     return AnimatedScale(
                       scale: isSelected ? 0.88 : 1.0,
