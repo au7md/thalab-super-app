@@ -10,7 +10,9 @@ import 'core/theme.dart';
 import 'core/storage_service.dart';
 import 'core/notification_worker.dart';
 import 'core/rafiq_notifications_service.dart';
+import 'core/daily_progress.dart';
 import 'widgets/floating_nav_bar.dart';
+import 'widgets/daily_progress_card.dart';
 import 'features/rafiq/tasbih_screen.dart';
 import 'features/rafiq/adhkar_screen.dart';
 import 'features/rafiq/prayer_times_screen.dart';
@@ -20,6 +22,7 @@ import 'features/rafiq/hijri_events_screen.dart';
 import 'features/media/gallery_screen.dart';
 import 'features/music/music_studio_screen.dart';
 import 'features/more/more_hub_screen.dart';
+import 'features/more/productivity_pro_screens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -611,6 +614,7 @@ class _RafiqTabState extends State<RafiqTab> {
   String _locationName = 'القاهرة، مصر';
   PrayerTimes? _prayerTimes;
   Timer? _liveTimer;
+  DailyProgress? _daily;
 
   static const List<String> _hijriMonthsAr = [
     'محرم',
@@ -658,12 +662,15 @@ class _RafiqTabState extends State<RafiqTab> {
       params: params,
     );
 
+    final daily = await DailyProgress.load(prefs);
+
     if (!mounted) return;
     setState(() {
       _khatmahRead = prefs.getInt('khatmah_pages_read') ?? 0;
       _hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
       _locationName = locLabel;
       _prayerTimes = pt;
+      _daily = daily;
     });
   }
 
@@ -1098,6 +1105,16 @@ class _RafiqTabState extends State<RafiqTab> {
           ),
         ),
         const SizedBox(height: 14),
+        if (_daily != null) ...[
+          DailyProgressCard(
+            progress: _daily!,
+            onOpenAdhkar: () => _open(const AdhkarScreen()),
+            onOpenTasbih: () => _open(const TasbihScreen()),
+            onOpenQuran: () => _open(const QuranScreen(), isKhatmah: true),
+            onOpenHabits: () => _open(const IntegratedHabitScreen()),
+          ),
+          const SizedBox(height: 14),
+        ],
         GridView.count(
           padding: EdgeInsets.zero,
           shrinkWrap: true,
