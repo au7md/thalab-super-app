@@ -52,7 +52,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     'isha': false,
   };
   int _totalPrayerPoints = 0;
-  String _selectedMuezzinId = 'afasy';
 
   // إعدادات التنبيه لكل صلاة (قبل / عند الأذان / بعد الأذان)
   Map<String, bool> _adhanNotifEnabled = {
@@ -76,6 +75,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     'maghrib': 10,
     'isha': 15,
   };
+
+  // المؤذن المختار لكل صلاة
+  Map<String, String> _perPrayerMuezzin = {};
 
   static const List<String> _hijriMonthsAr = [
     'محرم',
@@ -178,6 +180,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     final loadedAdhan = <String, bool>{};
     final loadedBefore = <String, int>{};
     final loadedAfter = <String, int>{};
+    final loadedMuezzin = <String, String>{};
 
     for (final k in keys) {
       loadedStatus[k] = prefs.getInt('prayer_log_${dateKey}_$k') ?? 0;
@@ -185,16 +188,18 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
       loadedAdhan[k] = prefs.getBool('prayer_notif_${k}_adhan') ?? true;
       loadedBefore[k] = prefs.getInt('prayer_notif_${k}_before') ?? (k == 'fajr' ? 15 : 10);
       loadedAfter[k] = prefs.getInt('prayer_notif_${k}_after') ?? (k == 'fajr' ? 20 : 15);
+      loadedMuezzin[k] =
+          prefs.getString('prayer_muezzin_$k') ?? (k == 'fajr' ? 'fajr_egypt' : 'mishary_afasy');
     }
 
     setState(() {
       _todayPrayerStatus = loadedStatus;
       _todaySunnahDone = loadedSunnah;
       _totalPrayerPoints = prefs.getInt('total_prayer_points') ?? 0;
-      _selectedMuezzinId = prefs.getString('selected_muezzin_id') ?? 'afasy';
       _adhanNotifEnabled = loadedAdhan;
       _beforeNotifMins = loadedBefore;
       _afterNotifMins = loadedAfter;
+      _perPrayerMuezzin = loadedMuezzin;
     });
 
     _calculatePrayerTimes();
@@ -1115,7 +1120,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     );
   }
 
-  /// التبويب الثالث: إعدادات تنبيهات كل صلاة + اختيار صوت المؤذن
+  /// التبويب الثالث: إعدادات تنبيهات كل صلاة + اختيار المؤذن لكل صلاة
   Widget _buildPrayerNotificationsTab() {
     final prayers = [
       ('fajr', 'صلاة الفجر', Icons.wb_twilight_rounded),
@@ -1147,54 +1152,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                   'خصّص تنبيه الاستعداد قبل الأذان، تنبيه الأذان، وتنبيه الإقامة وأذكار ما بعد الصلاة لكل فرض بشكل مستقل.',
                   style: TextStyle(fontSize: 12, height: 1.45),
                 ),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(15),
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: ThalabTheme.cardSurface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: ThalabTheme.softBorder, width: 1.3),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.record_voice_over_rounded, color: ThalabTheme.foxOrange),
-                  SizedBox(width: 8),
-                  Text('صوت المؤذن المفضل', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: RafiqNotificationsService.muezzins.map((m) {
-                  final selected = _selectedMuezzinId == m.id;
-                  return ChoiceChip(
-                    label: Text(
-                      m.name,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                        color: selected ? Colors.white : ThalabTheme.darkSlate,
-                      ),
-                    ),
-                    selected: selected,
-                    selectedColor: ThalabTheme.foxOrange,
-                    backgroundColor: ThalabTheme.creamBackground,
-                    onSelected: (_) async {
-                      final prefs = await SharedPreferences.getInstance();
-                      setState(() => _selectedMuezzinId = m.id);
-                      await prefs.setString('selected_muezzin_id', m.id);
-                      await _syncNotificationsNow();
-                    },
-                  );
-                }).toList(),
               ),
             ],
           ),
@@ -1307,6 +1264,44 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     );
                   }).toList(),
                 ),
+                const SizedBox(height: 10),
+                const Text(
+                  'صوت المؤذن لهذه الصلاة:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThalabTheme.mutedSlate),
+                ),
+                const SizedBox(height: 6),
+                Builder(builder: (context) {
+                  final list = key == 'fajr'
+                      ? RafiqNotificationsService.fajrMuezzins
+                      : RafiqNotificationsService.generalMuezzins;
+                  final currentId =
+                      _perPrayerMuezzin[key] ?? (key == 'fajr' ? 'fajr_egypt' : 'mishary_afasy');
+                  return DropdownButtonFormField<String>(
+                    value: list.any((m) => m.id == currentId) ? currentId : list.first.id,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Theme.of(context).scaffoldBackgroundColor,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    items: list
+                        .map((m) => DropdownMenuItem(
+                              value: m.id,
+                              child: Text(m.name, style: const TextStyle(fontSize: 13)),
+                            ))
+                        .toList(),
+                    onChanged: (val) async {
+                      if (val == null) return;
+                      final prefs = await SharedPreferences.getInstance();
+                      setState(() => _perPrayerMuezzin[key] = val);
+                      await prefs.setString('prayer_muezzin_$key', val);
+                      await _syncNotificationsNow();
+                    },
+                  );
+                }),
               ],
             ),
           );
