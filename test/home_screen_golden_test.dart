@@ -198,3 +198,15 @@ void main() {
     });
   }
 }
+
+
+/// Shared harness entry for sibling golden tests: fonts + plugin mocks.
+Future<void> debugSetupHarness() async {
+  _requireFontFiles();
+  _mockPluginChannels();
+  _installFontHttpMock();
+  await _loadRealFonts();
+}
+
+/// Public wrapper around [_withRealFont] for sibling golden tests.
+ThemeData debugThemeWithRealFont(ThemeData base) => _withRealFont(base);
