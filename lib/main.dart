@@ -1106,19 +1106,51 @@ class _RafiqTabState extends State<RafiqTab> {
               icon: Icons.calendar_month_rounded,
               onTap: () => _open(const HijriEventsScreen(initialTab: 0)),
             ),
-            _RafiqServiceCard(
-              title: 'سجل الصلوات',
-              subtitle: 'متابعة الفروض الخمس والسنن',
-              icon: Icons.fact_check_rounded,
-              onTap: () => _open(const PrayerTimesScreen(initialTab: 1)),
-            ),
-            _RafiqServiceCard(
-              title: 'تنبيهات الأذان',
-              subtitle: 'المؤذن وتنبيهات قبل وبعد الصلاة',
-              icon: Icons.alarm_on_rounded,
-              onTap: () => _open(const PrayerTimesScreen(initialTab: 2)),
-            ),
           ],
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () => _open(const PrayerTimesScreen(initialTab: 1)),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? ThalabTheme.darkBorder
+                    : ThalabTheme.softBorder,
+                width: 1.4,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.foxOrange.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.fact_check_rounded, color: ThalabTheme.foxOrange, size: 24),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('صلاتي — السجل والتنبيهات',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text('متابعة الفروض، السنن، واختيار المؤذن لكل صلاة',
+                          style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11.5)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded,
+                    size: 16, color: ThalabTheme.mutedSlate),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -1148,9 +1180,14 @@ class _RafiqServiceCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: ThalabTheme.cardSurface,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? ThalabTheme.darkBorder
+                : ThalabTheme.softBorder,
+            width: 1.4,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
