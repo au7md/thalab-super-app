@@ -401,7 +401,7 @@ class _TasbihScreenState extends State<TasbihScreen>
             tooltip: _vibrationEnabled ? 'إيقاف الاهتزاز' : 'تفعيل الاهتزاز',
             icon: Icon(
               _vibrationEnabled ? Icons.vibration_rounded : Icons.smartphone_rounded,
-              color: _vibrationEnabled ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+              color: _vibrationEnabled ? ThalabTheme.foxOrange : ThalabTheme.mutedText(context),
             ),
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
@@ -847,7 +847,7 @@ class _StatBadge extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 10.5, color: ThalabTheme.mutedSlate),
+            style: TextStyle(fontSize: 10.5, color: ThalabTheme.mutedText(context)),
           ),
           const SizedBox(height: 2),
           Text(
@@ -898,7 +898,7 @@ class _StyleToggleBtn extends StatelessWidget {
             Icon(
               icon,
               size: 16,
-              color: selected ? Colors.white : ThalabTheme.mutedSlate,
+              color: selected ? Colors.white : ThalabTheme.mutedText(context),
             ),
             const SizedBox(width: 6),
             Flexible(
