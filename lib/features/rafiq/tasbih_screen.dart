@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
+import '../../core/daily_progress.dart';
 
 class _TasbihPhraseItem {
   final String text;
@@ -127,6 +128,15 @@ class _TasbihScreenState extends State<TasbihScreen>
     if (roundJustCompleted && _vibrationEnabled) {
       HapticFeedback.heavyImpact();
     }
+
+    // عدّاد تسبيح اليوم (يُصفَّر تلقائياً بتغيّر التاريخ)
+    final todayKey = DailyProgress.dateKey(DateTime.now());
+    final savedDay = prefs.getString('tasbih_daily_date');
+    final todaySoFar = savedDay == todayKey
+        ? (prefs.getInt('tasbih_daily_count') ?? 0)
+        : 0;
+    await prefs.setString('tasbih_daily_date', todayKey);
+    await prefs.setInt('tasbih_daily_count', todaySoFar + 1);
 
     await prefs.setInt('tasbih_current', _tasbihCount);
     await prefs.setInt('tasbih_rounds', _completedRounds);
