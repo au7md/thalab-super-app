@@ -43,6 +43,13 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
+  // ألوان متجاوبة مع الثيم
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardBg => Theme.of(context).cardColor;
+  Color get _innerBg => Theme.of(context).scaffoldBackgroundColor;
+  Color get _borderColor => _isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
+  Color get _textColor => _isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
+
   Future<void> _loadProgress() async {
     final prefs = await SharedPreferences.getInstance();
     final savedBookmarks = prefs.getStringList('quran_bookmarks') ?? [];
@@ -134,7 +141,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
   void _openWirdSettingsSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -160,9 +167,13 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'إعدادات الورد والختمة المتكاملة',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _textColor,
+                      ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -186,7 +197,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                   child: LinearProgressIndicator(
                     value: progressPct,
                     minHeight: 8,
-                    backgroundColor: ThalabTheme.softBorder,
+                    backgroundColor: _borderColor,
                     valueColor: const AlwaysStoppedAnimation(ThalabTheme.foxOrange),
                   ),
                 ),
@@ -194,9 +205,9 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: ThalabTheme.creamBackground,
+                    color: _innerBg,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: ThalabTheme.softBorder),
+                    border: Border.all(color: _borderColor),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -208,7 +219,11 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                               style: TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
                           Text(
                             '${quran.getSurahNameArabic(startData['surah'])} : ${startData['start']}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
+                              color: _textColor,
+                            ),
                           ),
                         ],
                       ),
@@ -219,7 +234,11 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                               style: const TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
                           Text(
                             '${quran.getSurahNameArabic(endData['surah'])} : ${endData['end']}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
+                              color: _textColor,
+                            ),
                           ),
                         ],
                       ),
@@ -229,7 +248,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                 const SizedBox(height: 16),
                 Text(
                   'مدة الختمة المستهدفة: $_khatmahGoalDays يوماً ($pagesPerDay صفحة يومياً)',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: _textColor),
                 ),
                 Text(
                   'المتبقي لإنهاء الختمة: $estimatedDaysLeft يوماً ($_completedPagesCount / 604 صفحة)',
@@ -244,7 +263,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                       label: Text(
                         '$days يوم',
                         style: TextStyle(
-                          color: selected ? Colors.white : ThalabTheme.darkSlate,
+                          color: selected ? Colors.white : _textColor,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -311,7 +330,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
     final sorted = _bookmarkedPages.map(int.parse).toList()..sort();
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -320,8 +339,8 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('العلامات المرجعية المحفوظة',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            Text('العلامات المرجعية المحفوظة',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _textColor)),
             const SizedBox(height: 12),
             if (sorted.isEmpty)
               const Padding(
@@ -496,9 +515,9 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: _cardBg,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: _borderColor),
             ),
             child: TabBar(
               controller: _tabController,
@@ -508,7 +527,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               labelColor: Colors.white,
-              unselectedLabelColor: ThalabTheme.darkSlate,
+              unselectedLabelColor: _textColor,
               labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
               dividerColor: Colors.transparent,
               padding: const EdgeInsets.all(4),
@@ -552,9 +571,9 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: _cardBg,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: _borderColor),
             ),
             child: Row(
               children: [
@@ -585,7 +604,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                         style: GoogleFonts.amiri(
                           fontSize: 19,
                           fontWeight: FontWeight.bold,
-                          color: ThalabTheme.darkSlate,
+                          color: _textColor,
                         ),
                       ),
                       Text(
@@ -647,9 +666,9 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: _cardBg,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: _borderColor),
             ),
             child: Row(
               children: [
@@ -676,7 +695,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                     children: [
                       Text(
                         'الجزء $juzNum',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _textColor),
                       ),
                       Text(
                         'يبدأ من سورة ${quran.getSurahNameArabic(firstSurah)} (آية $firstVerse)',
@@ -770,20 +789,34 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: ThalabTheme.cardSurface,
+        backgroundColor: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.download_for_offline_rounded, color: ThalabTheme.foxOrange),
-            SizedBox(width: 8),
+            const Icon(Icons.download_for_offline_rounded, color: ThalabTheme.foxOrange),
+            const SizedBox(width: 8),
             Expanded(
-              child: Text('تنزيل المصحف المصور أوفلاين', style: TextStyle(fontSize: 17)),
+              child: Text(
+                'تنزيل المصحف المصور أوفلاين',
+                style: TextStyle(
+                  fontSize: 17,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? ThalabTheme.darkTextPrimary
+                      : ThalabTheme.darkSlate,
+                ),
+              ),
             ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'هل ترغب في تنزيل صفحات المصحف الشريف المصور (604 صفحة) على جهازك الآن لتتمكن من القراءة في أي وقت بدون إنترنت؟',
-          style: TextStyle(height: 1.5, fontSize: 13.5),
+          style: TextStyle(
+            height: 1.5,
+            fontSize: 13.5,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? ThalabTheme.darkTextPrimary
+                : ThalabTheme.darkSlate,
+          ),
         ),
         actions: [
           TextButton(
@@ -846,13 +879,18 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
 
   void _openJumpToPageDialog() {
     final pageCtrl = TextEditingController(text: '$_currentPage');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: ThalabTheme.cardSurface,
+        backgroundColor: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text('الانتقال السريع لصفحة',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: Text('الانتقال السريع لصفحة',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate,
+            )),
         content: TextField(
           controller: pageCtrl,
           keyboardType: TextInputType.number,
@@ -860,7 +898,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
           decoration: InputDecoration(
             hintText: 'أدخل رقم الصفحة (1 - 604)',
             filled: true,
-            fillColor: ThalabTheme.creamBackground,
+            fillColor: Theme.of(context).scaffoldBackgroundColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none,
@@ -897,10 +935,11 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
     final surahName = quran.getSurahNameArabic(surahNum);
     final formattedVerse =
         '﴿$verseText﴾\n— سورة $surahName • آية ${_toArabicDigits(verseNum)} (صفحة $_currentPage)';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -915,7 +954,11 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
               children: [
                 Text(
                   'سورة $surahName • آية ${_toArabicDigits(verseNum)}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close_rounded),
@@ -927,9 +970,11 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: ThalabTheme.creamBackground,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(
+                  color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
+                ),
               ),
               child: Text(
                 '﴿$verseText﴾',
@@ -938,7 +983,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
                 style: GoogleFonts.amiriQuran(
                   fontSize: 20,
                   height: 2.0,
-                  color: ThalabTheme.darkSlate,
+                  color: isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate,
                 ),
               ),
             ),
@@ -994,6 +1039,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
     double cardFontSize = 21.0;
     bool showSurahName = true;
     bool showAppName = true;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final List<({String name, List<Color> colors, Color text, Color accent})> themes = [
       (
@@ -1028,11 +1074,15 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
         builder: (context, setDialogState) {
           final t = themes[bgIndex];
           return AlertDialog(
-            backgroundColor: ThalabTheme.cardSurface,
+            backgroundColor: Theme.of(context).cardColor,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            title: const Text(
+            title: Text(
               'تخصيص بطاقة الآية',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate,
+              ),
             ),
             content: SingleChildScrollView(
               child: Column(
@@ -1113,7 +1163,9 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
                             gradient: LinearGradient(colors: themes[i].colors),
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: selected ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                              color: selected
+                                  ? ThalabTheme.foxOrange
+                                  : (isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder),
                               width: selected ? 2.5 : 1,
                             ),
                           ),
@@ -1202,9 +1254,11 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
   }
 
   void _openDisplaySettings() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -1215,8 +1269,8 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('إعدادات عرض المصحف',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              Text('إعدادات عرض المصحف',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: textColor)),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -1226,7 +1280,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
                       selected: _isImageMushaf,
                       selectedColor: ThalabTheme.foxOrange,
                       labelStyle: TextStyle(
-                        color: _isImageMushaf ? Colors.white : ThalabTheme.darkSlate,
+                        color: _isImageMushaf ? Colors.white : textColor,
                         fontWeight: FontWeight.bold,
                       ),
                       onSelected: (_) async {
@@ -1244,7 +1298,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
                       selected: !_isImageMushaf,
                       selectedColor: ThalabTheme.foxOrange,
                       labelStyle: TextStyle(
-                        color: !_isImageMushaf ? Colors.white : ThalabTheme.darkSlate,
+                        color: !_isImageMushaf ? Colors.white : textColor,
                         fontWeight: FontWeight.bold,
                       ),
                       onSelected: (_) async {
@@ -1260,7 +1314,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
               const SizedBox(height: 14),
               if (!_isImageMushaf) ...[
                 Text('حجم الخط العثماني: ${_fontSize.toInt()}',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
                 Slider(
                   value: _fontSize,
                   min: 18,
@@ -1731,12 +1785,7 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
 
   @override
   ThemeData appBarTheme(BuildContext context) {
-    return Theme.of(context).copyWith(
-      appBarTheme: const AppBarTheme(
-        backgroundColor: ThalabTheme.creamBackground,
-        elevation: 0,
-      ),
-    );
+    return Theme.of(context);
   }
 
   String _normalizeArabic(String input) {
@@ -1827,6 +1876,8 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
       );
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: matches.length,
@@ -1842,9 +1893,11 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(
+                color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
+              ),
             ),
             child: Row(
               children: [
