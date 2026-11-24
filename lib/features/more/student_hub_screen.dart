@@ -45,7 +45,7 @@ class _StudentHubScreenState extends State<StudentHubScreen>
         bottom: TabBar(
           controller: _tabController,
           labelColor: ThalabTheme.foxOrange,
-          unselectedLabelColor: ThalabTheme.mutedSlate,
+          unselectedLabelColor: ThalabTheme.mutedText(context),
           indicatorColor: ThalabTheme.foxOrange,
           tabs: const [
             Tab(icon: Icon(Icons.track_changes_rounded), text: 'الأهداف والمواد'),
@@ -165,10 +165,10 @@ class _StudyGoalsTabState extends State<_StudyGoalsTab> {
         label: const Text('إضافة مادة'),
       ),
       body: _subjects.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 'أضف موادك الدراسية وحدد ساعات المذاكرة المستهدفة',
-                style: TextStyle(color: ThalabTheme.mutedSlate),
+                style: TextStyle(color: ThalabTheme.mutedText(context)),
               ),
             )
           : ListView.separated(
@@ -219,13 +219,13 @@ class _StudyGoalsTabState extends State<_StudyGoalsTab> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('تم إنجاز $done من $target ساعة',
-                              style: const TextStyle(
-                                  color: ThalabTheme.mutedSlate, fontSize: 12)),
+                              style: TextStyle(
+                                  color: ThalabTheme.mutedText(context), fontSize: 12)),
                           Row(
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.remove_circle_outline_rounded,
-                                    color: ThalabTheme.mutedSlate),
+                                icon: Icon(Icons.remove_circle_outline_rounded,
+                                    color: ThalabTheme.mutedText(context)),
                                 onPressed: () {
                                   if (done > 0) {
                                     setState(() => _subjects[i]['done'] = done - 1);
@@ -373,7 +373,7 @@ class _StudyScheduleTabState extends State<_StudyScheduleTab> {
           child: dayTasks.isEmpty
               ? Center(
                   child: Text('لا توجد مهام مجدولة ليوم $_selectedDay',
-                      style: const TextStyle(color: ThalabTheme.mutedSlate)),
+                      style: TextStyle(color: ThalabTheme.mutedText(context))),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
