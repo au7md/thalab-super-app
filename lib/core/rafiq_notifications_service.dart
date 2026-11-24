@@ -360,7 +360,6 @@ class RafiqNotificationsService {
               UILocalNotificationDateInterpretation.absoluteTime,
         );
       } catch (_) {
-        // خطة بديلة تلقائية إذا رفض النظام التنبيه الدقيق
         await _plugin.zonedSchedule(
           id,
           title,
@@ -387,7 +386,7 @@ class RafiqNotificationsService {
     if (!_initialized) return;
     try {
       final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-      tz.TZDateTime scheduled = tz.TZDateTime(
+      tz.TZDateTime tzScheduled = tz.TZDateTime(
         tz.local,
         now.year,
         now.month,
@@ -395,8 +394,8 @@ class RafiqNotificationsService {
         hour,
         minute,
       );
-      if (scheduled.isBefore(now)) {
-        scheduled = scheduled.add(const Duration(days: 1));
+      if (tzScheduled.isBefore(now)) {
+        tzScheduled = tzScheduled.add(const Duration(days: 1));
       }
 
       const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -414,23 +413,20 @@ class RafiqNotificationsService {
           id,
           title,
           body,
-          scheduled,
+          tzScheduled,
           details,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          matchDateTimeComponents: DateTimeComponents.time,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
         );
       } catch (_) {
-        // خطة بديلة تلقائية إذا رفض النظام التنبيه الدقيق
         await _plugin.zonedSchedule(
           id,
           title,
           body,
-          scheduled,
+          tzScheduled,
           details,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          matchDateTimeComponents: DateTimeComponents.time,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
         );
