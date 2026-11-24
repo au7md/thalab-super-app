@@ -140,11 +140,11 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'اللهم اغفر لي ولوالديّ وللمسلمين أجمعين، واجعل هذا العمل خالصاً لوجهك الكريم ونافعاً لكل من يستخدمه.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            color: ThalabTheme.mutedSlate, fontSize: 12.5, height: 1.5),
+                            color: ThalabTheme.mutedText(context), fontSize: 12.5, height: 1.5),
                       ),
                       const SizedBox(height: 12),
                       ElevatedButton.icon(
@@ -497,18 +497,18 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                         color: ThalabTheme.foxOrange, size: 22),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('عن المطور والصدقة الجارية',
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
                         Text('تطوير: أحمد تعلب (au7md) • اضغط للتواصل',
-                            style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
+                            style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 11)),
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: ThalabTheme.mutedSlate),
+                  Icon(Icons.chevron_right_rounded, color: ThalabTheme.mutedText(context)),
                 ],
               ),
             ),
@@ -807,7 +807,7 @@ class _ToolGridCard extends StatelessWidget {
             Text(subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
+                style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 11)),
           ],
         ),
       ),
