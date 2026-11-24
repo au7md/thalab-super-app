@@ -506,7 +506,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                         borderRadius: BorderRadius.circular(12),
                         child: _StatBadge(
                           label: 'الهدف (اضغط)',
-                          value: '$_tasbihCount / $_tasbihTarget',
+                          value: '$_tasbihCount من $_tasbihTarget',
                           highlight: true,
                         ),
                       ),
@@ -670,7 +670,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            '$_tasbihCount / $_tasbihTarget',
+                            '$_tasbihCount من $_tasbihTarget',
                             style: const TextStyle(
                               color: Color(0xFFD4AF37),
                               fontSize: 12.5,
