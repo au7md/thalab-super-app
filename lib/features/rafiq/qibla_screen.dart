@@ -20,6 +20,12 @@ class _QiblaScreenState extends State<QiblaScreen> {
   bool _isUpdating = false;
   bool _wasAligned = false;
 
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardBg => Theme.of(context).cardColor;
+  Color get _innerBg => Theme.of(context).scaffoldBackgroundColor;
+  Color get _borderColor => _isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
+  Color get _textColor => _isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
+
   static const double _kaabaLat = 21.422487;
   static const double _kaabaLng = 39.826206;
 
@@ -127,7 +133,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
   void _openCityPickerSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -151,7 +157,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   final c = _quickCities[idx];
                   return ListTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    tileColor: ThalabTheme.creamBackground,
+                    tileColor: _innerBg,
                     leading: const Icon(Icons.location_city_rounded, color: ThalabTheme.foxOrange),
                     title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     onTap: () async {
@@ -234,9 +240,9 @@ class _QiblaScreenState extends State<QiblaScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: ThalabTheme.cardSurface,
+                        color: _cardBg,
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: ThalabTheme.softBorder),
+                        border: Border.all(color: _borderColor),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -297,7 +303,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                           width: 4,
                           height: 18,
                           decoration: BoxDecoration(
-                            color: isAligned ? const Color(0xFF1B8A5A) : ThalabTheme.darkSlate,
+                            color: isAligned ? const Color(0xFF1B8A5A) : _textColor,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -308,7 +314,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                         height: 285,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: ThalabTheme.cardSurface,
+                          color: _cardBg,
                           border: Border.all(
                             color: isAligned ? const Color(0xFF1B8A5A) : ThalabTheme.foxOrange,
                             width: isAligned ? 6 : 4.5,
@@ -327,6 +333,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                             headingDeg: hasCompass ? heading : 0.0,
                             activeColor:
                                 isAligned ? const Color(0xFF1B8A5A) : ThalabTheme.foxOrange,
+                            textColor: _textColor,
                           ),
                         ),
                       ),
@@ -384,7 +391,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                           width: 20,
                           height: 20,
                           decoration: BoxDecoration(
-                            color: ThalabTheme.darkSlate,
+                            color: _textColor,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 3),
                           ),
@@ -465,12 +472,15 @@ class _QiblaInfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: ThalabTheme.cardSurface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: ThalabTheme.softBorder),
+        border: Border.all(
+          color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
+        ),
       ),
       child: Row(
         children: [
@@ -495,10 +505,12 @@ class _QiblaInfoTile extends StatelessWidget {
 class _CompassDialPainter extends CustomPainter {
   final double headingDeg;
   final Color activeColor;
+  final Color textColor;
 
   _CompassDialPainter({
     required this.headingDeg,
     required this.activeColor,
+    required this.textColor,
   });
 
   @override
@@ -541,7 +553,7 @@ class _CompassDialPainter extends CustomPainter {
         text: TextSpan(
           text: text,
           style: TextStyle(
-            color: deg == 0 ? Colors.redAccent : ThalabTheme.darkSlate,
+            color: deg == 0 ? Colors.redAccent : textColor,
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
@@ -561,5 +573,7 @@ class _CompassDialPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CompassDialPainter oldDelegate) =>
-      oldDelegate.headingDeg != headingDeg || oldDelegate.activeColor != activeColor;
+      oldDelegate.headingDeg != headingDeg ||
+      oldDelegate.activeColor != activeColor ||
+      oldDelegate.textColor != textColor;
 }
