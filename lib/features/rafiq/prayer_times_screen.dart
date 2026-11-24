@@ -1154,26 +1154,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
       children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: ThalabTheme.foxOrange.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.notifications_active_rounded, color: ThalabTheme.foxOrange),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'خصّص تنبيه الاستعداد، صوت المؤذن، وتنبيه الإقامة والأذكار لكل صلاة بمرونة كاملة.',
-                  style: TextStyle(fontSize: 12, height: 1.45, color: _textColor),
-                ),
-              ),
-            ],
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Row(
@@ -1200,10 +1180,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     }
                   },
                   icon: const Icon(Icons.play_circle_outline_rounded, size: 20),
-                  label: const Text(
-                    'تجربة الأذان (5 ث)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                  ),
+                  label: const Text('تجربة الأذان (5 ث)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1234,10 +1212,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     }
                   },
                   icon: const Icon(Icons.fact_check_rounded, size: 20),
-                  label: const Text(
-                    'تذكير سجل الصلاة',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                  ),
+                  label: const Text('تذكير سجل الصلاة',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                 ),
               ),
             ],
@@ -1256,157 +1232,155 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
               : RafiqNotificationsService.generalMuezzins;
           final currentMuezzinId =
               _perPrayerMuezzin[key] ?? (key == 'fajr' ? 'fajr_egypt' : 'mishary_afasy');
+          final muezzinName = muezzinList
+              .firstWhere((m) => m.id == currentMuezzinId, orElse: () => muezzinList.first)
+              .name;
 
           return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(15),
+            margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
               color: _cardBg,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: _borderColor, width: 1.3),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(icon, color: ThalabTheme.foxOrange, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
+            child: Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: ThalabTheme.foxOrange.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: ThalabTheme.foxOrange, size: 22),
+                ),
+                title: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: _textColor,
+                  ),
+                ),
+                subtitle: Text(
+                  adhanOn ? 'مفعّل • $muezzinName' : 'الأذان متوقف',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                ),
+                trailing: Switch(
+                  value: adhanOn,
+                  activeColor: ThalabTheme.foxOrange,
+                  onChanged: (val) async {
+                    final prefs = await SharedPreferences.getInstance();
+                    setState(() => _adhanNotifEnabled[key] = val);
+                    await prefs.setBool('prayer_notif_${key}_adhan', val);
+                    await _syncNotificationsNow();
+                  },
+                ),
+                children: [
+                  const Divider(height: 12),
+                  DropdownButtonFormField<int>(
+                    value: beforeOptions.contains(beforeVal) ? beforeVal : 0,
+                    dropdownColor: _cardBg,
+                    style: TextStyle(color: _textColor, fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: 'تنبيه الاستعداد قبل الأذان',
+                      labelStyle: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                      filled: true,
+                      fillColor: _innerBg,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
                       ),
                     ),
-                    Row(
-                      children: [
-                        Text('الأذان', style: TextStyle(fontSize: 12, color: _textColor)),
-                        Switch(
-                          value: adhanOn,
-                          activeColor: ThalabTheme.foxOrange,
-                          onChanged: (val) async {
-                            final prefs = await SharedPreferences.getInstance();
-                            setState(() => _adhanNotifEnabled[key] = val);
-                            await prefs.setBool('prayer_notif_${key}_adhan', val);
-                            await _syncNotificationsNow();
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const Divider(height: 14),
-                const Text(
-                  'تنبيه الاستعداد قبل الأذان:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThalabTheme.mutedSlate),
-                ),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<int>(
-                  value: beforeOptions.contains(beforeVal) ? beforeVal : 0,
-                  dropdownColor: _cardBg,
-                  style: TextStyle(color: _textColor, fontSize: 13),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: _innerBg,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
-                    ),
+                    items: beforeOptions
+                        .map((mins) => DropdownMenuItem(
+                              value: mins,
+                              child: Text(
+                                mins == 0 ? 'إيقاف التنبيه المسبق' : 'قبل الأذان بـ $mins دقيقة',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (val) async {
+                      if (val == null) return;
+                      final prefs = await SharedPreferences.getInstance();
+                      setState(() => _beforeNotifMins[key] = val);
+                      await prefs.setInt('prayer_notif_${key}_before', val);
+                      await _syncNotificationsNow();
+                    },
                   ),
-                  items: beforeOptions
-                      .map((mins) => DropdownMenuItem(
-                            value: mins,
-                            child: Text(
-                              mins == 0 ? 'إيقاف التنبيه المسبق' : 'قبل الأذان بـ $mins دقيقة',
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (val) async {
-                    if (val == null) return;
-                    final prefs = await SharedPreferences.getInstance();
-                    setState(() => _beforeNotifMins[key] = val);
-                    await prefs.setInt('prayer_notif_${key}_before', val);
-                    await _syncNotificationsNow();
-                  },
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'صوت المؤذن لهذه الصلاة:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThalabTheme.mutedSlate),
-                ),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  value: muezzinList.any((m) => m.id == currentMuezzinId)
-                      ? currentMuezzinId
-                      : muezzinList.first.id,
-                  dropdownColor: _cardBg,
-                  style: TextStyle(color: _textColor, fontSize: 13),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: _innerBg,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: muezzinList.any((m) => m.id == currentMuezzinId)
+                        ? currentMuezzinId
+                        : muezzinList.first.id,
+                    dropdownColor: _cardBg,
+                    style: TextStyle(color: _textColor, fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: 'صوت المؤذن لهذه الصلاة',
+                      labelStyle: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                      filled: true,
+                      fillColor: _innerBg,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
+                    items: muezzinList
+                        .map((m) => DropdownMenuItem(
+                              value: m.id,
+                              child: Text(m.name, style: const TextStyle(fontSize: 13)),
+                            ))
+                        .toList(),
+                    onChanged: (val) async {
+                      if (val == null) return;
+                      final prefs = await SharedPreferences.getInstance();
+                      setState(() => _perPrayerMuezzin[key] = val);
+                      await prefs.setString('prayer_muezzin_$key', val);
+                      await _syncNotificationsNow();
+                    },
                   ),
-                  items: muezzinList
-                      .map((m) => DropdownMenuItem(
-                            value: m.id,
-                            child: Text(m.name, style: const TextStyle(fontSize: 13)),
-                          ))
-                      .toList(),
-                  onChanged: (val) async {
-                    if (val == null) return;
-                    final prefs = await SharedPreferences.getInstance();
-                    setState(() => _perPrayerMuezzin[key] = val);
-                    await prefs.setString('prayer_muezzin_$key', val);
-                    await _syncNotificationsNow();
-                  },
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'تنبيه الإقامة وأذكار بعد الصلاة:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ThalabTheme.mutedSlate),
-                ),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<int>(
-                  value: afterOptions.contains(afterVal) ? afterVal : 0,
-                  dropdownColor: _cardBg,
-                  style: TextStyle(color: _textColor, fontSize: 13),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: _innerBg,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<int>(
+                    value: afterOptions.contains(afterVal) ? afterVal : 0,
+                    dropdownColor: _cardBg,
+                    style: TextStyle(color: _textColor, fontSize: 13),
+                    decoration: InputDecoration(
+                      labelText: 'تنبيه الإقامة وأذكار بعد الصلاة',
+                      labelStyle: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                      filled: true,
+                      fillColor: _innerBg,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
+                    items: afterOptions
+                        .map((mins) => DropdownMenuItem(
+                              value: mins,
+                              child: Text(
+                                mins == 0 ? 'إيقاف تنبيه ما بعد الصلاة' : 'بعد الأذان بـ $mins دقيقة',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: (val) async {
+                      if (val == null) return;
+                      final prefs = await SharedPreferences.getInstance();
+                      setState(() => _afterNotifMins[key] = val);
+                      await prefs.setInt('prayer_notif_${key}_after', val);
+                      await _syncNotificationsNow();
+                    },
                   ),
-                  items: afterOptions
-                      .map((mins) => DropdownMenuItem(
-                            value: mins,
-                            child: Text(
-                              mins == 0 ? 'إيقاف تنبيه ما بعد الصلاة' : 'بعد الأذان بـ $mins دقيقة',
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (val) async {
-                    if (val == null) return;
-                    final prefs = await SharedPreferences.getInstance();
-                    setState(() => _afterNotifMins[key] = val);
-                    await prefs.setInt('prayer_notif_${key}_after', val);
-                    await _syncNotificationsNow();
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }),
