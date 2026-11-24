@@ -898,8 +898,10 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                   ),
                   Switch(
                     value: _masterNotifEnabled,
-                    activeColor: Colors.white,
-                    activeTrackColor: Colors.black26,
+                    activeColor: ThalabTheme.foxOrange,
+                    activeTrackColor: Colors.white,
+                    inactiveThumbColor: Colors.white70,
+                    inactiveTrackColor: Colors.black26,
                     onChanged: (val) async {
                       final prefs = await SharedPreferences.getInstance();
                       setState(() => _masterNotifEnabled = val);
