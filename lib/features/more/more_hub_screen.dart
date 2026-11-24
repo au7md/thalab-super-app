@@ -309,19 +309,20 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
 
           // 2. قسم الإنتاجية والتركيز + ركن الطلاب
           const _SectionHeader(
               title: 'الإنتاجية والتركيز (Pro)', icon: Icons.bolt_rounded),
           const SizedBox(height: 10),
           GridView.count(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 1.5,
+            childAspectRatio: 1.48,
             children: [
               _ToolGridCard(
                 title: 'مؤقت بومودورو',
@@ -361,19 +362,20 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
 
-          // 3. الأدوات الذكية والحاسبات (بدون حاسبة الزكاة وبدون فراغ زائد)
+          // 3. الأدوات الذكية والحاسبات
           const _SectionHeader(
               title: 'الأدوات الذكية والحاسبات', icon: Icons.calculate_rounded),
           const SizedBox(height: 10),
           GridView.count(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 1.5,
+            childAspectRatio: 1.48,
             children: [
               _ToolGridCard(
                 title: 'محول الوحدات',
@@ -413,18 +415,19 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
 
           // 4. الإعدادات والمشاركة
           const _SectionHeader(title: 'النظام والحساب', icon: Icons.tune_rounded),
           const SizedBox(height: 10),
           GridView.count(
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 1.5,
+            childAspectRatio: 1.48,
             children: [
               _ToolGridCard(
                 title: 'الإعدادات',
@@ -448,7 +451,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
 
           // 5. كارت الصدقة الجارية والمطور في نهاية الصفحة
           InkWell(
