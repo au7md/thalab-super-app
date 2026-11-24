@@ -389,8 +389,8 @@ class _AgeCalculatorScreenState extends State<AgeCalculatorScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('تاريخ الميلاد',
-                            style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 12)),
+                        Text('تاريخ الميلاد',
+                            style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 12)),
                         const SizedBox(height: 4),
                         Text(
                           '${_birthDate.year}/${_birthDate.month}/${_birthDate.day}',
@@ -441,8 +441,8 @@ class _AgeCalculatorScreenState extends State<AgeCalculatorScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('إجمالي الأيام التي عشتها:',
-                          style: TextStyle(color: ThalabTheme.mutedSlate)),
+                      Text('إجمالي الأيام التي عشتها:',
+                          style: TextStyle(color: ThalabTheme.mutedText(context))),
                       Text('$totalDays يوم',
                           style: const TextStyle(fontWeight: FontWeight.bold)),
                     ],
@@ -451,8 +451,8 @@ class _AgeCalculatorScreenState extends State<AgeCalculatorScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('المتبقي على عيد ميلادك القادم:',
-                          style: TextStyle(color: ThalabTheme.mutedSlate)),
+                      Text('المتبقي على عيد ميلادك القادم:',
+                          style: TextStyle(color: ThalabTheme.mutedText(context))),
                       Text('$daysToNext يوم',
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, color: ThalabTheme.foxOrange)),
@@ -718,7 +718,7 @@ class _StatCard extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                   color: ThalabTheme.foxOrange)),
           Text(label,
-              style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+              style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context))),
         ],
       ),
     );
