@@ -635,7 +635,9 @@ jobs:
               }
           }
           EOF
-          for dir in android/app/src/main/res/mipmap-*; do cp assets/images/app_logo.png "$dir/ic_launcher.png"; done
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          convert assets/images/app_logo.png -resize 192x192 PNG32:/tmp/ic_launcher.png
+          for dir in android/app/src/main/res/mipmap-*; do cp /tmp/ic_launcher.png "$dir/ic_launcher.png"; done
           flutter pub get
 
       - name: Build Release APK (arm64)
