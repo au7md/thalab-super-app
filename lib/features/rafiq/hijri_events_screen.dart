@@ -274,7 +274,8 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
               indicatorSize: TabBarIndicatorSize.tab,
               labelColor: Colors.white,
               unselectedLabelColor: ThalabTheme.darkSlate,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              labelPadding: EdgeInsets.zero,
               dividerColor: Colors.transparent,
               padding: const EdgeInsets.all(4),
               tabs: const [
@@ -309,7 +310,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     final isWhiteDay = todayH.hDay == 13 || todayH.hDay == 14 || todayH.hDay == 15;
     final isMonOrThu = gToday.weekday == DateTime.monday || gToday.weekday == DateTime.thursday;
 
-    // حساب الأيام المتبقية على الأيام البيض القادمة (13 من الشهر الهجري)
     int daysToWhiteDays;
     if (todayH.hDay < 13) {
       daysToWhiteDays = 13 - todayH.hDay;
@@ -322,7 +322,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 2, 16, 28),
       children: [
-        // 1. بطاقة التاريخ الهجري والميلادي الرئيسية
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -377,7 +376,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                 ),
               ),
               const SizedBox(height: 14),
-              // شريط ضبط فرق الرؤية الشرعية للهلال
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
@@ -424,7 +422,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         ),
         const SizedBox(height: 12),
 
-        // 2. بطاقة سنن الصيام الدورية (الأيام البيض + الإثنين والخميس)
         Container(
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
@@ -491,7 +488,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
           ),
         ),
 
-        // 3. قائمة المناسبات الإسلامية بتصميم بطاقات ثري
         ...sortedEvents.map((event) {
           final daysLeft = _daysUntil(todayH, event);
           final isToday = daysLeft == 0;
@@ -578,7 +574,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    '✨ ${event.virtue}',
+                    event.virtue,
                     style: const TextStyle(
                       fontSize: 11.5,
                       color: ThalabTheme.mutedSlate,
@@ -599,7 +595,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     final monthName = _hijriMonthsAr[(_viewHijriMonth - 1).clamp(0, 11)];
     final daysInMonth = HijriCalendar().getDaysInMonth(_viewHijriYear, _viewHijriMonth);
     final firstDayGregorian = HijriCalendar().hijriToGregorian(_viewHijriYear, _viewHijriMonth, 1);
-    // تحويل weekday (1=الإثنين .. 7=الأحد) بحيث يبدأ الأسبوع من السبت (0)
     final int startOffset = (firstDayGregorian.weekday % 7 + 1) % 7;
 
     final selectedDaySafe = (_selectedHijriDay ?? 1).clamp(1, daysInMonth);
@@ -607,7 +602,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         .hijriToGregorian(_viewHijriYear, _viewHijriMonth, selectedDaySafe)
         .subtract(Duration(days: _hijriOffset));
 
-    // التحقق من وجود مناسبة في اليوم المحدد
     final matchingEvents = _events
         .where((e) => e.month == _viewHijriMonth && e.day == selectedDaySafe)
         .toList();
@@ -615,7 +609,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
       children: [
-        // شريط التنقل بين الشهور الهجرية
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
@@ -673,7 +666,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         ),
         const SizedBox(height: 10),
 
-        // شبكة أيام الشهر الهجري + الميلادي
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -773,7 +765,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                 },
               ),
               const SizedBox(height: 10),
-              // دليل الألوان أسفل الشبكة
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -787,7 +778,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         ),
         const SizedBox(height: 12),
 
-        // بطاقة تفاصيل اليوم المحدد في التقويم
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -829,7 +819,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '🌟 ${ev.title}',
+                          ev.title,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: ThalabTheme.foxOrange,
@@ -843,7 +833,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                 )
               else if (selectedDaySafe == 13 || selectedDaySafe == 14 || selectedDaySafe == 15)
                 const Text(
-                  '🌙 يوم من الأيام البيض المباركة — يُستحب صيامه.',
+                  'يوم من الأيام البيض المباركة — يُستحب صيامه.',
                   style: TextStyle(fontSize: 13, color: ThalabTheme.foxOrange, fontWeight: FontWeight.bold),
                 )
               else
@@ -863,7 +853,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
       children: [
-        // 1. المفتاح الرئيسي للمنظومة + زر اختبار الإشعار
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
