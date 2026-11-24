@@ -28,12 +28,26 @@ const _gstaticHashes = [
 
 const _gstaticWeights = ['w200', 'w300', 'w400', 'w500', 'w600', 'w700'];
 
+// Hashes pinned by google_fonts 6.3.3 for Amiri / Amiri Quran, served from
+// test/fonts/*.ttf whose sha256 was verified against these exact values.
+const _amiriHashes = {
+  '82b49c37cfb90dd8fff8aab7508c2078bb32a200648acb2237dc02c30f4492ad':
+      'Amiri-Regular.ttf',
+  '53c460187d4f6d8fa2bde7a1a6587ca6487f807c31b094037164bb58e3b2bd4c':
+      'Amiri-Bold.ttf',
+  '6fb463ac2d53b77b67d274bec99e39a4288a2d0a962437c7b1c1f6e9a9ee799f':
+      'AmiriQuran-Regular.ttf',
+};
+
 void _installFontHttpMock() {
   final bytesByHash = <String, List<int>>{};
   for (var i = 0; i < _gstaticHashes.length; i++) {
     bytesByHash[_gstaticHashes[i]] =
         File('test/fonts/gstatic/${_gstaticWeights[i]}.ttf').readAsBytesSync();
   }
+  _amiriHashes.forEach((hash, file) {
+    bytesByHash[hash] = File('test/fonts/$file').readAsBytesSync();
+  });
   gfb.httpClient = MockClient((request) async {
     final hash = request.url.pathSegments.isEmpty
         ? ''
@@ -83,6 +97,9 @@ void _requireFontFiles() {
     'test/fonts/gstatic/w400.ttf',
     'test/fonts/gstatic/w600.ttf',
     'test/fonts/gstatic/w700.ttf',
+    'test/fonts/Amiri-Regular.ttf',
+    'test/fonts/Amiri-Bold.ttf',
+    'test/fonts/AmiriQuran-Regular.ttf',
   ];
   final missing = required.where((p) => !File(p).existsSync()).toList();
   if (missing.isNotEmpty) {
