@@ -46,7 +46,7 @@ class ThalabApp extends StatelessWidget {
 }
 
 // =========================================================================
-// شاشة الفتح (Splash Screen) مع أنيميشن تكبير وتلاشي هادئ
+// شاشة الفتح (Splash Screen)
 // =========================================================================
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -82,7 +82,7 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _checkFirstLaunch() async {
     final prefs = await SharedPreferences.getInstance();
     final bool isFirst = prefs.getBool('first_launch_v1.7') ?? true;
-    await Future.delayed(const Duration(milliseconds: 2000));
+    await Future.delayed(const Duration(milliseconds: 1800));
     if (!mounted) return;
 
     Navigator.pushReplacement(
@@ -143,12 +143,13 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 22),
                 const Text(
-                  'الثَّعْلَب',
+                  'الثعلب',
                   style: TextStyle(
-                    fontSize: 30,
+                    fontSize: 34,
                     fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
                     color: ThalabTheme.darkSlate,
                   ),
                 ),
@@ -156,7 +157,7 @@ class _SplashScreenState extends State<SplashScreen>
                 const Text(
                   'رفيقك اليومي المتكامل',
                   style: TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 14,
                     color: ThalabTheme.mutedSlate,
                     fontWeight: FontWeight.w600,
                   ),
@@ -227,20 +228,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 controller: _pageController,
                 onPageChanged: (idx) => setState(() => _currentPage = idx),
                 children: [
-                  _buildIntroPage(
-                    title: 'مرحباً بك في الثعلب',
-                    desc: 'مساحتك اليومية الهادئة للإنتاجية والذكر وتنظيم المذاكرة في مكان واحد.',
-                    icon: Icons.auto_awesome_rounded,
-                  ),
+                  _buildLogoIntroPage(),
                   _buildIntroPage(
                     title: 'الواحة الإيمانية',
                     desc: 'تابع مواقيت الصلاة والأذان، واقرأ وردك القرآني، وتحصن بالأذكار مع السبحة الذكية.',
                     icon: Icons.mosque_rounded,
                   ),
                   _buildIntroPage(
-                    title: 'ركن الطلاب والتحرير',
-                    desc: 'نظم جدولك الأسبوعي، واحسب معدلك GPA، مع استوديو لتسجيل وقص الصوتيات.',
-                    icon: Icons.school_rounded,
+                    title: 'المعرض، الصوتيات والمزيد',
+                    desc: 'تصفح صورك وفيديوهاتك، استمتع بمشغل واستوديو الصوتيات، واستفد من الخزنة، المؤقت، وركن الطلاب.',
+                    icon: Icons.widgets_rounded,
                   ),
                   _buildSetupPage(),
                 ],
@@ -254,36 +251,53 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   _currentPage < 3
                       ? TextButton(
                           onPressed: () => _pageController.jumpToPage(3),
-                          child: const Text('تخطي', style: TextStyle(color: ThalabTheme.mutedSlate)),
+                          child: const Text('تخطي',
+                              style: TextStyle(color: ThalabTheme.mutedSlate)),
                         )
                       : const SizedBox.shrink(),
                   Row(
                     children: List.generate(4, (i) {
-                      return Container(
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
                         margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: _currentPage == i ? 18 : 8,
+                        width: _currentPage == i ? 20 : 8,
                         height: 8,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(4),
-                          color: _currentPage == i ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                          color: _currentPage == i
+                              ? ThalabTheme.foxOrange
+                              : ThalabTheme.softBorder,
                         ),
                       );
                     }),
                   ),
                   _currentPage < 3
                       ? ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: ThalabTheme.foxOrange, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                          onPressed: () => _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.ease),
-                          child: const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ThalabTheme.foxOrange,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: () => _pageController.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.ease,
+                          ),
+                          child: const Icon(Icons.arrow_forward_rounded,
+                              color: Colors.white),
                         )
                       : ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: ThalabTheme.foxOrange,
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(horizontal: 22),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
                           ),
                           onPressed: _completeOnboarding,
-                          child: const Text('ابدأ الآن', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            'ابدأ الآن',
+                            style: TextStyle(
+                                color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
                         ),
                 ],
               ),
@@ -294,7 +308,59 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildIntroPage({required String title, required String desc, required IconData icon}) {
+  Widget _buildLogoIntroPage() {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 132,
+            height: 132,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: ThalabTheme.foxOrange.withOpacity(0.2),
+                  blurRadius: 28,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/app_logo.png',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: ThalabTheme.cardSurface,
+                  child: const Icon(Icons.pets_rounded,
+                      size: 64, color: ThalabTheme.foxOrange),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 36),
+          const Text(
+            'مرحباً بك في الثعلب',
+            style: TextStyle(
+                fontSize: 25,
+                fontWeight: FontWeight.w900,
+                color: ThalabTheme.darkSlate),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'مساحتك اليومية الهادئة للإنتاجية والذكر وإدارة الوسائط والأدوات الذكية في مكان واحد.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 14, color: ThalabTheme.mutedSlate, height: 1.6),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIntroPage(
+      {required String title, required String desc, required IconData icon}) {
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -306,15 +372,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               color: ThalabTheme.cardSurface,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: ThalabTheme.foxOrange.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 4)),
+                BoxShadow(
+                    color: ThalabTheme.foxOrange.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4)),
               ],
             ),
             child: Icon(icon, size: 68, color: ThalabTheme.foxOrange),
           ),
           const SizedBox(height: 36),
-          Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: ThalabTheme.darkSlate)),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: ThalabTheme.darkSlate)),
           const SizedBox(height: 12),
-          Text(desc, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: ThalabTheme.mutedSlate, height: 1.6)),
+          Text(desc,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 14, color: ThalabTheme.mutedSlate, height: 1.6)),
         ],
       ),
     );
@@ -330,23 +406,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const Center(
             child: Text(
               'دعنا نتعرف عليك',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: ThalabTheme.darkSlate),
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: ThalabTheme.darkSlate),
             ),
           ),
           const SizedBox(height: 24),
-          const Text('الاسم المفضل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const Text('الاسم المفضل',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 8),
           TextField(
             controller: _nameController,
             decoration: InputDecoration(
-              hintText: 'مثال: أحمد، سارة...',
+              hintText: 'مثال: أحمد...',
               filled: true,
               fillColor: ThalabTheme.cardSurface,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: ThalabTheme.softBorder)),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: ThalabTheme.softBorder)),
             ),
           ),
           const SizedBox(height: 20),
-          const Text('الجنس لضبط مناداة الواجهة والذكر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const Text('الجنس لضبط مناداة الواجهة والذكر',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -355,7 +438,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   label: const Center(child: Text('ذكر')),
                   selected: _gender == 'ذكر',
                   selectedColor: ThalabTheme.foxOrange,
-                  labelStyle: TextStyle(color: _gender == 'ذكر' ? Colors.white : ThalabTheme.darkSlate, fontWeight: FontWeight.bold),
+                  labelStyle: TextStyle(
+                      color:
+                          _gender == 'ذكر' ? Colors.white : ThalabTheme.darkSlate,
+                      fontWeight: FontWeight.bold),
                   onSelected: (_) => setState(() => _gender = 'ذكر'),
                 ),
               ),
@@ -365,7 +451,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   label: const Center(child: Text('أنثى')),
                   selected: _gender == 'أنثى',
                   selectedColor: ThalabTheme.foxOrange,
-                  labelStyle: TextStyle(color: _gender == 'أنثى' ? Colors.white : ThalabTheme.darkSlate, fontWeight: FontWeight.bold),
+                  labelStyle: TextStyle(
+                      color:
+                          _gender == 'أنثى' ? Colors.white : ThalabTheme.darkSlate,
+                      fontWeight: FontWeight.bold),
                   onSelected: (_) => setState(() => _gender = 'أنثى'),
                 ),
               ),
