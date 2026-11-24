@@ -6,12 +6,28 @@ import 'package:adhan/adhan.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+class MuezzinOption {
+  final String id;
+  final String name;
+  final String description;
+
+  const MuezzinOption(this.id, this.name, this.description);
+}
+
 class RafiqNotificationsService {
   RafiqNotificationsService._();
   static final RafiqNotificationsService instance = RafiqNotificationsService._();
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+
+  static const List<MuezzinOption> muezzins = [
+    MuezzinOption('afasy', 'الشيخ مشاري العفاسي', 'أذان هادئ وعذب'),
+    MuezzinOption('qatami', 'الشيخ ناصر القطامي', 'نبرة خاشعة ومميزة'),
+    MuezzinOption('dosari', 'الشيخ ياسر الدوسري', 'أذان الحرم المكي'),
+    MuezzinOption('abdulbasit', 'الشيخ عبد الباسط عبد الصمد', 'الأذان الكلاسيكي الأصيل'),
+    MuezzinOption('default', 'تنبيه النظام الافتراضي', 'نغمة إشعار قياسية'),
+  ];
 
   Future<void> init() async {
     if (_initialized) return;
@@ -66,16 +82,23 @@ class RafiqNotificationsService {
       final androidImplementation = _plugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       await androidImplementation?.requestNotificationsPermission();
+      await androidImplementation?.requestExactAlarmsPermission();
     } catch (e) {
       debugPrint('Permission request error: $e');
     }
   }
 
-  /// إرسال إشعار تجريبي فوري للتحقق من عمل الإشعارات على الجهاز
+  Future<String> _getUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString('user_name')?.trim() ?? '';
+    return name.isEmpty ? 'صديقي' : name;
+  }
+
   Future<void> sendTestNotification() async {
     await init();
+    final userName = await _getUserName();
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'rafiq_prayers_channel',
+      'rafiq_prayers_channel_v2',
       'تنبيهات رفيق الإيمانية',
       channelDescription: 'تنبيهات الأذان والأذكار والمناسبات',
       importance: Importance.max,
@@ -86,12 +109,11 @@ class RafiqNotificationsService {
     await _plugin.show(
       999,
       'رفيق — الواحة الإيمانية',
-      'منظومة الإشعارات الذكية تعمل بنجاح ومضبوطة على توقيتك المحلي.',
+      'أهلاً يا $userName، منظومة الإشعارات الدقيقة تعمل الآن بنجاح.',
       const NotificationDetails(android: androidDetails),
     );
   }
 
-  /// مزامنة شاملة لكل تنبيهات الصلوات (قبل / عند / بعد) + الأذكار + المناسبات
   Future<void> syncAllScheduledNotifications({
     required double lat,
     required double lng,
@@ -104,10 +126,15 @@ class RafiqNotificationsService {
     final masterEnabled = prefs.getBool('notif_master_enabled') ?? true;
     if (!masterEnabled) return;
 
+    final userName = await _getUserName();
+    final selectedMuezzin = prefs.getString('selected_muezzin_id') ?? 'afasy';
+    final muezzinName = muezzins
+        .firstWhere((m) => m.id == selectedMuezzin, orElse: () => muezzins.first)
+        .name;
+
     final coords = Coordinates(lat, lng);
     final now = DateTime.now();
 
-    // جدولة الصلوات لليوم والغد لضمان استمرارية التنبيهات حتى في الفجر التالي
     int idCounter = 100;
     for (int dayOffset = 0; dayOffset <= 1; dayOffset++) {
       final targetDate = now.add(Duration(days: dayOffset));
@@ -127,46 +154,44 @@ class RafiqNotificationsService {
         final adhanTime = p.$3;
 
         final adhanEnabled = prefs.getBool('prayer_notif_${key}_adhan') ?? true;
-        final beforeMins = prefs.getInt('prayer_notif_${key}_before') ?? 0; // 0 = معطل
-        final afterMins = prefs.getInt('prayer_notif_${key}_after') ?? 0; // 0 = معطل
+        final beforeMins = prefs.getInt('prayer_notif_${key}_before') ?? 0;
+        final afterMins = prefs.getInt('prayer_notif_${key}_after') ?? 0;
 
-        // 1. تنبيه قبل الأذان
         if (beforeMins > 0) {
           final beforeTime = adhanTime.subtract(Duration(minutes: beforeMins));
           if (beforeTime.isAfter(now)) {
             await _scheduleExact(
               id: idCounter++,
-              title: 'اقترب موعد صلاة $name',
+              title: 'اقتربت صلاة $name يا $userName',
               body: 'متبقي $beforeMins دقيقة على أذان $name — استعد للوضوء والصلاة.',
               scheduledTime: beforeTime,
-              channelId: 'rafiq_prayers_channel',
+              channelId: 'rafiq_prayers_channel_v2',
               channelName: 'مواقيت الصلاة - رفيق',
             );
           }
         }
 
-        // 2. تنبيه عند الأذان
         if (adhanEnabled && adhanTime.isAfter(now)) {
+          final fajrNote = key == 'fajr' ? ' • الصلاة خير من النوم' : '';
           await _scheduleExact(
             id: idCounter++,
-            title: 'حان الآن موعد أذان $name',
-            body: 'أقم صلاتك تنعم بحياتك — واحة رفيق الإيمانية',
+            title: 'حان الآن موعد أذان $name$fajrNote',
+            body: 'أقم صلاتك يا $userName ($muezzinName)',
             scheduledTime: adhanTime,
-            channelId: 'rafiq_prayers_channel',
+            channelId: 'rafiq_prayers_channel_v2',
             channelName: 'مواقيت الصلاة - رفيق',
           );
         }
 
-        // 3. تنبيه بعد الأذان (الإقامة وأذكار ما بعد الصلاة)
         if (afterMins > 0) {
           final afterTime = adhanTime.add(Duration(minutes: afterMins));
           if (afterTime.isAfter(now)) {
             await _scheduleExact(
               id: idCounter++,
-              title: 'إقامة صلاة $name وأذكار ما بعد الصلاة',
-              body: 'مضى $afterMins دقيقة على أذان $name — لا تنسَ أذكار دُبُر الصلاة.',
+              title: 'أذكار ما بعد صلاة $name',
+              body: 'تقبل الله طاعتك يا $userName — لا تنسَ أذكار دُبُر الصلاة.',
               scheduledTime: afterTime,
-              channelId: 'rafiq_prayers_channel',
+              channelId: 'rafiq_prayers_channel_v2',
               channelName: 'مواقيت الصلاة - رفيق',
             );
           }
@@ -174,11 +199,10 @@ class RafiqNotificationsService {
       }
     }
 
-    // 4. الأذكار اليومية المجدولة
     if (prefs.getBool('notif_azkar_morning') ?? true) {
       await scheduleDailyAzkar(
         id: 501,
-        title: 'أذكار الصباح ☀️',
+        title: 'أذكار الصباح يا $userName',
         body: 'حصّن يومك بذكر الله — افتح وِرد الصباح في رفيق',
         hour: prefs.getInt('notif_morning_hour') ?? 6,
         minute: prefs.getInt('notif_morning_min') ?? 30,
@@ -188,7 +212,7 @@ class RafiqNotificationsService {
     if (prefs.getBool('notif_azkar_evening') ?? true) {
       await scheduleDailyAzkar(
         id: 502,
-        title: 'أذكار المساء 🌅',
+        title: 'أذكار المساء يا $userName',
         body: 'أمسينا وأمسى الملك لله — موعد أذكار المساء الآن',
         hour: prefs.getInt('notif_evening_hour') ?? 17,
         minute: prefs.getInt('notif_evening_min') ?? 30,
@@ -198,7 +222,7 @@ class RafiqNotificationsService {
     if (prefs.getBool('notif_azkar_sleep') ?? true) {
       await scheduleDailyAzkar(
         id: 503,
-        title: 'أذكار النوم 🌙',
+        title: 'أذكار النوم يا $userName',
         body: 'اختم يومك بأذكار النوم وسورة الملك',
         hour: prefs.getInt('notif_sleep_hour') ?? 22,
         minute: prefs.getInt('notif_sleep_min') ?? 30,
@@ -208,14 +232,13 @@ class RafiqNotificationsService {
     if (prefs.getBool('notif_quran_wird') ?? true) {
       await scheduleDailyAzkar(
         id: 504,
-        title: 'وِردك القرآني اليومي 📖',
+        title: 'وِردك القرآني اليومي يا $userName',
         body: 'لا تهجر القرآن اليوم — تابع تقدمك في الختمة',
         hour: prefs.getInt('notif_wird_hour') ?? 20,
         minute: prefs.getInt('notif_wird_min') ?? 0,
       );
     }
 
-    // 5. تنبيهات المناسبات الهجرية والأيام البيض
     if (prefs.getBool('notif_hijri_events') ?? true) {
       final hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
       final todayH = HijriCalendar.fromDate(now.add(Duration(days: hijriOffset)));
@@ -245,9 +268,9 @@ class RafiqNotificationsService {
           await _scheduleExact(
             id: eventId++,
             title: 'مناسبة إسلامية: ${ev.$3}',
-            body: 'تذكير من تقويم رفيق الهجري — اغتنم فضل اليوم بالطاعة والذكر.',
+            body: 'تذكير من تقويم الثعلب الهجري يا $userName — اغتنم فضل اليوم.',
             scheduledTime: notifyAt,
-            channelId: 'rafiq_events_channel',
+            channelId: 'rafiq_events_channel_v2',
             channelName: 'المناسبات الهجرية - رفيق',
           );
         }
@@ -288,7 +311,7 @@ class RafiqNotificationsService {
         body,
         tzScheduled,
         details,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
       );
@@ -320,11 +343,11 @@ class RafiqNotificationsService {
       }
 
       const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'rafiq_azkar_channel',
+        'rafiq_azkar_channel_v2',
         'الأذكار اليومية - رفيق',
         channelDescription: 'تذكير بأذكار الصباح والمساء والورد',
         importance: Importance.high,
-        priority: Priority.defaultPriority,
+        priority: Priority.high,
       );
 
       await _plugin.zonedSchedule(
@@ -333,7 +356,7 @@ class RafiqNotificationsService {
         body,
         scheduled,
         const NotificationDetails(android: androidDetails),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
