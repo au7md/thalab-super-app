@@ -2515,4 +2515,464 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
           ),
         ],
       ),
-      body: !_isR
+      body: !_isReady
+          ? const Center(child: CircularProgressIndicator(color: ThalabTheme.foxOrange))
+          : Column(
+              children: [
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _TrimmerTimeBox(
+                          label: 'البداية',
+                          time: _fmtPrecise(_startSec),
+                          cardBg: _cardBg,
+                          borderColor: _borderColor,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _TrimmerTimeBox(
+                          label: 'المحدد',
+                          time: _fmtPrecise(selectedDuration),
+                          cardBg: ThalabTheme.foxOrange.withOpacity(0.12),
+                          borderColor: ThalabTheme.foxOrange,
+                          highlight: true,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _TrimmerTimeBox(
+                          label: 'النهاية',
+                          time: _fmtPrecise(_endSec),
+                          cardBg: _cardBg,
+                          borderColor: _borderColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth - 32;
+                    return GestureDetector(
+                      onHorizontalDragStart: (d) {
+                        final ratio = (d.localPosition.dx / width).clamp(0.0, 1.0);
+                        final distStart = (ratio - startRatio).abs();
+                        final distEnd = (ratio - endRatio).abs();
+                        _draggingHandle = distStart <= distEnd ? 'start' : 'end';
+                      },
+                      onHorizontalDragUpdate: (d) {
+                        final ratio = (d.localPosition.dx / width).clamp(0.0, 1.0);
+                        final sec = ratio * _totalSec;
+                        setState(() {
+                          if (_draggingHandle == 'start') {
+                            _startSec = sec.clamp(0.0, _endSec - 0.3);
+                          } else if (_draggingHandle == 'end') {
+                            _endSec = sec.clamp(_startSec + 0.3, _totalSec);
+                          }
+                        });
+                      },
+                      onHorizontalDragEnd: (_) {
+                        _draggingHandle = null;
+                        _player.seek(Duration(milliseconds: (_startSec * 1000).toInt()));
+                      },
+                      child: Container(
+                        height: 205,
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: _isDark ? const Color(0xFF14181E) : ThalabTheme.darkSlate,
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(color: _borderColor, width: 1.5),
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: List.generate(_waveHeights.length, (i) {
+                                final barRatio = i / _waveHeights.length;
+                                final inRange =
+                                    barRatio >= startRatio && barRatio <= endRatio;
+                                return Container(
+                                  width: 3.5,
+                                  height: 120 * _waveHeights[i],
+                                  decoration: BoxDecoration(
+                                    color: inRange
+                                        ? ThalabTheme.foxOrange
+                                        : Colors.white24,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                );
+                              }),
+                            ),
+                            Align(
+                              alignment: Alignment(-1.0 + (startRatio * 2.0), 0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: ThalabTheme.foxOrange, width: 3),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Container(width: 3, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment(-1.0 + (endRatio * 2.0), 0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Container(width: 3, color: Colors.white),
+                                  ),
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: ThalabTheme.foxOrange, width: 3),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment(-1.0 + (progressRatio * 2.0), 0),
+                              child: Container(
+                                width: 2.5,
+                                height: 170,
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  _fmtPrecise(_currentSec),
+                  style: const TextStyle(
+                      fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'إجمالي المدة: ${_fmtPrecise(_totalSec)}',
+                  style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 13),
+                ),
+                const Spacer(),
+                if (_isProcessing)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 40),
+                    child: CircularProgressIndicator(color: ThalabTheme.foxOrange),
+                  )
+                else
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 26),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _cardBg,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: _borderColor),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _StudioBottomAction(
+                          icon: Icons.delete_sweep_rounded,
+                          label: 'حذف المحدد',
+                          active: true,
+                          activeColor: Colors.redAccent,
+                          onTap: () => _applyInstantEdit('cut'),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.replay_5_rounded, size: 28),
+                          onPressed: () {
+                            final t = (_currentSec - 3).clamp(0.0, _totalSec);
+                            _player.seek(Duration(milliseconds: (t * 1000).toInt()));
+                          },
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            if (_isPlaying) {
+                              _player.pause();
+                            } else {
+                              _player.seek(
+                                  Duration(milliseconds: (_startSec * 1000).toInt()));
+                              _player.play();
+                            }
+                          },
+                          child: Container(
+                            width: 64,
+                            height: 64,
+                            decoration: const BoxDecoration(
+                              color: Colors.redAccent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 36,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.forward_5_rounded, size: 28),
+                          onPressed: () {
+                            final t = (_currentSec + 3).clamp(0.0, _totalSec);
+                            _player.seek(Duration(milliseconds: (t * 1000).toInt()));
+                          },
+                        ),
+                        _StudioBottomAction(
+                          icon: Icons.content_cut_rounded,
+                          label: 'قص الأطراف',
+                          active: true,
+                          activeColor: ThalabTheme.foxOrange,
+                          onTap: () => _applyInstantEdit('keep'),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class _TrimmerTimeBox extends StatelessWidget {
+  final String label;
+  final String time;
+  final Color cardBg;
+  final Color borderColor;
+  final bool highlight;
+
+  const _TrimmerTimeBox({
+    required this.label,
+    required this.time,
+    required this.cardBg,
+    required this.borderColor,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: highlight ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            time,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: highlight ? ThalabTheme.foxOrange : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StudioBottomAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  const _StudioBottomAction({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? activeColor.withOpacity(0.14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: active
+                ? activeColor
+                : (isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: active ? activeColor : ThalabTheme.mutedSlate, size: 22),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                color: active ? activeColor : ThalabTheme.mutedSlate,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopAudioActionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopAudioActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: ThalabTheme.foxOrange.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: ThalabTheme.foxOrange, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RelaxPresetCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RelaxPresetCard({
+    required this.title,
+    required this.icon,
+    this.isSelected = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? ThalabTheme.foxOrange.withOpacity(0.14)
+              : Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? ThalabTheme.foxOrange
+                : (isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder),
+            width: isSelected ? 1.8 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: ThalabTheme.foxOrange, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: isSelected
+                      ? ThalabTheme.foxOrange
+                      : (isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate),
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle_rounded,
+                  color: ThalabTheme.foxOrange, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
