@@ -790,7 +790,7 @@ class _RafiqTabState extends State<RafiqTab> {
         const SizedBox(height: 10),
         InkWell(
           borderRadius: BorderRadius.circular(24),
-          onTap: () => _open(const PrayerTimesScreen()),
+          onTap: () => _open(const PrayerTimesScreen(initialTab: 0)),
           child: Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -895,6 +895,24 @@ class _RafiqTabState extends State<RafiqTab> {
                       ],
                     ),
                   ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _MiniPrayerSlot(name: 'الفجر', time: _formatTime(pt?.fajr), isNext: nextPrayer == Prayer.fajr || nextPrayer == Prayer.none),
+                      _MiniPrayerSlot(name: 'الظهر', time: _formatTime(pt?.dhuhr), isNext: nextPrayer == Prayer.dhuhr),
+                      _MiniPrayerSlot(name: 'العصر', time: _formatTime(pt?.asr), isNext: nextPrayer == Prayer.asr),
+                      _MiniPrayerSlot(name: 'المغرب', time: _formatTime(pt?.maghrib), isNext: nextPrayer == Prayer.maghrib),
+                      _MiniPrayerSlot(name: 'العشاء', time: _formatTime(pt?.isha), isNext: nextPrayer == Prayer.isha),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1035,13 +1053,13 @@ class _RafiqTabState extends State<RafiqTab> {
               title: 'سجل الصلوات',
               subtitle: 'متابعة الفروض الخمس والسنن',
               icon: Icons.fact_check_rounded,
-              onTap: () => _open(const PrayerTimesScreen()),
+              onTap: () => _open(const PrayerTimesScreen(initialTab: 1)),
             ),
             _RafiqServiceCard(
               title: 'تنبيهات الأذان',
-              subtitle: 'إعدادات قبل وبعد كل صلاة',
+              subtitle: 'المؤذن وتنبيهات قبل وبعد الصلاة',
               icon: Icons.alarm_on_rounded,
-              onTap: () => _open(const PrayerTimesScreen()),
+              onTap: () => _open(const PrayerTimesScreen(initialTab: 2)),
             ),
           ],
         ),
@@ -1120,6 +1138,50 @@ class _RafiqServiceCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MiniPrayerSlot extends StatelessWidget {
+  final String name;
+  final String time;
+  final bool isNext;
+
+  const _MiniPrayerSlot({
+    required this.name,
+    required this.time,
+    required this.isNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: isNext ? Colors.white.withOpacity(0.22) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Text(
+            name,
+            style: TextStyle(
+              color: isNext ? Colors.white : Colors.white70,
+              fontSize: 10.5,
+              fontWeight: isNext ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            time.replaceAll(' ص', '').replaceAll(' م', ''),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11.5,
+              fontWeight: isNext ? FontWeight.w900 : FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
