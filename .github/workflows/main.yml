@@ -640,9 +640,12 @@ jobs:
           convert assets/images/app_logo.png -gravity center -crop 78%x78%+0+0 +repage -resize 192x192! -alpha remove -alpha off PNG24:/tmp/ic_launcher.png
           for dir in android/app/src/main/res/mipmap-*; do cp /tmp/ic_launcher.png "$dir/ic_launcher.png"; done
           sed -i 's/@android:color\/white/#FFF8F0/g; s/@android:color\/black/#121316/g' android/app/src/main/res/drawable*/launch_background.xml || true
-          mkdir -p android/app/src/main/res/raw
-          cp assets/audio/adhan/*.mp3 android/app/src/main/res/raw/ || true
           flutter pub get
+
+      - name: Copy Adhan audio to Android raw
+        run: |
+          mkdir -p android/app/src/main/res/raw
+          cp assets/audio/adhan/*.mp3 android/app/src/main/res/raw/
 
       - name: Build Release APK (arm64)
         run: flutter build apk --release --split-per-abi
