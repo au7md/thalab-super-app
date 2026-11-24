@@ -32,6 +32,12 @@ class _TasbihScreenState extends State<TasbihScreen>
   late AnimationController _beadAnimController;
   final List<_TasbihPhraseItem> _customPhrases = [];
 
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardBg => Theme.of(context).cardColor;
+  Color get _innerBg => Theme.of(context).scaffoldBackgroundColor;
+  Color get _borderColor => _isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
+  Color get _textColor => _isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
+
   static const List<_TasbihPhraseItem> _defaultPhrases = [
     _TasbihPhraseItem(text: 'سُبْحَانَ اللَّهِ', target: 33),
     _TasbihPhraseItem(text: 'الْحَمْدُ لِلَّهِ', target: 33),
@@ -158,7 +164,7 @@ class _TasbihScreenState extends State<TasbihScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -185,7 +191,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                 decoration: InputDecoration(
                   hintText: 'اكتب الذكر هنا (مثال: رَبِّ اغْفِرْ لِي وَتُبْ عَلَيَّ)...',
                   filled: true,
-                  fillColor: ThalabTheme.creamBackground,
+                  fillColor: _innerBg,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -206,8 +212,9 @@ class _TasbihScreenState extends State<TasbihScreen>
                     label: Text('$t'),
                     selected: active,
                     selectedColor: ThalabTheme.foxOrange,
+                    backgroundColor: _innerBg,
                     labelStyle: TextStyle(
-                      color: active ? Colors.white : ThalabTheme.darkSlate,
+                      color: active ? Colors.white : _textColor,
                       fontWeight: FontWeight.bold,
                     ),
                     onSelected: (_) => setSheetState(() => selectedTarget = t),
@@ -259,7 +266,7 @@ class _TasbihScreenState extends State<TasbihScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -311,13 +318,13 @@ class _TasbihScreenState extends State<TasbihScreen>
                       '$target تسبيحة',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : ThalabTheme.darkSlate,
+                        color: isSelected ? Colors.white : _textColor,
                       ),
                     ),
                   ),
                   selected: isSelected,
                   selectedColor: ThalabTheme.foxOrange,
-                  backgroundColor: ThalabTheme.creamBackground,
+                  backgroundColor: _innerBg,
                   onSelected: (_) async {
                     await _applyNewTarget(target);
                     if (ctx.mounted) Navigator.pop(ctx);
@@ -336,7 +343,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                     decoration: InputDecoration(
                       hintText: 'أو اكتب هدفاً مخصصاً (مثل 70)...',
                       filled: true,
-                      fillColor: ThalabTheme.creamBackground,
+                      fillColor: _innerBg,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -417,16 +424,16 @@ class _TasbihScreenState extends State<TasbihScreen>
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: selected ? Colors.white : ThalabTheme.darkSlate,
+                        color: selected ? Colors.white : _textColor,
                       ),
                     ),
                     selected: selected,
                     selectedColor: ThalabTheme.foxOrange,
-                    backgroundColor: ThalabTheme.cardSurface,
+                    backgroundColor: _cardBg,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
                       side: BorderSide(
-                        color: selected ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                        color: selected ? ThalabTheme.foxOrange : _borderColor,
                       ),
                     ),
                     onSelected: (_) async {
@@ -453,12 +460,12 @@ class _TasbihScreenState extends State<TasbihScreen>
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
+                color: _cardBg,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: ThalabTheme.softBorder, width: 1.3),
+                border: Border.all(color: _borderColor, width: 1.3),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withOpacity(_isDark ? 0.16 : 0.03),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -473,7 +480,7 @@ class _TasbihScreenState extends State<TasbihScreen>
                       fontSize: 23,
                       fontWeight: FontWeight.bold,
                       height: 1.75,
-                      color: ThalabTheme.darkSlate,
+                      color: _textColor,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -508,9 +515,9 @@ class _TasbihScreenState extends State<TasbihScreen>
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
+                color: _cardBg,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(color: _borderColor),
               ),
               child: Row(
                 children: [
@@ -568,8 +575,8 @@ class _TasbihScreenState extends State<TasbihScreen>
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: ThalabTheme.darkSlate,
-                    side: const BorderSide(color: ThalabTheme.softBorder),
+                    foregroundColor: _textColor,
+                    side: BorderSide(color: _borderColor),
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
@@ -817,12 +824,13 @@ class _StatBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: highlight
             ? ThalabTheme.foxOrange.withOpacity(0.12)
-            : ThalabTheme.creamBackground,
+            : Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -837,7 +845,9 @@ class _StatBadge extends StatelessWidget {
             style: TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.bold,
-              color: highlight ? ThalabTheme.foxOrange : ThalabTheme.darkSlate,
+              color: highlight
+                  ? ThalabTheme.foxOrange
+                  : (isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate),
             ),
           ),
         ],
@@ -861,6 +871,7 @@ class _StyleToggleBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -888,7 +899,9 @@ class _StyleToggleBtn extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.bold,
-                  color: selected ? Colors.white : ThalabTheme.darkSlate,
+                  color: selected
+                      ? Colors.white
+                      : (isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate),
                 ),
               ),
             ),
