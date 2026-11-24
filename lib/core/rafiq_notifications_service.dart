@@ -124,11 +124,15 @@ class RafiqNotificationsService {
     );
   }
 
-  Future<void> sendTestScheduledAdhan({int delaySeconds = 5}) async {
+  Future<void> sendTestScheduledAdhan({
+    int delaySeconds = 5,
+    String? muezzinId,
+  }) async {
     await init();
     final prefs = await SharedPreferences.getInstance();
     final userName = await _getUserName();
-    final muezzinId = prefs.getString('prayer_muezzin_dhuhr') ?? 'mishary_afasy';
+    final selectedMuezzin =
+        muezzinId ?? prefs.getString('prayer_muezzin_dhuhr') ?? 'mishary_afasy';
     final scheduledTime = DateTime.now().add(Duration(seconds: delaySeconds));
 
     await _scheduleExact(
@@ -136,9 +140,9 @@ class RafiqNotificationsService {
       title: 'تجربة الأذان المجدول',
       body: 'أهلاً يا $userName، تم جدولة الأذان وتشغيله بنجاح.',
       scheduledTime: scheduledTime,
-      channelId: 'rafiq_adhan_${muezzinId}_v1',
+      channelId: 'rafiq_adhan_${selectedMuezzin}_v1',
       channelName: 'تجربة الأذان - رفيق',
-      rawSound: muezzinId == 'default' ? null : muezzinId,
+      rawSound: selectedMuezzin == 'default' ? null : selectedMuezzin,
       isAdhan: true,
     );
   }
