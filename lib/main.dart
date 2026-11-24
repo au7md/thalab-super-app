@@ -182,11 +182,11 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'رفيقك اليومي المتكامل',
                   style: TextStyle(
                     fontSize: 14,
-                    color: ThalabTheme.mutedSlate,
+                    color: ThalabTheme.mutedText(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -278,8 +278,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   _currentPage < 3
                       ? TextButton(
                           onPressed: () => _pageController.jumpToPage(3),
-                          child: const Text('تخطي',
-                              style: TextStyle(color: ThalabTheme.mutedSlate)),
+                          child: Text('تخطي',
+                              style: TextStyle(color: ThalabTheme.mutedText(context))),
                         )
                       : const SizedBox.shrink(),
                   Row(
@@ -375,11 +375,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 color: Theme.of(context).textTheme.bodyLarge?.color),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'مساحتك اليومية الهادئة للإنتاجية والذكر وإدارة الوسائط والأدوات الذكية في مكان واحد.',
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontSize: 14, color: ThalabTheme.mutedSlate, height: 1.6),
+                fontSize: 14, color: ThalabTheme.mutedText(context), height: 1.6),
           ),
         ],
       ),
@@ -416,8 +416,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 12),
           Text(desc,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 14, color: ThalabTheme.mutedSlate, height: 1.6)),
+              style: TextStyle(
+                  fontSize: 14, color: ThalabTheme.mutedText(context), height: 1.6)),
         ],
       ),
     );
@@ -1208,19 +1208,19 @@ class _RafiqTabState extends State<RafiqTab> {
                   child: const Icon(Icons.fact_check_rounded, color: ThalabTheme.foxOrange, size: 24),
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('صلاتي — السجل والتنبيهات',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                       Text('متابعة الفروض، السنن، واختيار المؤذن لكل صلاة',
-                          style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11.5)),
+                          style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 11.5)),
                     ],
                   ),
                 ),
-                const Icon(Icons.arrow_forward_ios_rounded,
-                    size: 16, color: ThalabTheme.mutedSlate),
+                Icon(Icons.arrow_forward_ios_rounded,
+                    size: 16, color: ThalabTheme.mutedText(context)),
               ],
             ),
           ),
@@ -1301,7 +1301,7 @@ class _RafiqServiceCard extends StatelessWidget {
               subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
+              style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 10.5),
             ),
           ],
         ),
