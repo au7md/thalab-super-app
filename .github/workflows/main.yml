@@ -646,6 +646,13 @@ jobs:
         run: |
           mkdir -p android/app/src/main/res/raw
           cp assets/audio/adhan/*.mp3 android/app/src/main/res/raw/
+          # Release resource shrinking removes raw sounds that are only
+          # referenced by name at runtime (notification channels). Keep them.
+          cat > android/app/src/main/res/raw/keep.xml << 'KEEPEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources xmlns:tools="http://schemas.android.com/tools"
+              tools:keep="@raw/*" />
+          KEEPEOF
 
       - name: Build Release APK (arm64)
         run: flutter build apk --release --split-per-abi
@@ -653,7 +660,18 @@ jobs:
       - name: Rename APK
         run: mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk build/app/outputs/flutter-apk/Thalab-${{ github.event.inputs.version_tag }}.apk
 
+      # Always keep the built APK as a workflow artifact so branch builds can
+      # be verified without touching any release.
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Thalab-${{ github.event.inputs.version_tag }}-apk
+          path: build/app/outputs/flutter-apk/Thalab-${{ github.event.inputs.version_tag }}.apk
+
+      # Publishing stays exclusive to main so a verification dispatch from a
+      # review branch can never create or overwrite a release.
       - name: Publish to GitHub Releases
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version_tag }}
