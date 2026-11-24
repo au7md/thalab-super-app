@@ -165,7 +165,9 @@ class RafiqNotificationsService {
     final now = DateTime.now();
 
     int idCounter = 100;
-    for (int dayOffset = 0; dayOffset <= 1; dayOffset++) {
+    // Rolling 7-day window; the WorkManager top-up task and app-start sync
+    // keep this window moving forward even if the app is not opened daily.
+    for (int dayOffset = 0; dayOffset <= 7; dayOffset++) {
       final targetDate = now.add(Duration(days: dayOffset));
       final pt = PrayerTimes(coords, DateComponents.from(targetDate), params);
 
@@ -418,6 +420,9 @@ class RafiqNotificationsService {
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
+          // Fixed clock times, so a true daily recurrence is safe and keeps
+          // working without the app being reopened.
+          matchDateTimeComponents: DateTimeComponents.time,
         );
       } catch (_) {
         await _plugin.zonedSchedule(
@@ -429,6 +434,7 @@ class RafiqNotificationsService {
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
         );
       }
     } catch (e) {
