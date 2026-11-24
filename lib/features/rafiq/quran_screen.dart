@@ -595,20 +595,31 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: ThalabTheme.creamBackground,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    'ص $startPage',
-                    style: const TextStyle(
-                      color: ThalabTheme.foxOrange,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12.5,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: ThalabTheme.foxOrange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'ص $startPage',
+                        style: const TextStyle(
+                          color: ThalabTheme.foxOrange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12.5,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: ThalabTheme.mutedSlate,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -979,106 +990,213 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
   }
 
   void _openVerseImageShareDialog(String surahName, int verseNum, String verseText) {
+    int bgIndex = 0;
+    double cardFontSize = 21.0;
+    bool showSurahName = true;
+    bool showAppName = true;
+
+    final List<({String name, List<Color> colors, Color text, Color accent})> themes = [
+      (
+        name: 'كريمي',
+        colors: const [Color(0xFFFFFAF2), Color(0xFFFFEBD6)],
+        text: const Color(0xFF1F1D1A),
+        accent: ThalabTheme.foxOrange,
+      ),
+      (
+        name: 'ليلي',
+        colors: const [Color(0xFF1A1D24), Color(0xFF282E3A)],
+        text: Colors.white,
+        accent: const Color(0xFFF7B267),
+      ),
+      (
+        name: 'زمردي',
+        colors: const [Color(0xFF123524), Color(0xFF1E563B)],
+        text: Colors.white,
+        accent: const Color(0xFFA7F3D0),
+      ),
+      (
+        name: 'سماوي',
+        colors: const [Color(0xFFE0F2FE), Color(0xFFBAE6FD)],
+        text: const Color(0xFF0F172A),
+        accent: const Color(0xFF0369A1),
+      ),
+    ];
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ThalabTheme.cardSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('معاينة بطاقة الآية',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        content: RepaintBoundary(
-          key: _verseCardKey,
-          child: Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFFFAF2), Color(0xFFFFEBD6)],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.foxOrange.withOpacity(0.45), width: 1.5),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final t = themes[bgIndex];
+          return AlertDialog(
+            backgroundColor: ThalabTheme.cardSurface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: const Text(
+              'تخصيص بطاقة الآية',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.menu_book_rounded, color: ThalabTheme.foxOrange, size: 24),
-                const SizedBox(height: 10),
-                Text(
-                  '﴿$verseText﴾',
-                  textAlign: TextAlign.center,
-                  textDirection: TextDirection.rtl,
-                  style: GoogleFonts.amiriQuran(
-                    fontSize: 21,
-                    height: 2.1,
-                    color: const Color(0xFF1F1D1A),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: ThalabTheme.foxOrange.withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'سورة $surahName • آية ${_toArabicDigits(verseNum)}',
-                    style: const TextStyle(
-                      color: ThalabTheme.foxOrange,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RepaintBoundary(
+                    key: _verseCardKey,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: t.colors,
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: t.accent.withOpacity(0.45), width: 1.5),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.menu_book_rounded, color: t.accent, size: 22),
+                          const SizedBox(height: 10),
+                          Text(
+                            '﴿$verseText﴾',
+                            textAlign: TextAlign.center,
+                            textDirection: TextDirection.rtl,
+                            style: GoogleFonts.amiriQuran(
+                              fontSize: cardFontSize,
+                              height: 2.0,
+                              color: t.text,
+                            ),
+                          ),
+                          if (showSurahName) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: t.accent.withOpacity(0.16),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'سورة $surahName • آية ${_toArabicDigits(verseNum)}',
+                                style: TextStyle(
+                                  color: t.accent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (showAppName) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'تطبيق الثعلب • المصحف الشريف',
+                              style: TextStyle(
+                                color: t.text.withOpacity(0.6),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'تطبيق الثعلب • المصحف الشريف',
-                  style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10),
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: List.generate(themes.length, (i) {
+                      final selected = bgIndex == i;
+                      return GestureDetector(
+                        onTap: () => setDialogState(() => bgIndex = i),
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: themes[i].colors),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: selected ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                              width: selected ? 2.5 : 1,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Text('حجم الخط:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Slider(
+                          value: cardFontSize,
+                          min: 16,
+                          max: 28,
+                          activeColor: ThalabTheme.foxOrange,
+                          onChanged: (v) => setDialogState(() => cardFontSize = v),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('إظهار اسم السورة والآية', style: TextStyle(fontSize: 12.5)),
+                    activeColor: ThalabTheme.foxOrange,
+                    value: showSurahName,
+                    onChanged: (v) => setDialogState(() => showSurahName = v),
+                  ),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('إظهار اسم التطبيق', style: TextStyle(fontSize: 12.5)),
+                    activeColor: ThalabTheme.foxOrange,
+                    value: showAppName,
+                    onChanged: (v) => setDialogState(() => showAppName = v),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedSlate)),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ThalabTheme.foxOrange,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-            onPressed: () async {
-              try {
-                final boundary = _verseCardKey.currentContext?.findRenderObject()
-                    as RenderRepaintBoundary?;
-                if (boundary != null) {
-                  final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-                  final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-                  if (byteData != null) {
-                    final tempDir = await getTemporaryDirectory();
-                    final file = File('${tempDir.path}/aya_${surahName.hashCode}_$verseNum.png');
-                    await file.writeAsBytes(byteData.buffer.asUint8List());
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    await Share.shareXFiles(
-                      [XFile(file.path)],
-                      text: 'سورة $surahName • آية ${_toArabicDigits(verseNum)} — تطبيق الثعلب',
-                    );
-                    return;
-                  }
-                }
-              } catch (_) {}
-              if (ctx.mounted) Navigator.pop(ctx);
-              await Share.share(
-                '﴿$verseText﴾\n— سورة $surahName • آية ${_toArabicDigits(verseNum)}',
-              );
-            },
-            icon: const Icon(Icons.share_rounded, size: 18),
-            label: const Text('مشاركة الصورة'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedSlate)),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ThalabTheme.foxOrange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () async {
+                  try {
+                    final boundary = _verseCardKey.currentContext?.findRenderObject()
+                        as RenderRepaintBoundary?;
+                    if (boundary != null) {
+                      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+                      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+                      if (byteData != null) {
+                        final tempDir = await getTemporaryDirectory();
+                        final file = File('${tempDir.path}/aya_${surahName.hashCode}_$verseNum.png');
+                        await file.writeAsBytes(byteData.buffer.asUint8List());
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        await Share.shareXFiles(
+                          [XFile(file.path)],
+                          text: 'سورة $surahName • آية ${_toArabicDigits(verseNum)} — تطبيق الثعلب',
+                        );
+                        return;
+                      }
+                    }
+                  } catch (_) {}
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  await Share.share(
+                    '﴿$verseText﴾\n— سورة $surahName • آية ${_toArabicDigits(verseNum)}',
+                  );
+                },
+                icon: const Icon(Icons.share_rounded, size: 18),
+                label: const Text('مشاركة الصورة'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
