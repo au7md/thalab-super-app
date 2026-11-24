@@ -46,7 +46,7 @@ class ThalabApp extends StatelessWidget {
 }
 
 // =========================================================================
-// شاشة الفتح (Splash Screen) مع أنيميشن هادئ
+// شاشة الفتح (Splash Screen) مع أنيميشن تكبير وتلاشي هادئ
 // =========================================================================
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -55,18 +55,26 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1100),
     );
-    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
+    _scaleAnimation = Tween<double>(begin: 0.82, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
     _controller.forward();
     _checkFirstLaunch();
   }
@@ -74,20 +82,19 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Future<void> _checkFirstLaunch() async {
     final prefs = await SharedPreferences.getInstance();
     final bool isFirst = prefs.getBool('first_launch_v1.7') ?? true;
-    await Future.delayed(const Duration(milliseconds: 2200));
+    await Future.delayed(const Duration(milliseconds: 2000));
     if (!mounted) return;
 
-    if (isFirst) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainShellScreen()),
-      );
-    }
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 450),
+        pageBuilder: (_, __, ___) =>
+            isFirst ? const OnboardingScreen() : const MainShellScreen(),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      ),
+    );
   }
 
   @override
@@ -100,51 +107,62 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ThalabTheme.creamBackground,
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 130,
-                height: 130,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: ThalabTheme.cardSurface,
-                  boxShadow: [
-                    BoxShadow(
-                      color: ThalabTheme.foxOrange.withOpacity(0.12),
-                      blurRadius: 36,
-                      offset: const Offset(0, 8),
+      body: Center(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 126,
+                  height: 126,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: ThalabTheme.foxOrange.withOpacity(0.22),
+                        blurRadius: 32,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/app_logo.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: ThalabTheme.cardSurface,
+                        child: const Icon(
+                          Icons.pets_rounded,
+                          size: 62,
+                          color: ThalabTheme.foxOrange,
+                        ),
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Image.asset('assets/images/app_logo.png', errorBuilder: (_, __, ___) => const Icon(Icons.pets_rounded, size: 68, color: ThalabTheme.foxOrange)),
+                const SizedBox(height: 24),
+                const Text(
+                  'الثَّعْلَب',
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    color: ThalabTheme.darkSlate,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'التَّفَاؤُلُ وَاليَقِينُ',
-                style: TextStyle(
-                  fontSize: 13,
-                  letterSpacing: 2.0,
-                  color: ThalabTheme.mutedSlate,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 6),
+                const Text(
+                  'رفيقك اليومي المتكامل',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: ThalabTheme.mutedSlate,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'الثَّعْلَب',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: ThalabTheme.darkSlate,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
