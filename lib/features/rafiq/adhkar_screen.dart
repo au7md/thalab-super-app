@@ -390,7 +390,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                 hintText: isNamesTab
                     ? 'ابحث باسم من أسماء الله أو معناه...'
                     : 'ابحث في الأذكار أو الأدعية أو الأبواب...',
-                hintStyle: const TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate),
+                hintStyle: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedText(context)),
                 prefixIcon: const Icon(Icons.search_rounded, color: ThalabTheme.foxOrange),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -500,7 +500,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                               ? 'لم تُضف أي أذكار للمفضلة بعد — اضغط على أيقونة القلب لحفظ الذكر'
                               : 'لا توجد نتائج مطابقة لبحثك',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 14),
+                          style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 14),
                         ),
                       ),
                     )
@@ -581,14 +581,14 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                               size: 20,
                                               color: isFav
                                                   ? Colors.redAccent
-                                                  : ThalabTheme.mutedSlate,
+                                                  : ThalabTheme.mutedText(context),
                                             ),
                                             onPressed: () => _toggleFavorite(item.text),
                                           ),
                                           IconButton(
                                             tooltip: 'مشاركة الذكر',
-                                            icon: const Icon(Icons.share_rounded,
-                                                size: 19, color: ThalabTheme.mutedSlate),
+                                            icon: Icon(Icons.share_rounded,
+                                                size: 19, color: ThalabTheme.mutedText(context)),
                                             onPressed: () {
                                               Share.share(
                                                 '${item.text}\n\n(${item.reference}) — تطبيق الثعلب',
@@ -597,8 +597,8 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                           ),
                                           IconButton(
                                             tooltip: 'نسخ الذكر',
-                                            icon: const Icon(Icons.copy_rounded,
-                                                size: 19, color: ThalabTheme.mutedSlate),
+                                            icon: Icon(Icons.copy_rounded,
+                                                size: 19, color: ThalabTheme.mutedText(context)),
                                             onPressed: () {
                                               Clipboard.setData(ClipboardData(text: item.text));
                                               ScaffoldMessenger.of(context).showSnackBar(
@@ -640,10 +640,10 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                             child: Text(
                                               item.reference,
                                               textAlign: TextAlign.center,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 12,
                                                 height: 1.5,
-                                                color: ThalabTheme.mutedSlate,
+                                                color: ThalabTheme.mutedText(context),
                                               ),
                                             ),
                                           ),
@@ -781,10 +781,10 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
                     height: 1.4,
-                    color: ThalabTheme.mutedSlate,
+                    color: ThalabTheme.mutedText(context),
                   ),
                 ),
               ],
