@@ -24,6 +24,12 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
   String _searchQuery = '';
   String _selectedSubChapter = 'الكل';
 
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardBg => Theme.of(context).cardColor;
+  Color get _innerBg => Theme.of(context).scaffoldBackgroundColor;
+  Color get _borderColor => _isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
+  Color get _textColor => _isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
+
   static const List<String> _tabs = [
     'الصباح',
     'المساء',
@@ -225,10 +231,10 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
     }
   }
 
-      void _showNameDetailSheet(dynamic item) {
+  void _showNameDetailSheet(dynamic item) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -339,16 +345,16 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: selected ? Colors.white : ThalabTheme.darkSlate,
+                      color: selected ? Colors.white : _textColor,
                     ),
                   ),
                   selected: selected,
                   selectedColor: ThalabTheme.foxOrange,
-                  backgroundColor: ThalabTheme.cardSurface,
+                  backgroundColor: _cardBg,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                     side: BorderSide(
-                      color: selected ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                      color: selected ? ThalabTheme.foxOrange : _borderColor,
                     ),
                   ),
                   onSelected: (_) {
@@ -399,15 +405,15 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: ThalabTheme.cardSurface,
+                fillColor: _cardBg,
                 contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                  borderSide: BorderSide(color: _borderColor),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                  borderSide: BorderSide(color: _borderColor),
                 ),
               ),
             ),
@@ -429,12 +435,12 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
-                        color: isSubSelected ? Colors.white : ThalabTheme.darkSlate,
+                        color: isSubSelected ? Colors.white : _textColor,
                       ),
                     ),
                     selected: isSubSelected,
                     selectedColor: ThalabTheme.foxOrangeLight,
-                    backgroundColor: ThalabTheme.cardSurface,
+                    backgroundColor: _cardBg,
                     showCheckmark: false,
                     onSelected: (_) {
                       setState(() {
@@ -467,7 +473,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                       child: LinearProgressIndicator(
                         value: items.isEmpty ? 0 : completedCount / items.length,
                         minHeight: 7,
-                        backgroundColor: ThalabTheme.softBorder,
+                        backgroundColor: _borderColor,
                         valueColor: const AlwaysStoppedAnimation(ThalabTheme.foxOrange),
                       ),
                     ),
@@ -519,18 +525,18 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
                                 color: isDone
-                                    ? const Color(0xFFF1F9F4)
-                                    : ThalabTheme.cardSurface,
+                                    ? (_isDark ? const Color(0xFF162B22) : const Color(0xFFF1F9F4))
+                                    : _cardBg,
                                 borderRadius: BorderRadius.circular(28),
                                 border: Border.all(
                                   color: isDone
                                       ? const Color(0xFF2E9E6B)
-                                      : ThalabTheme.softBorder,
+                                      : _borderColor,
                                   width: 1.8,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
+                                    color: Colors.black.withOpacity(_isDark ? 0.18 : 0.04),
                                     blurRadius: 16,
                                     offset: const Offset(0, 6),
                                   ),
@@ -620,7 +626,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                               fontSize: 22,
                                               height: 2.0,
                                               fontWeight: FontWeight.w700,
-                                              color: ThalabTheme.darkSlate,
+                                              color: _textColor,
                                             ),
                                           ),
                                           const SizedBox(height: 16),
@@ -628,7 +634,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 14, vertical: 8),
                                             decoration: BoxDecoration(
-                                              color: ThalabTheme.creamBackground,
+                                              color: _innerBg,
                                               borderRadius: BorderRadius.circular(14),
                                             ),
                                             child: Text(
@@ -754,9 +760,9 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: _cardBg,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: ThalabTheme.softBorder, width: 1.4),
+              border: Border.all(color: _borderColor, width: 1.4),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
