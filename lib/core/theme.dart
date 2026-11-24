@@ -49,6 +49,13 @@ class ThalabTheme {
   static const Color darkTextPrimary = Color(0xFFF3F4F6);
   static const Color darkTextMuted = Color(0xFF9CA3AF);
 
+
+  /// لون النص الثانوي حسب الوضع: رمادي هادئ في النهار، أفتح في الليل.
+  static Color mutedText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? darkTextMuted
+          : mutedSlate;
+
   static ThemeData get lightTheme {
     final baseTextTheme = GoogleFonts.readexProTextTheme();
 
