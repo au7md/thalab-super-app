@@ -21,6 +21,7 @@ import 'features/more/more_hub_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RafiqNotificationsService.instance.init();
+  await ThemeController.instance.load();
   runApp(const ThalabApp());
 }
 
@@ -29,18 +30,25 @@ class ThalabApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'الثعلب',
-      debugShowCheckedModeBanner: false,
-      theme: ThalabTheme.lightTheme,
-      locale: const Locale('ar', 'EG'),
-      supportedLocales: const [Locale('ar', 'EG')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      home: const SplashScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.instance.mode,
+      builder: (_, currentMode, __) {
+        return MaterialApp(
+          title: 'الثعلب',
+          debugShowCheckedModeBanner: false,
+          theme: ThalabTheme.lightTheme,
+          darkTheme: ThalabTheme.darkTheme,
+          themeMode: currentMode,
+          locale: const Locale('ar', 'EG'),
+          supportedLocales: const [Locale('ar', 'EG')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }
@@ -399,68 +407,117 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildSetupPage() {
     return Padding(
       padding: const EdgeInsets.all(28),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Center(
-            child: Text(
-              'دعنا نتعرف عليك',
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: ThalabTheme.darkSlate),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text('الاسم المفضل',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              hintText: 'مثال: أحمد...',
-              filled: true,
-              fillColor: ThalabTheme.cardSurface,
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: ThalabTheme.softBorder)),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text('الجنس لضبط مناداة الواجهة والذكر',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: ChoiceChip(
-                  label: const Center(child: Text('ذكر')),
-                  selected: _gender == 'ذكر',
-                  selectedColor: ThalabTheme.foxOrange,
-                  labelStyle: TextStyle(
-                      color:
-                          _gender == 'ذكر' ? Colors.white : ThalabTheme.darkSlate,
-                      fontWeight: FontWeight.bold),
-                  onSelected: (_) => setState(() => _gender = 'ذكر'),
-                ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Center(
+              child: Text(
+                'دعنا نتعرف عليك',
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: ThalabTheme.darkSlate),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ChoiceChip(
-                  label: const Center(child: Text('أنثى')),
-                  selected: _gender == 'أنثى',
-                  selectedColor: ThalabTheme.foxOrange,
-                  labelStyle: TextStyle(
-                      color:
-                          _gender == 'أنثى' ? Colors.white : ThalabTheme.darkSlate,
-                      fontWeight: FontWeight.bold),
-                  onSelected: (_) => setState(() => _gender = 'أنثى'),
-                ),
+            ),
+            const SizedBox(height: 24),
+            const Text('الاسم المفضل',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                hintText: 'مثال: أحمد...',
+                filled: true,
+                fillColor: ThalabTheme.cardSurface,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: ThalabTheme.softBorder)),
               ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 20),
+            const Text('الجنس لضبط مناداة الواجهة والذكر',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ChoiceChip(
+                    label: const Center(child: Text('ذكر')),
+                    selected: _gender == 'ذكر',
+                    selectedColor: ThalabTheme.foxOrange,
+                    labelStyle: TextStyle(
+                        color:
+                            _gender == 'ذكر' ? Colors.white : ThalabTheme.darkSlate,
+                        fontWeight: FontWeight.bold),
+                    onSelected: (_) => setState(() => _gender = 'ذكر'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ChoiceChip(
+                    label: const Center(child: Text('أنثى')),
+                    selected: _gender == 'أنثى',
+                    selectedColor: ThalabTheme.foxOrange,
+                    labelStyle: TextStyle(
+                        color:
+                            _gender == 'أنثى' ? Colors.white : ThalabTheme.darkSlate,
+                        fontWeight: FontWeight.bold),
+                    onSelected: (_) => setState(() => _gender = 'أنثى'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text('مظهر التطبيق المفضل',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 8),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: ThemeController.instance.mode,
+              builder: (_, mode, __) {
+                final isDark = mode == ThemeMode.dark;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        avatar: Icon(Icons.wb_sunny_rounded,
+                            size: 18,
+                            color: !isDark ? Colors.white : ThalabTheme.foxOrange),
+                        label: const Center(child: Text('الوضع الفاتح')),
+                        selected: !isDark,
+                        selectedColor: ThalabTheme.foxOrange,
+                        labelStyle: TextStyle(
+                          color: !isDark ? Colors.white : ThalabTheme.darkSlate,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        onSelected: (_) =>
+                            ThemeController.instance.setTheme(ThemeMode.light),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ChoiceChip(
+                        avatar: Icon(Icons.nights_stay_rounded,
+                            size: 18,
+                            color: isDark ? Colors.white : ThalabTheme.foxOrange),
+                        label: const Center(child: Text('الوضع الليلي')),
+                        selected: isDark,
+                        selectedColor: ThalabTheme.foxOrange,
+                        labelStyle: TextStyle(
+                          color: isDark ? Colors.white : ThalabTheme.darkSlate,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        onSelected: (_) =>
+                            ThemeController.instance.setTheme(ThemeMode.dark),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
