@@ -27,6 +27,23 @@ echo "$ENTRIES" | while read -r weight hash len; do
   echo "ok $weight ($len bytes, sha256 verified)"
 done
 
+# Amiri / Amiri Quran, pinned by google_fonts 6.3.3 (used by the rafiq
+# screens). Same sha256 + length verification, written to the fonts root.
+AMIRI_ENTRIES="Amiri-Regular.ttf 82b49c37cfb90dd8fff8aab7508c2078bb32a200648acb2237dc02c30f4492ad 403728
+Amiri-Bold.ttf 53c460187d4f6d8fa2bde7a1a6587ca6487f807c31b094037164bb58e3b2bd4c 379988
+AmiriQuran-Regular.ttf 6fb463ac2d53b77b67d274bec99e39a4288a2d0a962437c7b1c1f6e9a9ee799f 318964"
+
+echo "$AMIRI_ENTRIES" | while read -r out hash len; do
+  curl -fsSL -o "$out" "https://fonts.gstatic.com/s/a/${hash}.ttf"
+  actual_hash=$(sha256sum "$out" | cut -d' ' -f1)
+  actual_len=$(stat -c%s "$out")
+  if [ "$actual_hash" != "$hash" ] || [ "$actual_len" != "$len" ]; then
+    echo "CHECKSUM MISMATCH for $out" >&2
+    exit 1
+  fi
+  echo "ok $out ($len bytes, sha256 verified)"
+done
+
 # The golden harness also uses these legacy copies for the synchronous
 # 'ReadexPro' family registration (same typeface, gstatic v27 static cuts).
 curl -fsSL -o ReadexPro-400.ttf 'https://fonts.gstatic.com/s/readexpro/v27/SLXnc1bJ7HE5YDoGPuzj_dh8uc7wUy8ZQQyX2KY8TL0kGZN6blTC4USmgg.ttf'
