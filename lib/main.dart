@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:adhan/adhan.dart';
+import 'package:workmanager/workmanager.dart';
 import 'core/theme.dart';
 import 'core/storage_service.dart';
+import 'core/notification_worker.dart';
 import 'core/rafiq_notifications_service.dart';
 import 'widgets/floating_nav_bar.dart';
 import 'features/rafiq/tasbih_screen.dart';
@@ -22,7 +25,24 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RafiqNotificationsService.instance.init();
   await ThemeController.instance.load();
+  await _registerNotificationTopUp();
   runApp(const ThalabApp());
+}
+
+/// Registers a periodic background task that re-schedules prayer and azkar
+/// notifications, so they keep firing even if the app stays closed for days.
+Future<void> _registerNotificationTopUp() async {
+  try {
+    await Workmanager().initialize(notificationTopUpDispatcher);
+    await Workmanager().registerPeriodicTask(
+      kNotificationTopUpTask,
+      kNotificationTopUpTask,
+      frequency: const Duration(hours: 12),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.update,
+    );
+  } catch (e) {
+    debugPrint('Notification top-up registration error: $e');
+  }
 }
 
 class ThalabApp extends StatelessWidget {
