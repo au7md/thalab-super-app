@@ -52,6 +52,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     'isha': false,
   };
   int _totalPrayerPoints = 0;
+  String _selectedMuezzinId = 'afasy';
 
   // إعدادات التنبيه لكل صلاة (قبل / عند الأذان / بعد الأذان)
   Map<String, bool> _adhanNotifEnabled = {
@@ -190,6 +191,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
       _todayPrayerStatus = loadedStatus;
       _todaySunnahDone = loadedSunnah;
       _totalPrayerPoints = prefs.getInt('total_prayer_points') ?? 0;
+      _selectedMuezzinId = prefs.getString('selected_muezzin_id') ?? 'afasy';
       _adhanNotifEnabled = loadedAdhan;
       _beforeNotifMins = loadedBefore;
       _afterNotifMins = loadedAfter;
@@ -288,7 +290,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
       }
 
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
+        desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
 
@@ -721,7 +723,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
               indicatorSize: TabBarIndicatorSize.tab,
               labelColor: Colors.white,
               unselectedLabelColor: ThalabTheme.darkSlate,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5),
+              labelPadding: EdgeInsets.zero,
               dividerColor: Colors.transparent,
               padding: const EdgeInsets.all(4),
               tabs: const [
@@ -955,7 +958,6 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
       children: [
-        // بطاقة ملخص إنجاز اليوم
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1113,7 +1115,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     );
   }
 
-  /// التبويب الثالث: إعدادات تنبيهات كل صلاة (قبل الأذان / عند الأذان / بعد الأذان)
+  /// التبويب الثالث: إعدادات تنبيهات كل صلاة + اختيار صوت المؤذن
   Widget _buildPrayerNotificationsTab() {
     final prayers = [
       ('fajr', 'صلاة الفجر', Icons.wb_twilight_rounded),
@@ -1145,6 +1147,54 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                   'خصّص تنبيه الاستعداد قبل الأذان، تنبيه الأذان، وتنبيه الإقامة وأذكار ما بعد الصلاة لكل فرض بشكل مستقل.',
                   style: TextStyle(fontSize: 12, height: 1.45),
                 ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(15),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: ThalabTheme.cardSurface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: ThalabTheme.softBorder, width: 1.3),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.record_voice_over_rounded, color: ThalabTheme.foxOrange),
+                  SizedBox(width: 8),
+                  Text('صوت المؤذن المفضل', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: RafiqNotificationsService.muezzins.map((m) {
+                  final selected = _selectedMuezzinId == m.id;
+                  return ChoiceChip(
+                    label: Text(
+                      m.name,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: selected ? Colors.white : ThalabTheme.darkSlate,
+                      ),
+                    ),
+                    selected: selected,
+                    selectedColor: ThalabTheme.foxOrange,
+                    backgroundColor: ThalabTheme.creamBackground,
+                    onSelected: (_) async {
+                      final prefs = await SharedPreferences.getInstance();
+                      setState(() => _selectedMuezzinId = m.id);
+                      await prefs.setString('selected_muezzin_id', m.id);
+                      await _syncNotificationsNow();
+                    },
+                  );
+                }).toList(),
               ),
             ],
           ),
