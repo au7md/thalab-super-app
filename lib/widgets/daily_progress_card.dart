@@ -42,16 +42,19 @@ class DailyProgressCard extends StatelessWidget {
               const Icon(Icons.insights_rounded,
                   color: ThalabTheme.foxOrange, size: 18),
               const SizedBox(width: 6),
-              const Text(
-                'يومك في الثعلب',
-                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+              const Expanded(
+                child: Text(
+                  'يومك في الثعلب',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+                ),
               ),
-              const Spacer(),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(
-                  color: ThalabTheme.foxOrange.withOpacity(0.12),
+                  color: ThalabTheme.foxOrange.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: Text(
