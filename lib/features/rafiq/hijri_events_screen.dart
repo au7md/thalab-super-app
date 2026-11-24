@@ -38,18 +38,22 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
   late TabController _tabController;
   int _hijriOffset = 0;
 
-  // الشهر والسنة المعروضان في شبكة التقويم التفاعلية
   late int _viewHijriYear;
   late int _viewHijriMonth;
   int? _selectedHijriDay;
 
-  // إعدادات الإشعارات الشاملة
   bool _masterNotifEnabled = true;
   bool _morningAzkarNotif = true;
   bool _eveningAzkarNotif = true;
   bool _sleepAzkarNotif = true;
   bool _quranWirdNotif = true;
   bool _hijriEventsNotif = true;
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardBg => Theme.of(context).cardColor;
+  Color get _innerBg => Theme.of(context).scaffoldBackgroundColor;
+  Color get _borderColor => _isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
+  Color get _textColor => _isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
 
   static const List<String> _hijriMonthsAr = [
     'محرم',
@@ -261,9 +265,9 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
           Container(
             margin: const EdgeInsets.fromLTRB(16, 4, 16, 10),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: _cardBg,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: _borderColor),
             ),
             child: TabBar(
               controller: _tabController,
@@ -273,7 +277,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               labelColor: Colors.white,
-              unselectedLabelColor: ThalabTheme.darkSlate,
+              unselectedLabelColor: _textColor,
               labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
               labelPadding: EdgeInsets.zero,
               dividerColor: Colors.transparent,
@@ -300,7 +304,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     );
   }
 
-  /// التبويب الأول: بطاقة التاريخ + ضبط الرؤية + الأيام البيض + المناسبات المرتبة
   Widget _buildEventsList(
     HijriCalendar todayH,
     String todayMonthName,
@@ -425,7 +428,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         Container(
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            color: ThalabTheme.cardSurface,
+            color: _cardBg,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: ThalabTheme.foxOrange.withOpacity(0.35), width: 1.3),
           ),
@@ -505,10 +508,10 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isToday ? ThalabTheme.foxOrange.withOpacity(0.08) : ThalabTheme.cardSurface,
+              color: isToday ? ThalabTheme.foxOrange.withOpacity(0.08) : _cardBg,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isToday ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                color: isToday ? ThalabTheme.foxOrange : _borderColor,
                 width: isToday ? 1.8 : 1.3,
               ),
             ),
@@ -546,13 +549,17 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                       decoration: BoxDecoration(
                         color: isToday
                             ? ThalabTheme.foxOrange
-                            : const Color(0xFF163A38).withOpacity(0.1),
+                            : (_isDark
+                                ? const Color(0xFF235C58).withOpacity(0.35)
+                                : const Color(0xFF163A38).withOpacity(0.1)),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         badgeText,
                         style: TextStyle(
-                          color: isToday ? Colors.white : const Color(0xFF163A38),
+                          color: isToday
+                              ? Colors.white
+                              : (_isDark ? const Color(0xFF7FD1C8) : const Color(0xFF163A38)),
                           fontWeight: FontWeight.bold,
                           fontSize: 11.5,
                         ),
@@ -570,7 +577,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: ThalabTheme.creamBackground,
+                    color: _innerBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -590,7 +597,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     );
   }
 
-  /// التبويب الثاني: شبكة التقويم الهجري والميلادي التفاعلية
   Widget _buildInteractiveCalendarTab(HijriCalendar todayH) {
     final monthName = _hijriMonthsAr[(_viewHijriMonth - 1).clamp(0, 11)];
     final daysInMonth = HijriCalendar().getDaysInMonth(_viewHijriYear, _viewHijriMonth);
@@ -612,9 +618,9 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: ThalabTheme.cardSurface,
+            color: _cardBg,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: ThalabTheme.softBorder, width: 1.3),
+            border: Border.all(color: _borderColor, width: 1.3),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -669,9 +675,9 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: ThalabTheme.cardSurface,
+            color: _cardBg,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: ThalabTheme.softBorder, width: 1.3),
+            border: Border.all(color: _borderColor, width: 1.3),
           ),
           child: Column(
             children: [
@@ -726,14 +732,14 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                         color: isSelected
                             ? ThalabTheme.foxOrange
                             : isToday
-                                ? const Color(0xFF163A38).withOpacity(0.14)
+                                ? const Color(0xFF163A38).withOpacity(_isDark ? 0.45 : 0.14)
                                 : isWhite
-                                    ? ThalabTheme.foxOrange.withOpacity(0.08)
-                                    : ThalabTheme.creamBackground,
+                                    ? ThalabTheme.foxOrange.withOpacity(0.1)
+                                    : _innerBg,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isToday
-                              ? const Color(0xFF163A38)
+                              ? (_isDark ? const Color(0xFF4CA89F) : const Color(0xFF163A38))
                               : hasEvent
                                   ? ThalabTheme.foxOrange
                                   : Colors.transparent,
@@ -748,7 +754,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                             style: TextStyle(
                               fontSize: 13.5,
                               fontWeight: FontWeight.bold,
-                              color: isSelected ? Colors.white : ThalabTheme.darkSlate,
+                              color: isSelected ? Colors.white : _textColor,
                             ),
                           ),
                           Text(
@@ -768,9 +774,12 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _LegendDot(color: const Color(0xFF163A38), label: 'اليوم'),
+                  _LegendDot(
+                    color: _isDark ? const Color(0xFF4CA89F) : const Color(0xFF163A38),
+                    label: 'اليوم',
+                  ),
                   _LegendDot(color: ThalabTheme.foxOrange.withOpacity(0.35), label: 'الأيام البيض'),
-                  _LegendDot(color: ThalabTheme.foxOrange, label: 'مناسبة دينية'),
+                  const _LegendDot(color: ThalabTheme.foxOrange, label: 'مناسبة دينية'),
                 ],
               ),
             ],
@@ -781,9 +790,9 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: ThalabTheme.cardSurface,
+            color: _cardBg,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: ThalabTheme.softBorder, width: 1.3),
+            border: Border.all(color: _borderColor, width: 1.3),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -848,7 +857,6 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     );
   }
 
-  /// التبويب الثالث: مركز الإشعارات والتنبيهات المتكامل
   Widget _buildNotificationsCenterTab() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
@@ -1080,13 +1088,17 @@ class _NotifToggleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: ThalabTheme.cardSurface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: ThalabTheme.softBorder, width: 1.2),
+        border: Border.all(
+          color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
+          width: 1.2,
+        ),
       ),
       child: Row(
         children: [
