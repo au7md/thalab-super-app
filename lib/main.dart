@@ -114,7 +114,6 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ThalabTheme.creamBackground,
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -141,7 +140,7 @@ class _SplashScreenState extends State<SplashScreen>
                       'assets/images/app_logo.png',
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        color: ThalabTheme.cardSurface,
+                        color: Theme.of(context).cardColor,
                         child: const Icon(
                           Icons.pets_rounded,
                           size: 62,
@@ -158,7 +157,6 @@ class _SplashScreenState extends State<SplashScreen>
                     fontSize: 34,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.5,
-                    color: ThalabTheme.darkSlate,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -227,7 +225,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ThalabTheme.creamBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -340,7 +337,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 'assets/images/app_logo.png',
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
-                  color: ThalabTheme.cardSurface,
+                  color: Theme.of(context).cardColor,
                   child: const Icon(Icons.pets_rounded,
                       size: 64, color: ThalabTheme.foxOrange),
                 ),
@@ -348,12 +345,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 36),
-          const Text(
+          Text(
             'مرحباً بك في الثعلب',
             style: TextStyle(
                 fontSize: 25,
                 fontWeight: FontWeight.w900,
-                color: ThalabTheme.darkSlate),
+                color: Theme.of(context).textTheme.bodyLarge?.color),
           ),
           const SizedBox(height: 12),
           const Text(
@@ -377,7 +374,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Container(
             padding: const EdgeInsets.all(26),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: Theme.of(context).cardColor,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
@@ -390,10 +387,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 36),
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
-                  color: ThalabTheme.darkSlate)),
+                  color: Theme.of(context).textTheme.bodyLarge?.color)),
           const SizedBox(height: 12),
           Text(desc,
               textAlign: TextAlign.center,
@@ -405,6 +402,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildSetupPage() {
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
     return Padding(
       padding: const EdgeInsets.all(28),
       child: SingleChildScrollView(
@@ -412,33 +410,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Center(
+            Center(
               child: Text(
                 'دعنا نتعرف عليك',
                 style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    color: ThalabTheme.darkSlate),
+                    color: textColor),
               ),
             ),
             const SizedBox(height: 24),
-            const Text('الاسم المفضل',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text('الاسم المفضل',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
               decoration: InputDecoration(
                 hintText: 'مثال: أحمد...',
                 filled: true,
-                fillColor: ThalabTheme.cardSurface,
+                fillColor: Theme.of(context).cardColor,
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: ThalabTheme.softBorder)),
+                    borderSide: BorderSide(color: Theme.of(context).dividerColor)),
               ),
             ),
             const SizedBox(height: 20),
-            const Text('الجنس لضبط مناداة الواجهة والذكر',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text('الجنس لضبط مناداة الواجهة والذكر',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -448,8 +448,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     selected: _gender == 'ذكر',
                     selectedColor: ThalabTheme.foxOrange,
                     labelStyle: TextStyle(
-                        color:
-                            _gender == 'ذكر' ? Colors.white : ThalabTheme.darkSlate,
+                        color: _gender == 'ذكر' ? Colors.white : textColor,
                         fontWeight: FontWeight.bold),
                     onSelected: (_) => setState(() => _gender = 'ذكر'),
                   ),
@@ -461,8 +460,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     selected: _gender == 'أنثى',
                     selectedColor: ThalabTheme.foxOrange,
                     labelStyle: TextStyle(
-                        color:
-                            _gender == 'أنثى' ? Colors.white : ThalabTheme.darkSlate,
+                        color: _gender == 'أنثى' ? Colors.white : textColor,
                         fontWeight: FontWeight.bold),
                     onSelected: (_) => setState(() => _gender = 'أنثى'),
                   ),
@@ -470,8 +468,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            const Text('مظهر التطبيق المفضل',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text('مظهر التطبيق المفضل',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
             const SizedBox(height: 8),
             ValueListenableBuilder<ThemeMode>(
               valueListenable: ThemeController.instance.mode,
@@ -488,7 +487,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         selected: !isDark,
                         selectedColor: ThalabTheme.foxOrange,
                         labelStyle: TextStyle(
-                          color: !isDark ? Colors.white : ThalabTheme.darkSlate,
+                          color: !isDark ? Colors.white : textColor,
                           fontWeight: FontWeight.bold,
                         ),
                         onSelected: (_) =>
@@ -505,7 +504,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         selected: isDark,
                         selectedColor: ThalabTheme.foxOrange,
                         labelStyle: TextStyle(
-                          color: isDark ? Colors.white : ThalabTheme.darkSlate,
+                          color: isDark ? Colors.white : textColor,
                           fontWeight: FontWeight.bold,
                         ),
                         onSelected: (_) =>
