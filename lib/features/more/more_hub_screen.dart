@@ -222,6 +222,27 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 color: ThalabTheme.foxOrange),
             onPressed: _openDeveloperSheet,
           ),
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: ThemeController.instance.mode,
+            builder: (_, mode, __) {
+              final isDark = mode == ThemeMode.dark;
+              return IconButton(
+                tooltip: isDark ? 'التحويل للوضع الفاتح' : 'التحويل للوضع الليلي',
+                icon: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: Icon(
+                    isDark ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded,
+                    key: ValueKey(isDark),
+                    color: ThalabTheme.foxOrange,
+                  ),
+                ),
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  ThemeController.instance.toggle();
+                },
+              );
+            },
+          ),
           IconButton(
             tooltip: 'الإعدادات',
             icon: const Icon(Icons.settings_rounded, color: ThalabTheme.darkSlate),
@@ -460,7 +481,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: ThalabTheme.softBorder),
               ),
@@ -753,15 +774,18 @@ class _ToolGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: ThalabTheme.cardSurface,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: ThalabTheme.softBorder),
+          border: Border.all(
+            color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
