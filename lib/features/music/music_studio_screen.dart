@@ -553,7 +553,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedSlate)),
+            child: Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedText(context))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -629,7 +629,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedSlate)),
+            child: Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedText(context))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -680,10 +680,10 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
               ],
             ),
             if (_playlists.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
                 child: Text('لا توجد قوائم تشغيل بعد — أنشئ قائمة جديدة الآن',
-                    style: TextStyle(color: ThalabTheme.mutedSlate)),
+                    style: TextStyle(color: ThalabTheme.mutedText(context))),
               )
             else
               ..._playlists.keys.map((plName) {
@@ -769,8 +769,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
             const Text('مؤقت النوم التلقائي',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            const Text('إيقاف التشغيل تلقائياً بعد المدة المحددة',
-                style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 12.5)),
+            Text('إيقاف التشغيل تلقائياً بعد المدة المحددة',
+                style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 12.5)),
             const SizedBox(height: 16),
             Wrap(
               spacing: 10,
@@ -923,8 +923,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                             track.subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: ThalabTheme.mutedSlate, fontSize: 12),
+                            style: TextStyle(
+                                color: ThalabTheme.mutedText(context), fontSize: 12),
                           ),
                         ],
                       ),
@@ -932,7 +932,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     IconButton(
                       icon: Icon(
                         isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        color: isFav ? Colors.redAccent : ThalabTheme.mutedSlate,
+                        color: isFav ? Colors.redAccent : ThalabTheme.mutedText(context),
                       ),
                       onPressed: () async {
                         await _toggleFavorite(track.id);
@@ -948,7 +948,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.share_rounded, color: ThalabTheme.mutedSlate),
+                      icon: Icon(Icons.share_rounded, color: ThalabTheme.mutedText(context)),
                       onPressed: () => Share.shareXFiles([XFile(track.path)]),
                     ),
                   ],
@@ -972,7 +972,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(_fmtDur(_position),
-                          style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+                          style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context))),
                       if (_sleepSecondsLeft > 0)
                         Text('مؤقت نشط: ${_fmtSec(_sleepSecondsLeft)}',
                             style: const TextStyle(
@@ -980,7 +980,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                 color: ThalabTheme.foxOrange,
                                 fontWeight: FontWeight.bold)),
                       Text(_fmtDur(_duration),
-                          style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+                          style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context))),
                     ],
                   ),
                 ),
@@ -992,7 +992,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     IconButton(
                       icon: Icon(
                         Icons.shuffle_rounded,
-                        color: _isShuffle ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+                        color: _isShuffle ? ThalabTheme.foxOrange : ThalabTheme.mutedText(context),
                       ),
                       onPressed: () {
                         setState(() => _isShuffle = !_isShuffle);
@@ -1058,7 +1058,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                             : Icons.repeat_rounded,
                         color: _loopMode != LoopMode.off
                             ? ThalabTheme.foxOrange
-                            : ThalabTheme.mutedSlate,
+                            : ThalabTheme.mutedText(context),
                       ),
                       onPressed: () {
                         setState(() {
@@ -1158,9 +1158,9 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
               ],
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'يبدأ تشغيل صوتياتك تلقائياً مع مؤقت عد تنازلي لإيقاف الصوت بهدوء:',
-              style: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate),
+              style: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedText(context)),
             ),
             const SizedBox(height: 16),
             GridView.count(
@@ -1308,7 +1308,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     Icons.bedtime_rounded,
                     color: _sleepSecondsLeft > 0
                         ? ThalabTheme.foxOrange
-                        : ThalabTheme.mutedSlate,
+                        : ThalabTheme.mutedText(context),
                   ),
                   onPressed: _openSleepTimerSheet,
                 ),
@@ -1353,7 +1353,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     decoration: InputDecoration(
                       hintText: 'ابحث بالاسم أو المجلد أو التسجيل...',
                       hintStyle:
-                          const TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate),
+                          TextStyle(fontSize: 12.5, color: ThalabTheme.mutedText(context)),
                       prefixIcon:
                           const Icon(Icons.search_rounded, color: ThalabTheme.foxOrange),
                       suffixIcon: _searchQuery.isNotEmpty
@@ -1430,9 +1430,9 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Text(
+                                      Text(
                                         'لا توجد ملفات صوتية في هذا القسم',
-                                        style: TextStyle(color: ThalabTheme.mutedSlate),
+                                        style: TextStyle(color: ThalabTheme.mutedText(context)),
                                       ),
                                       const SizedBox(height: 12),
                                       OutlinedButton.icon(
@@ -1529,9 +1529,9 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                                     '${track.folder} • ${_fmtSec(track.durationSeconds)}',
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontSize: 11,
-                                                      color: ThalabTheme.mutedSlate,
+                                                      color: ThalabTheme.mutedText(context),
                                                     ),
                                                   ),
                                                 ],
@@ -1545,14 +1545,14 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                                 size: 20,
                                                 color: isFav
                                                     ? Colors.redAccent
-                                                    : ThalabTheme.mutedSlate,
+                                                    : ThalabTheme.mutedText(context),
                                               ),
                                               onPressed: () => _toggleFavorite(track.id),
                                             ),
                                             PopupMenuButton<String>(
-                                              icon: const Icon(Icons.more_vert_rounded,
+                                              icon: Icon(Icons.more_vert_rounded,
                                                   size: 20,
-                                                  color: ThalabTheme.mutedSlate),
+                                                  color: ThalabTheme.mutedText(context)),
                                               color: _cardBg,
                                               onSelected: (val) async {
                                                 if (val == 'trim') _openAudioEditor(track);
@@ -1740,8 +1740,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   Widget _buildFoldersView() {
     final folders = _folderGroups.keys.toList();
     if (folders.isEmpty) {
-      return const Center(
-        child: Text('لا توجد مجلدات صوتية', style: TextStyle(color: ThalabTheme.mutedSlate)),
+      return Center(
+        child: Text('لا توجد مجلدات صوتية', style: TextStyle(color: ThalabTheme.mutedText(context))),
       );
     }
     return ListView.separated(
@@ -1768,7 +1768,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
             ),
             title: Text(folder, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('$count ملف صوتي'),
-            trailing: const Icon(Icons.chevron_right_rounded, color: ThalabTheme.mutedSlate),
+            trailing: Icon(Icons.chevron_right_rounded, color: ThalabTheme.mutedText(context)),
             onTap: () => setState(() => _selectedFolderName = folder),
           ),
         );
@@ -1796,11 +1796,11 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
         ),
         const SizedBox(height: 12),
         if (names.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 30),
             child: Center(
               child: Text('لا توجد قوائم تشغيل بعد',
-                  style: TextStyle(color: ThalabTheme.mutedSlate)),
+                  style: TextStyle(color: ThalabTheme.mutedText(context))),
             ),
           )
         else
@@ -2188,18 +2188,18 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                   ],
                 ),
                 const SizedBox(height: 2),
-                const Text(
+                Text(
                   'تُحفظ تلقائياً في مجلد الهاتف: Music/Thalab Recordings',
-                  style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                  style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 11),
                 ),
               ],
             ),
           ),
           Expanded(
             child: _savedRecordings.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text('لا توجد تسجيلات محفوظة بعد',
-                        style: TextStyle(color: ThalabTheme.mutedSlate)),
+                        style: TextStyle(color: ThalabTheme.mutedText(context))),
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
@@ -2252,8 +2252,8 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     _formatFileDate(file),
-                                    style: const TextStyle(
-                                        color: ThalabTheme.mutedSlate, fontSize: 11),
+                                    style: TextStyle(
+                                        color: ThalabTheme.mutedText(context), fontSize: 11),
                                   ),
                                 ],
                               ),
@@ -2279,8 +2279,8 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                             ),
                             IconButton(
                               tooltip: 'مشاركة',
-                              icon: const Icon(Icons.share_rounded,
-                                  color: ThalabTheme.mutedSlate, size: 20),
+                              icon: Icon(Icons.share_rounded,
+                                  color: ThalabTheme.mutedText(context), size: 20),
                               onPressed: () => Share.shareXFiles([XFile(file.path)]),
                             ),
                             IconButton(
@@ -2494,7 +2494,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
         actions: [
           IconButton(
             tooltip: 'إعادة ضبط التحديد',
-            icon: const Icon(Icons.restore_rounded, color: ThalabTheme.mutedSlate),
+            icon: Icon(Icons.restore_rounded, color: ThalabTheme.mutedText(context)),
             onPressed: () {
               setState(() {
                 _startSec = 0.0;
@@ -2675,7 +2675,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'إجمالي المدة: ${_fmtPrecise(_totalSec)}',
-                  style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 13),
+                  style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 13),
                 ),
                 const Spacer(),
                 if (_isProcessing)
@@ -2786,7 +2786,7 @@ class _TrimmerTimeBox extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 10.5,
-              color: highlight ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+              color: highlight ? ThalabTheme.foxOrange : ThalabTheme.mutedText(context),
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -2840,14 +2840,14 @@ class _StudioBottomAction extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: active ? activeColor : ThalabTheme.mutedSlate, size: 22),
+            Icon(icon, color: active ? activeColor : ThalabTheme.mutedText(context), size: 22),
             const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.bold,
-                color: active ? activeColor : ThalabTheme.mutedSlate,
+                color: active ? activeColor : ThalabTheme.mutedText(context),
               ),
             ),
           ],
@@ -2906,7 +2906,7 @@ class _TopAudioActionCard extends StatelessWidget {
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
+                    style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 10.5),
                   ),
                 ],
               ),
