@@ -619,6 +619,12 @@ class _RafiqTabState extends State<RafiqTab> {
     params.madhab = Madhab.shafi;
     final pt = PrayerTimes(Coordinates(lat, lng), DateComponents.from(DateTime.now()), params);
 
+    RafiqNotificationsService.instance.syncAllScheduledNotifications(
+      lat: lat,
+      lng: lng,
+      params: params,
+    );
+
     if (!mounted) return;
     setState(() {
       _khatmahRead = prefs.getInt('khatmah_pages_read') ?? 0;
