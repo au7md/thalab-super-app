@@ -2054,7 +2054,7 @@ class _InfoLine extends StatelessWidget {
             width: 105,
             child: Text(
               '$label:',
-              style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 13),
+              style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 13),
             ),
           ),
           Expanded(
