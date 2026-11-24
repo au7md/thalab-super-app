@@ -458,7 +458,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                       isMonOrThu
                           ? 'اليوم يُستحب صيامه (سنة الإثنين والخميس)'
                           : 'صيام ثلاثة أيام من كل شهر يعدل صيام الدهر كله',
-                      style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                      style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context)),
                     ),
                   ],
                 ),
@@ -539,7 +539,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                           ),
                           Text(
                             '${event.day} $eventMonthName • يوافق ${_formatGregorianAr(gTarget)}',
-                            style: const TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate),
+                            style: TextStyle(fontSize: 11, color: ThalabTheme.mutedText(context)),
                           ),
                         ],
                       ),
@@ -582,9 +582,9 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                   ),
                   child: Text(
                     event.virtue,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11.5,
-                      color: ThalabTheme.mutedSlate,
+                      color: ThalabTheme.mutedText(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -648,7 +648,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                   ),
                   Text(
                     'يوافق ${_gregorianMonthsAr[firstDayGregorian.month - 1]} ${firstDayGregorian.year} م',
-                    style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                    style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context)),
                   ),
                 ],
               ),
@@ -688,10 +688,10 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                         child: Center(
                           child: Text(
                             d,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: ThalabTheme.mutedSlate,
+                              color: ThalabTheme.mutedText(context),
                             ),
                           ),
                         ),
@@ -761,7 +761,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                             '${gDate.day}',
                             style: TextStyle(
                               fontSize: 9.5,
-                              color: isSelected ? Colors.white70 : ThalabTheme.mutedSlate,
+                              color: isSelected ? Colors.white70 : ThalabTheme.mutedText(context),
                             ),
                           ),
                         ],
@@ -846,9 +846,9 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                   style: TextStyle(fontSize: 13, color: ThalabTheme.foxOrange, fontWeight: FontWeight.bold),
                 )
               else
-                const Text(
+                Text(
                   'يوم عادي من الشهر الهجري — اغتنمه بالذكر وتلاوة الورد القرآني.',
-                  style: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate),
+                  style: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedText(context)),
                 ),
             ],
           ),
@@ -1067,7 +1067,7 @@ class _LegendDot extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 5),
-        Text(label, style: const TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
+        Text(label, style: TextStyle(fontSize: 11, color: ThalabTheme.mutedText(context))),
       ],
     );
   }
@@ -1118,7 +1118,7 @@ class _NotifToggleCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text(subtitle, style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+                Text(subtitle, style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context))),
               ],
             ),
           ),
