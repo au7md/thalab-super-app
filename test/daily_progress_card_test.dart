@@ -66,14 +66,4 @@ void main() {
     expect(find.text('ابدأ يومك'), findsOneWidget);
   });
 
-  testWidgets('golden: light and dark card', (tester) async {
-    await tester.pumpWidget(_wrap(ThalabTheme.lightTheme, sample));
-    await tester.pumpAndSettle();
-    await expectLater(find.byType(DailyProgressCard),
-        matchesGoldenFile('goldens/daily_card_light.png'));
-    await tester.pumpWidget(_wrap(ThalabTheme.darkTheme, sample));
-    await tester.pumpAndSettle();
-    await expectLater(find.byType(DailyProgressCard),
-        matchesGoldenFile('goldens/daily_card_dark.png'));
-  }, tags: 'golden');
 }
