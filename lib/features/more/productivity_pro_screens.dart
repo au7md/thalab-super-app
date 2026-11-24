@@ -253,7 +253,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
               IconButton(
                 iconSize: 30,
                 tooltip: 'إعادة ضبط',
-                icon: const Icon(Icons.refresh_rounded, color: ThalabTheme.mutedSlate),
+                icon: Icon(Icons.refresh_rounded, color: ThalabTheme.mutedText(context)),
                 onPressed: () => _isWorkMode
                     ? _selectWorkMinutes(_selectedWorkMin)
                     : _selectBreakMinutes(_selectedBreakMin),
@@ -557,8 +557,8 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.backspace_outlined,
-                        color: ThalabTheme.mutedSlate),
+                    icon: Icon(Icons.backspace_outlined,
+                        color: ThalabTheme.mutedText(context)),
                     onPressed: () {
                       if (_enteredPin.isNotEmpty) {
                         setState(() => _enteredPin =
@@ -584,7 +584,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
               Icons.fingerprint_rounded,
               color: _biometricEnabled
                   ? ThalabTheme.foxOrange
-                  : ThalabTheme.mutedSlate,
+                  : ThalabTheme.mutedText(context),
             ),
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
@@ -606,9 +606,9 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
       body: Stack(
         children: [
           _notes.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text('الخزنة فارغة — اضغط على القلم بالأسفل لإضافة ملاحظة',
-                      style: TextStyle(color: ThalabTheme.mutedSlate)),
+                      style: TextStyle(color: ThalabTheme.mutedText(context))),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
@@ -647,8 +647,8 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                           if ((n['body'] ?? '').toString().isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(n['body'],
-                                style: const TextStyle(
-                                    color: ThalabTheme.mutedSlate, height: 1.4)),
+                                style: TextStyle(
+                                    color: ThalabTheme.mutedText(context), height: 1.4)),
                           ],
                           const SizedBox(height: 8),
                           Text(n['date'] ?? '',
