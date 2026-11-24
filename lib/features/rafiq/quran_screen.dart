@@ -215,8 +215,8 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('بداية ورد اليوم',
-                              style: TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
+                          Text('بداية ورد اليوم',
+                              style: TextStyle(fontSize: 11, color: ThalabTheme.mutedText(context))),
                           Text(
                             '${quran.getSurahNameArabic(startData['surah'])} : ${startData['start']}',
                             style: TextStyle(
@@ -231,7 +231,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text('نهاية الورد (ص $wirdEndPage)',
-                              style: const TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
+                              style: TextStyle(fontSize: 11, color: ThalabTheme.mutedText(context))),
                           Text(
                             '${quran.getSurahNameArabic(endData['surah'])} : ${endData['end']}',
                             style: TextStyle(
@@ -252,7 +252,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                 ),
                 Text(
                   'المتبقي لإنهاء الختمة: $estimatedDaysLeft يوماً ($_completedPagesCount / 604 صفحة)',
-                  style: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                  style: TextStyle(fontSize: 12, color: ThalabTheme.mutedText(context)),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -343,10 +343,10 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _textColor)),
             const SizedBox(height: 12),
             if (sorted.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Text('لا توجد علامات مرجعية محفوظة بعد',
-                    style: TextStyle(color: ThalabTheme.mutedSlate)),
+                    style: TextStyle(color: ThalabTheme.mutedText(context))),
               )
             else
               Wrap(
@@ -609,7 +609,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                       ),
                       Text(
                         '$place • $versesCount آية',
-                        style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                        style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context)),
                       ),
                     ],
                   ),
@@ -633,10 +633,10 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Icon(
+                    Icon(
                       Icons.arrow_forward_ios_rounded,
                       size: 14,
-                      color: ThalabTheme.mutedSlate,
+                      color: ThalabTheme.mutedText(context),
                     ),
                   ],
                 ),
@@ -699,7 +699,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                       ),
                       Text(
                         'يبدأ من سورة ${quran.getSurahNameArabic(firstSurah)} (آية $firstVerse)',
-                        style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                        style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context)),
                       ),
                     ],
                   ),
@@ -821,8 +821,8 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('لاحقاً (قراءة بالإنترنت)',
-                style: TextStyle(color: ThalabTheme.mutedSlate)),
+            child: Text('لاحقاً (قراءة بالإنترنت)',
+                style: TextStyle(color: ThalabTheme.mutedText(context))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -908,7 +908,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedSlate)),
+            child: Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedText(context))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1210,7 +1210,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedSlate)),
+                child: Text('إلغاء', style: TextStyle(color: ThalabTheme.mutedText(context))),
               ),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
@@ -1531,10 +1531,10 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
               children: [
                 const Icon(Icons.wifi_off_rounded, size: 46, color: ThalabTheme.foxOrange),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'تعذر تحميل صورة الصفحة لعدم توفر اتصال بالإنترنت.\nيمكنك التبديل الفوري إلى النص العثماني (أميري) أو تنزيل الصفحات عند توفر الشبكة.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13.5, height: 1.6, color: ThalabTheme.mutedSlate),
+                  style: TextStyle(fontSize: 13.5, height: 1.6, color: ThalabTheme.mutedText(context)),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
@@ -1829,10 +1829,10 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
   Widget _buildSearchBody(BuildContext context) {
     final normQuery = _normalizeArabic(query);
     if (normQuery.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'اكتب اسم السورة أو جزءاً من آية للبحث الفوري',
-          style: TextStyle(color: ThalabTheme.mutedSlate),
+          style: TextStyle(color: ThalabTheme.mutedText(context)),
         ),
       );
     }
@@ -1871,8 +1871,8 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
     }
 
     if (matches.isEmpty) {
-      return const Center(
-        child: Text('لا توجد نتائج مطابقة لبحثك', style: TextStyle(color: ThalabTheme.mutedSlate)),
+      return Center(
+        child: Text('لا توجد نتائج مطابقة لبحثك', style: TextStyle(color: ThalabTheme.mutedText(context))),
       );
     }
 
@@ -1917,7 +1917,7 @@ class _QuranSmartSearchDelegate extends SearchDelegate<void> {
                         item.subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 12),
+                        style: TextStyle(color: ThalabTheme.mutedText(context), fontSize: 12),
                       ),
                     ],
                   ),
