@@ -407,7 +407,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                               : _innerBg,
                           leading: Icon(
                             Icons.location_city_rounded,
-                            color: isSelected ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+                            color: isSelected ? ThalabTheme.foxOrange : ThalabTheme.mutedText(context),
                           ),
                           title: Text(
                             fullLabel,
@@ -848,7 +848,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                   children: [
                     Icon(
                       p['icon'] as IconData,
-                      color: isNext ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+                      color: isNext ? ThalabTheme.foxOrange : ThalabTheme.mutedText(context),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -865,7 +865,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                           ),
                           Text(
                             '${p['fard']} • ${p['sunnahCount']}',
-                            style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                            style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context)),
                           ),
                         ],
                       ),
@@ -993,7 +993,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                       ),
                       Text(
                         'الفروض: $completedFardCount / 5  •  السنن: $completedSunnahCount / 5',
-                        style: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                        style: TextStyle(fontSize: 12, color: ThalabTheme.mutedText(context)),
                       ),
                     ],
                   ),
@@ -1067,7 +1067,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                           status > 0
                               ? Icons.check_circle_rounded
                               : Icons.radio_button_unchecked_rounded,
-                          color: status > 0 ? const Color(0xFF1B8A5A) : ThalabTheme.mutedSlate,
+                          color: status > 0 ? const Color(0xFF1B8A5A) : ThalabTheme.mutedText(context),
                           size: 22,
                         ),
                         const SizedBox(width: 8),
@@ -1083,8 +1083,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     ),
                     Text(
                       _formatTime(time),
-                      style: const TextStyle(
-                        color: ThalabTheme.mutedSlate,
+                      style: TextStyle(
+                        color: ThalabTheme.mutedText(context),
                         fontWeight: FontWeight.bold,
                         fontSize: 12.5,
                       ),
@@ -1268,7 +1268,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                   adhanOn ? 'مفعّل • $muezzinName' : 'الأذان متوقف',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                  style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context)),
                 ),
                 trailing: Switch(
                   value: adhanOn,
@@ -1288,7 +1288,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     style: TextStyle(color: _textColor, fontSize: 13),
                     decoration: InputDecoration(
                       labelText: 'تنبيه الاستعداد قبل الأذان',
-                      labelStyle: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                      labelStyle: TextStyle(fontSize: 12, color: ThalabTheme.mutedText(context)),
                       filled: true,
                       fillColor: _innerBg,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1323,7 +1323,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     style: TextStyle(color: _textColor, fontSize: 13),
                     decoration: InputDecoration(
                       labelText: 'صوت المؤذن لهذه الصلاة',
-                      labelStyle: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                      labelStyle: TextStyle(fontSize: 12, color: ThalabTheme.mutedText(context)),
                       filled: true,
                       fillColor: _innerBg,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1353,7 +1353,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                     style: TextStyle(color: _textColor, fontSize: 13),
                     decoration: InputDecoration(
                       labelText: 'تنبيه الإقامة وأذكار بعد الصلاة',
-                      labelStyle: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+                      labelStyle: TextStyle(fontSize: 12, color: ThalabTheme.mutedText(context)),
                       filled: true,
                       fillColor: _innerBg,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1449,7 +1449,7 @@ class _NaflRow extends StatelessWidget {
               Text(title,
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: textColor)),
               const SizedBox(height: 2),
-              Text(subtitle, style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+              Text(subtitle, style: TextStyle(fontSize: 11.5, color: ThalabTheme.mutedText(context))),
             ],
           ),
         ),
