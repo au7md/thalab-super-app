@@ -1066,6 +1066,7 @@ class _RafiqTabState extends State<RafiqTab> {
         ),
         const SizedBox(height: 14),
         GridView.count(
+          padding: EdgeInsets.zero,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: 2,
