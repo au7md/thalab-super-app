@@ -14,12 +14,16 @@ class ThalabFloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       height: 70,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFFFFF), Color(0xFFFFF8F0)],
+        gradient: LinearGradient(
+          colors: isDark
+              ? const [Color(0xFF1E2025), Color(0xFF16171B)]
+              : const [Color(0xFFFFFFFF), Color(0xFFFFF8F0)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -36,23 +40,29 @@ class ThalabFloatingNavBar extends StatelessWidget {
             offset: const Offset(0, 3),
           ),
         ],
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(
+          color: isDark ? ThalabTheme.darkBorder : Colors.white,
+          width: 2,
+        ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildItem(0, 'رفيق', isRafiq: true, icon: Icons.nights_stay_rounded),
-          _buildItem(1, 'المعرض', icon: Icons.movie_creation_rounded),
-          _buildItem(2, 'الموسيقى', icon: Icons.music_note_rounded),
-          _buildItem(3, 'المزيد', icon: Icons.grid_view_rounded),
+          _buildItem(context, 0, 'رفيق', isRafiq: true, icon: Icons.nights_stay_rounded),
+          _buildItem(context, 1, 'المعرض', icon: Icons.movie_creation_rounded),
+          _buildItem(context, 2, 'الموسيقى', icon: Icons.music_note_rounded),
+          _buildItem(context, 3, 'المزيد', icon: Icons.grid_view_rounded),
         ],
       ),
     );
   }
 
-  Widget _buildItem(int idx, String label,
+  Widget _buildItem(BuildContext context, int idx, String label,
       {required IconData icon, bool isRafiq = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final active = idx == currentIndex;
+    final inactiveColor = isDark ? Colors.white70 : ThalabTheme.darkSlate;
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -97,7 +107,7 @@ class ThalabFloatingNavBar extends StatelessWidget {
                       children: [
                         Icon(
                           Icons.pets_rounded,
-                          color: active ? Colors.white : ThalabTheme.darkSlate,
+                          color: active ? Colors.white : inactiveColor,
                           size: 22,
                         ),
                         Positioned(
@@ -115,7 +125,7 @@ class ThalabFloatingNavBar extends StatelessWidget {
                     )
                   : Icon(
                       icon,
-                      color: active ? Colors.white : ThalabTheme.darkSlate,
+                      color: active ? Colors.white : inactiveColor,
                       size: 23,
                     ),
             ),
