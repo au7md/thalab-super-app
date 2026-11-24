@@ -78,6 +78,12 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   int _sleepSecondsLeft = 0;
   String _activeRelaxLabel = '';
 
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardBg => Theme.of(context).cardColor;
+  Color get _innerBg => Theme.of(context).scaffoldBackgroundColor;
+  Color get _borderColor => _isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
+  Color get _textColor => _isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
+
   static const List<String> _tabs = [
     'كل الصوتيات',
     'المجلدات',
@@ -96,6 +102,16 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     );
     _studioChannel.setMethodCallHandler((call) async {
       if (call.method == 'onMediaAction') {
+        if (call.arguments is Map) {
+          final map = call.arguments as Map;
+          final action = map['action']?.toString() ?? '';
+          if (action == 'seekTo') {
+            final posMs = (map['positionMs'] as num?)?.toInt() ?? 0;
+            await _player.seek(Duration(milliseconds: posMs));
+            _pushMediaNotification();
+          }
+          return;
+        }
         final action = call.arguments?.toString() ?? '';
         if (action == 'play_pause') {
           _isPlaying ? _player.pause() : _player.play();
@@ -103,11 +119,30 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
           _playNext();
         } else if (action == 'prev') {
           _playPrevious();
+        } else if (action == 'rewind_10') {
+          final target = (_position.inSeconds - 10).clamp(0, 99999);
+          await _player.seek(Duration(seconds: target));
+          _pushMediaNotification();
+        } else if (action == 'forward_10') {
+          await _player.seek(Duration(seconds: _position.inSeconds + 10));
+          _pushMediaNotification();
         }
       }
     });
     _bindPlayerStreams();
     _loadAudioLibrary(restoreLastSession: true);
+  }
+
+  void _pushMediaNotification() {
+    if (_currentIndex < 0 || _currentIndex >= _allTracks.length) return;
+    final track = _allTracks[_currentIndex];
+    _studioChannel.invokeMethod('updateMediaNotification', {
+      'title': track.title,
+      'subtitle': track.subtitle,
+      'isPlaying': _isPlaying,
+      'durationMs': _duration.inMilliseconds,
+      'positionMs': _position.inMilliseconds,
+    });
   }
 
   void _bindPlayerStreams() {
@@ -121,16 +156,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
         _discController.stop();
         _savePlaybackCheckpoint();
       }
-      if (_currentIndex >= 0 && _currentIndex < _allTracks.length) {
-        final track = _allTracks[_currentIndex];
-        _studioChannel.invokeMethod('updateMediaNotification', {
-          'title': track.title,
-          'subtitle': track.subtitle,
-          'isPlaying': playing,
-          'durationMs': _duration.inMilliseconds,
-          'positionMs': _position.inMilliseconds,
-        });
-      }
+      _pushMediaNotification();
       if (state.processingState == ProcessingState.completed) {
         _handleTrackCompleted();
       }
@@ -444,7 +470,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     final ids = _selectedTrackIds.toList();
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -510,7 +536,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: ThalabTheme.cardSurface,
+        backgroundColor: _cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('إعادة تسمية الملف',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -518,7 +544,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
           controller: ctrl,
           decoration: InputDecoration(
             filled: true,
-            fillColor: ThalabTheme.creamBackground,
+            fillColor: _innerBg,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none,
@@ -585,7 +611,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: ThalabTheme.cardSurface,
+        backgroundColor: _cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Text('قائمة تشغيل جديدة',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -594,7 +620,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
           decoration: InputDecoration(
             hintText: 'مثال: تلاوات خاشعة، تركيز، سفر...',
             filled: true,
-            fillColor: ThalabTheme.creamBackground,
+            fillColor: _innerBg,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none,
@@ -630,7 +656,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   void _openAddToPlaylistSheet(ThalabAudioTrack track) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -732,7 +758,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   void _openSleepTimerSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -757,12 +783,13 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                   label: Text(
                     mins == 0 ? 'إيقاف المؤقت' : '$mins دقيقة',
                     style: TextStyle(
-                      color: active ? Colors.white : ThalabTheme.darkSlate,
+                      color: active ? Colors.white : _textColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   selected: active,
                   selectedColor: ThalabTheme.foxOrange,
+                  backgroundColor: _innerBg,
                   onSelected: (_) {
                     _startRelaxOrSleepSession(mins, 'مؤقت النوم', autoPlay: false);
                     Navigator.pop(ctx);
@@ -781,7 +808,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: ThalabTheme.creamBackground,
+      backgroundColor: _innerBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
@@ -801,7 +828,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                   width: 44,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: ThalabTheme.softBorder,
+                    color: _borderColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -867,8 +894,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                         child: Container(
                           width: 62,
                           height: 62,
-                          decoration: const BoxDecoration(
-                            color: ThalabTheme.creamBackground,
+                          decoration: BoxDecoration(
+                            color: _innerBg,
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.music_note_rounded,
@@ -934,7 +961,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                   min: 0,
                   max: maxMs,
                   activeColor: ThalabTheme.foxOrange,
-                  inactiveColor: ThalabTheme.softBorder,
+                  inactiveColor: _borderColor,
                   onChanged: (v) {
                     _player.seek(Duration(milliseconds: v.toInt()));
                     setSheetState(() {});
@@ -1063,11 +1090,12 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: active ? Colors.white : ThalabTheme.darkSlate,
+                            color: active ? Colors.white : _textColor,
                           ),
                         ),
                         selected: active,
                         selectedColor: ThalabTheme.foxOrange,
+                        backgroundColor: _cardBg,
                         onSelected: (_) async {
                           setState(() => _playbackSpeed = sp);
                           await _player.setSpeed(sp);
@@ -1098,7 +1126,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   void _openFocusRelaxSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: ThalabTheme.cardSurface,
+      backgroundColor: _cardBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -1262,6 +1290,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                 PopupMenuButton<String>(
                   tooltip: 'ترتيب الصوتيات',
                   icon: const Icon(Icons.sort_rounded, color: ThalabTheme.foxOrange),
+                  color: _cardBg,
                   onSelected: (v) => setState(() => _sortBy = v),
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'newest', child: Text('الترتيب: الأحدث إضافة')),
@@ -1338,15 +1367,15 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                             )
                           : null,
                       filled: true,
-                      fillColor: ThalabTheme.cardSurface,
+                      fillColor: _cardBg,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(18),
-                        borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                        borderSide: BorderSide(color: _borderColor),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(18),
-                        borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                        borderSide: BorderSide(color: _borderColor),
                       ),
                     ),
                   ),
@@ -1367,12 +1396,18 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.bold,
-                            color: active ? Colors.white : ThalabTheme.darkSlate,
+                            color: active ? Colors.white : _textColor,
                           ),
                         ),
                         selected: active,
                         selectedColor: ThalabTheme.foxOrange,
-                        backgroundColor: ThalabTheme.cardSurface,
+                        backgroundColor: _cardBg,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          side: BorderSide(
+                            color: active ? ThalabTheme.foxOrange : _borderColor,
+                          ),
+                        ),
                         onSelected: (_) {
                           setState(() {
                             _selectedTab = idx;
@@ -1443,12 +1478,12 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                               ? ThalabTheme.foxOrange.withOpacity(0.18)
                                               : isCurrent
                                                   ? ThalabTheme.foxOrange.withOpacity(0.1)
-                                                  : ThalabTheme.cardSurface,
+                                                  : _cardBg,
                                           borderRadius: BorderRadius.circular(18),
                                           border: Border.all(
                                             color: (isSelected || isCurrent)
                                                 ? ThalabTheme.foxOrange
-                                                : ThalabTheme.softBorder,
+                                                : _borderColor,
                                           ),
                                         ),
                                         child: Row(
@@ -1487,7 +1522,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                                       fontSize: 13.5,
                                                       color: isCurrent
                                                           ? ThalabTheme.foxOrange
-                                                          : ThalabTheme.darkSlate,
+                                                          : _textColor,
                                                     ),
                                                   ),
                                                   const SizedBox(height: 2),
@@ -1519,6 +1554,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                               icon: const Icon(Icons.more_vert_rounded,
                                                   size: 20,
                                                   color: ThalabTheme.mutedSlate),
+                                              color: _cardBg,
                                               onSelected: (val) async {
                                                 if (val == 'trim') _openAudioEditor(track);
                                                 if (val == 'playlist') {
@@ -1636,8 +1672,9 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                 margin: const EdgeInsets.fromLTRB(14, 0, 14, 92),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: ThalabTheme.darkSlate,
+                  color: _isDark ? ThalabTheme.darkCard : ThalabTheme.darkSlate,
                   borderRadius: BorderRadius.circular(22),
+                  border: _isDark ? Border.all(color: ThalabTheme.darkBorder) : null,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.22),
@@ -1717,9 +1754,9 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
         final count = _folderGroups[folder]!.length;
         return Container(
           decoration: BoxDecoration(
-            color: ThalabTheme.cardSurface,
+            color: _cardBg,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: ThalabTheme.softBorder),
+            border: Border.all(color: _borderColor),
           ),
           child: ListTile(
             leading: Container(
@@ -1773,9 +1810,9 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
+                color: _cardBg,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(color: _borderColor),
               ),
               child: ListTile(
                 leading: const Icon(Icons.queue_music_rounded,
@@ -1799,7 +1836,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
 }
 
 // =========================================================================
-// المسجل الصوتي الاحترافي (عداد فوري + موجة حية + تاريخ ووقت كل تسجيل)
+// المسجل الصوتي الاحترافي
 // =========================================================================
 class _ProVoiceRecorderScreen extends StatefulWidget {
   const _ProVoiceRecorderScreen();
@@ -1824,6 +1861,11 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
   final List<double> _waveBars = List<double>.filled(32, 0.16);
   final List<int> _bookmarksSec = [];
   List<File> _savedRecordings = [];
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardBg => Theme.of(context).cardColor;
+  Color get _borderColor => _isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
+  Color get _textColor => _isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
 
   @override
   void initState() {
@@ -2000,9 +2042,9 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: _cardBg,
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: ThalabTheme.softBorder, width: 1.5),
+              border: Border.all(color: _borderColor, width: 1.5),
             ),
             child: Column(
               children: [
@@ -2045,9 +2087,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                         height:
                             _isRecording && !_isPaused ? (52 * val).clamp(8.0, 52.0) : 10,
                         decoration: BoxDecoration(
-                          color: _isRecording
-                              ? ThalabTheme.foxOrange
-                              : ThalabTheme.softBorder,
+                          color: _isRecording ? ThalabTheme.foxOrange : _borderColor,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
@@ -2087,7 +2127,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                           _isPaused
                               ? Icons.play_circle_filled_rounded
                               : Icons.pause_circle_filled_rounded,
-                          color: ThalabTheme.darkSlate,
+                          color: _textColor,
                           size: 38,
                         ),
                         onPressed: _togglePause,
@@ -2175,9 +2215,9 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
-                          color: ThalabTheme.cardSurface,
+                          color: _cardBg,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: ThalabTheme.softBorder),
+                          border: Border.all(color: _borderColor),
                         ),
                         child: Row(
                           children: [
@@ -2266,7 +2306,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
 }
 
 // =========================================================================
-// استوديو التحرير بالسحب المباشر على الموجة + تنفيذ فوري للمعاينة
+// استوديو التحرير المطور (مقابض بارزة + بطاقات وقت منفصلة + معاينة فورية)
 // =========================================================================
 class AudioTrimmerStudioScreen extends StatefulWidget {
   final String filePath;
@@ -2298,9 +2338,13 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
   double _startSec = 0.0;
   double _endSec = 10.0;
   double _currentSec = 0.0;
-  String? _draggingHandle; // 'start' | 'end' | null
+  String? _draggingHandle;
 
   late List<double> _waveHeights;
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _cardBg => Theme.of(context).cardColor;
+  Color get _borderColor => _isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
 
   @override
   void initState() {
@@ -2368,7 +2412,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
       final ok = await _studioChannel.invokeMethod<bool>('processAudioEdit', {
             'srcPath': _workingPath,
             'dstPath': nextTemp,
-            'mode': mode, // 'keep' or 'cut'
+            'mode': mode,
             'startMs': (_startSec * 1000).toInt(),
             'endMs': (_endSec * 1000).toInt(),
           }) ??
@@ -2437,6 +2481,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
     final startRatio = (_startSec / _totalSec).clamp(0.0, 1.0);
     final endRatio = (_endSec / _totalSec).clamp(0.0, 1.0);
     final progressRatio = (_currentSec / _totalSec).clamp(0.0, 1.0);
+    final selectedDuration = (_endSec - _startSec).clamp(0.0, _totalSec);
 
     return Scaffold(
       appBar: AppBar(
@@ -2448,6 +2493,17 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
         leadingWidth: 70,
         title: const Text('تحرير وقص الصوت'),
         actions: [
+          IconButton(
+            tooltip: 'إعادة ضبط التحديد',
+            icon: const Icon(Icons.restore_rounded, color: ThalabTheme.mutedSlate),
+            onPressed: () {
+              setState(() {
+                _startSec = 0.0;
+                _endSec = _totalSec;
+              });
+              _player.seek(Duration.zero);
+            },
+          ),
           TextButton(
             onPressed: _isProcessing ? null : _saveFinalFile,
             child: Text(
@@ -2464,29 +2520,45 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
           ? const Center(child: CircularProgressIndicator(color: ThalabTheme.foxOrange))
           : Column(
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
+                // بطاقات الوقت المنفصلة (البداية | المدة المختارة | النهاية)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('البداية: ${_fmtPrecise(_startSec)}',
-                          style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: ThalabTheme.foxOrange)),
-                      const Text('اسحب المقابض على الموجة مباشرة',
-                          style: TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate)),
-                      Text('النهاية: ${_fmtPrecise(_endSec)}',
-                          style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: ThalabTheme.foxOrange)),
+                      Expanded(
+                        child: _TrimmerTimeBox(
+                          label: 'البداية',
+                          time: _fmtPrecise(_startSec),
+                          cardBg: _cardBg,
+                          borderColor: _borderColor,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _TrimmerTimeBox(
+                          label: 'المحدد',
+                          time: _fmtPrecise(selectedDuration),
+                          cardBg: ThalabTheme.foxOrange.withOpacity(0.12),
+                          borderColor: ThalabTheme.foxOrange,
+                          highlight: true,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _TrimmerTimeBox(
+                          label: 'النهاية',
+                          time: _fmtPrecise(_endSec),
+                          cardBg: _cardBg,
+                          borderColor: _borderColor,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 14),
 
+                // منطقة الموجة الصوتية التفاعلية بمقابض سحب بارزة
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final width = constraints.maxWidth - 32;
@@ -2513,12 +2585,13 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                         _player.seek(Duration(milliseconds: (_startSec * 1000).toInt()));
                       },
                       child: Container(
-                        height: 190,
+                        height: 205,
                         margin: const EdgeInsets.symmetric(horizontal: 16),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
                         decoration: BoxDecoration(
-                          color: ThalabTheme.darkSlate,
-                          borderRadius: BorderRadius.circular(24),
+                          color: _isDark ? const Color(0xFF14181E) : ThalabTheme.darkSlate,
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(color: _borderColor, width: 1.5),
                         ),
                         child: Stack(
                           alignment: Alignment.center,
@@ -2531,7 +2604,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                                     barRatio >= startRatio && barRatio <= endRatio;
                                 return Container(
                                   width: 3.5,
-                                  height: 125 * _waveHeights[i],
+                                  height: 120 * _waveHeights[i],
                                   decoration: BoxDecoration(
                                     color: inRange
                                         ? ThalabTheme.foxOrange
@@ -2541,28 +2614,48 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                                 );
                               }),
                             ),
-                            // مقبض البداية
+                            // مقبض البداية برأس دائري بارز
                             Align(
                               alignment: Alignment(-1.0 + (startRatio * 2.0), 0),
-                              child: Container(
-                                width: 4,
-                                height: 155,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: ThalabTheme.foxOrange, width: 3),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Container(width: 3, color: Colors.white),
+                                  ),
+                                ],
                               ),
                             ),
-                            // مقبض النهاية
+                            // مقبض النهاية برأس دائري بارز
                             Align(
                               alignment: Alignment(-1.0 + (endRatio * 2.0), 0),
-                              child: Container(
-                                width: 4,
-                                height: 155,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Container(width: 3, color: Colors.white),
+                                  ),
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: ThalabTheme.foxOrange, width: 3),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             // مؤشر التشغيل الأحمر
@@ -2570,7 +2663,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                               alignment: Alignment(-1.0 + (progressRatio * 2.0), 0),
                               child: Container(
                                 width: 2.5,
-                                height: 160,
+                                height: 170,
                                 color: Colors.redAccent,
                               ),
                             ),
@@ -2580,7 +2673,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                     );
                   },
                 ),
-                const SizedBox(height: 26),
+                const SizedBox(height: 22),
 
                 Text(
                   _fmtPrecise(_currentSec),
@@ -2589,7 +2682,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'المدة الحالية: ${_fmtPrecise(_totalSec)}',
+                  'إجمالي المدة: ${_fmtPrecise(_totalSec)}',
                   style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 13),
                 ),
                 const Spacer(),
@@ -2600,8 +2693,14 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                     child: CircularProgressIndicator(color: ThalabTheme.foxOrange),
                   )
                 else
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 34),
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 26),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _cardBg,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: _borderColor),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -2613,7 +2712,7 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                           onTap: () => _applyInstantEdit('cut'),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.replay_5_rounded, size: 30),
+                          icon: const Icon(Icons.replay_5_rounded, size: 28),
                           onPressed: () {
                             final t = (_currentSec - 3).clamp(0.0, _totalSec);
                             _player.seek(Duration(milliseconds: (t * 1000).toInt()));
@@ -2630,8 +2729,8 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                             }
                           },
                           child: Container(
-                            width: 68,
-                            height: 68,
+                            width: 64,
+                            height: 64,
                             decoration: const BoxDecoration(
                               color: Colors.redAccent,
                               shape: BoxShape.circle,
@@ -2639,12 +2738,12 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
                             child: Icon(
                               _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                               color: Colors.white,
-                              size: 38,
+                              size: 36,
                             ),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.forward_5_rounded, size: 30),
+                          icon: const Icon(Icons.forward_5_rounded, size: 28),
                           onPressed: () {
                             final t = (_currentSec + 3).clamp(0.0, _totalSec);
                             _player.seek(Duration(milliseconds: (t * 1000).toInt()));
@@ -2666,6 +2765,55 @@ class _AudioTrimmerStudioScreenState extends State<AudioTrimmerStudioScreen> {
   }
 }
 
+class _TrimmerTimeBox extends StatelessWidget {
+  final String label;
+  final String time;
+  final Color cardBg;
+  final Color borderColor;
+  final bool highlight;
+
+  const _TrimmerTimeBox({
+    required this.label,
+    required this.time,
+    required this.cardBg,
+    required this.borderColor,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: highlight ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            time,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: highlight ? ThalabTheme.foxOrange : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StudioBottomAction extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -2683,16 +2831,19 @@ class _StudioBottomAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: active ? activeColor.withOpacity(0.14) : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: active ? activeColor : ThalabTheme.softBorder,
+            color: active
+                ? activeColor
+                : (isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder),
           ),
         ),
         child: Column(
@@ -2703,7 +2854,7 @@ class _StudioBottomAction extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: FontWeight.bold,
                 color: active ? activeColor : ThalabTheme.mutedSlate,
               ),
@@ -2734,15 +2885,18 @@ class _TopAudioActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: ThalabTheme.cardSurface,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: ThalabTheme.softBorder),
+          border: Border.all(
+            color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
+          ),
         ),
         child: Row(
           children: [
@@ -2792,6 +2946,7 @@ class _RelaxPresetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
@@ -2800,10 +2955,12 @@ class _RelaxPresetCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? ThalabTheme.foxOrange.withOpacity(0.14)
-              : ThalabTheme.creamBackground,
+              : Theme.of(context).scaffoldBackgroundColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+            color: isSelected
+                ? ThalabTheme.foxOrange
+                : (isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder),
             width: isSelected ? 1.8 : 1.0,
           ),
         ),
@@ -2817,7 +2974,9 @@ class _RelaxPresetCard extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
-                  color: isSelected ? ThalabTheme.foxOrange : ThalabTheme.darkSlate,
+                  color: isSelected
+                      ? ThalabTheme.foxOrange
+                      : (isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate),
                 ),
               ),
             ),
