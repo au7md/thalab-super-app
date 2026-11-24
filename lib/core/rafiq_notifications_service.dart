@@ -21,11 +21,21 @@ class RafiqNotificationsService {
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
-  static const List<MuezzinOption> muezzins = [
-    MuezzinOption('afasy', 'الشيخ مشاري العفاسي', 'أذان هادئ وعذب'),
-    MuezzinOption('qatami', 'الشيخ ناصر القطامي', 'نبرة خاشعة ومميزة'),
-    MuezzinOption('dosari', 'الشيخ ياسر الدوسري', 'أذان الحرم المكي'),
-    MuezzinOption('abdulbasit', 'الشيخ عبد الباسط عبد الصمد', 'الأذان الكلاسيكي الأصيل'),
+  static const List<MuezzinOption> fajrMuezzins = [
+    MuezzinOption('fajr_egypt', 'أذان الفجر — مصر', 'نبرة الفجر المصرية الأصيلة'),
+    MuezzinOption('fajr_kuwait', 'أذان الفجر — الكويت', 'أذان الفجر الكويتي الهادئ'),
+    MuezzinOption('default', 'تنبيه النظام الافتراضي', 'نغمة إشعار قياسية'),
+  ];
+
+  static const List<MuezzinOption> generalMuezzins = [
+    MuezzinOption('mishary_afasy', 'الشيخ مشاري العفاسي', 'أذان هادئ وعذب'),
+    MuezzinOption('nasser_qatami', 'الشيخ ناصر القطامي', 'نبرة خاشعة ومميزة'),
+    MuezzinOption('haram', 'أذان الحرم المكي', 'روحانية المسجد الحرام'),
+    MuezzinOption('abdul_basit', 'الشيخ عبد الباسط عبد الصمد', 'الأذان الكلاسيكي الأصيل'),
+    MuezzinOption('mustafa_ismail', 'الشيخ مصطفى إسماعيل', 'مقامات مصرية عريقة'),
+    MuezzinOption('hamad_daghreeri', 'الشيخ حمد الدغريري', 'أداء ندي ومؤثر'),
+    MuezzinOption('hamza_majali', 'الشيخ حمزة المجالي', 'صوت جهوري خاشع'),
+    MuezzinOption('nour_maghribi', 'الشيخ نور الدين المغربي', 'أداء مغربي متميز'),
     MuezzinOption('default', 'تنبيه النظام الافتراضي', 'نغمة إشعار قياسية'),
   ];
 
@@ -127,10 +137,6 @@ class RafiqNotificationsService {
     if (!masterEnabled) return;
 
     final userName = await _getUserName();
-    final selectedMuezzin = prefs.getString('selected_muezzin_id') ?? 'afasy';
-    final muezzinName = muezzins
-        .firstWhere((m) => m.id == selectedMuezzin, orElse: () => muezzins.first)
-        .name;
 
     final coords = Coordinates(lat, lng);
     final now = DateTime.now();
@@ -157,6 +163,13 @@ class RafiqNotificationsService {
         final beforeMins = prefs.getInt('prayer_notif_${key}_before') ?? 0;
         final afterMins = prefs.getInt('prayer_notif_${key}_after') ?? 0;
 
+        final defaultMuezzin = key == 'fajr' ? 'fajr_egypt' : 'mishary_afasy';
+        final prayerMuezzinId = prefs.getString('prayer_muezzin_$key') ?? defaultMuezzin;
+        final muezzinList = key == 'fajr' ? fajrMuezzins : generalMuezzins;
+        final muezzinName = muezzinList
+            .firstWhere((m) => m.id == prayerMuezzinId, orElse: () => muezzinList.first)
+            .name;
+
         if (beforeMins > 0) {
           final beforeTime = adhanTime.subtract(Duration(minutes: beforeMins));
           if (beforeTime.isAfter(now)) {
@@ -178,8 +191,10 @@ class RafiqNotificationsService {
             title: 'حان الآن موعد أذان $name$fajrNote',
             body: 'أقم صلاتك يا $userName ($muezzinName)',
             scheduledTime: adhanTime,
-            channelId: 'rafiq_prayers_channel_v2',
-            channelName: 'مواقيت الصلاة - رفيق',
+            channelId: 'rafiq_adhan_${prayerMuezzinId}_v1',
+            channelName: 'أذان $name - $muezzinName',
+            rawSound: prayerMuezzinId == 'default' ? null : prayerMuezzinId,
+            isAdhan: true,
           );
         }
 
@@ -285,6 +300,8 @@ class RafiqNotificationsService {
     required DateTime scheduledTime,
     required String channelId,
     required String channelName,
+    String? rawSound,
+    bool isAdhan = false,
   }) async {
     if (!_initialized || scheduledTime.isBefore(DateTime.now())) return;
     try {
@@ -295,8 +312,11 @@ class RafiqNotificationsService {
         channelName,
         channelDescription: 'تنبيهات واحة رفيق الإيمانية',
         importance: Importance.max,
-        priority: Priority.high,
+        priority: Priority.max,
         playSound: true,
+        sound: rawSound != null ? RawResourceAndroidNotificationSound(rawSound) : null,
+        audioAttributesUsage:
+            isAdhan ? AudioAttributesUsage.alarm : AudioAttributesUsage.notification,
         enableVibration: true,
       );
 
