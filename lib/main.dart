@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -879,9 +878,13 @@ class _RafiqTabState extends State<RafiqTab> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'رفيق — الواحة الإيمانية',
-              style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+            const Expanded(
+              child: Text(
+                'رفيق — الواحة الإيمانية',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+              ),
             ),
             IconButton(
               tooltip: 'منظومة الإشعارات والتنبيهات',
@@ -955,30 +958,39 @@ class _RafiqTabState extends State<RafiqTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(pVisual.skyIcon, color: Colors.white, size: 18),
-                            const SizedBox(width: 6),
-                            Text(
-                              'الصلاة القادمة: ${_arabicPrayerName(nextPrayer)}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(pVisual.skyIcon, color: Colors.white, size: 18),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'الصلاة القادمة: ${_arabicPrayerName(nextPrayer)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'موعد الأذان: ${_formatTime(nextTime)} • ${pVisual.periodBadge}',
-                          style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
-                        ),
-                      ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'موعد الأذان: ${_formatTime(nextTime)} • ${pVisual.periodBadge}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -1009,11 +1021,11 @@ class _RafiqTabState extends State<RafiqTab> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _MiniPrayerSlot(name: 'الفجر', time: _formatTime(pt?.fajr), isNext: nextPrayer == Prayer.fajr || nextPrayer == Prayer.none),
-                      _MiniPrayerSlot(name: 'الظهر', time: _formatTime(pt?.dhuhr), isNext: nextPrayer == Prayer.dhuhr),
-                      _MiniPrayerSlot(name: 'العصر', time: _formatTime(pt?.asr), isNext: nextPrayer == Prayer.asr),
-                      _MiniPrayerSlot(name: 'المغرب', time: _formatTime(pt?.maghrib), isNext: nextPrayer == Prayer.maghrib),
-                      _MiniPrayerSlot(name: 'العشاء', time: _formatTime(pt?.isha), isNext: nextPrayer == Prayer.isha),
+                      Expanded(child: Center(child: _MiniPrayerSlot(name: 'الفجر', time: _formatTime(pt?.fajr), isNext: nextPrayer == Prayer.fajr || nextPrayer == Prayer.none))),
+                      Expanded(child: Center(child: _MiniPrayerSlot(name: 'الظهر', time: _formatTime(pt?.dhuhr), isNext: nextPrayer == Prayer.dhuhr))),
+                      Expanded(child: Center(child: _MiniPrayerSlot(name: 'العصر', time: _formatTime(pt?.asr), isNext: nextPrayer == Prayer.asr))),
+                      Expanded(child: Center(child: _MiniPrayerSlot(name: 'المغرب', time: _formatTime(pt?.maghrib), isNext: nextPrayer == Prayer.maghrib))),
+                      Expanded(child: Center(child: _MiniPrayerSlot(name: 'العشاء', time: _formatTime(pt?.isha), isNext: nextPrayer == Prayer.isha))),
                     ],
                   ),
                 ),
@@ -1059,12 +1071,16 @@ class _RafiqTabState extends State<RafiqTab> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            timely.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: Text(
+                              timely.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -1122,7 +1138,7 @@ class _RafiqTabState extends State<RafiqTab> {
           crossAxisCount: 2,
           mainAxisSpacing: 10,
           crossAxisSpacing: 10,
-          childAspectRatio: 1.38,
+          childAspectRatio: 1.3,
           children: [
             _RafiqServiceCard(
               title: 'المصحف الشريف',
@@ -1280,7 +1296,7 @@ class _RafiqServiceCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
             Text(
               subtitle,
               maxLines: 1,
