@@ -23,6 +23,8 @@
 
     <!-- البصمة / القفل -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
         android:label="الثعلب"
@@ -67,6 +69,23 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- تشغيل الأذان كاملاً (خدمة أمامية) وجدولته -->
+        <service
+            android:name="com.au7md.thalab_app.AdhanService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <receiver
+            android:name="com.au7md.thalab_app.AdhanReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="com.au7md.thalab_app.AdhanBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
     <queries>
