@@ -31,6 +31,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   late TabController _tabController;
   PrayerTimes? _prayerTimes;
   String? _prayerTimesDateKey;
+  int debugCalcCount = 0;
+  String? get debugPrayerTimesDateKey => _prayerTimesDateKey;
+  DateTime? get debugFajrTime => _prayerTimes?.fajr;
   Coordinates _coords = Coordinates(30.0444, 31.2357);
   String _locationLabel = 'القاهرة، مصر';
   String _locationMode = 'أوفلاين';
@@ -234,6 +237,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   }
 
   void _calculatePrayerTimes() {
+    debugCalcCount++;
     final params = CalculationMethod.egyptian.getParameters();
     params.madhab = Madhab.shafi;
     final date = DateComponents.from(clock.now());
