@@ -74,6 +74,13 @@ void main() {
       expect(st.debugTomorrowFajr as DateTime,
           isNot(todayFajr.add(const Duration(days: 1))));
       expect((st.debugTomorrowFajr as DateTime).day, 26);
+
+      // Behavioral: the rendered hero must show tomorrow's exact fajr, marked
+      // as tomorrow, with the matching countdown (22:30 -> 04:58 = 6:28:00).
+      expect(find.text('الصلاة القادمة: الفجر'), findsOneWidget);
+      expect(find.text('موعد الأذان: 4:58 ص غدًا • نسائم الفجر'), findsOneWidget);
+      expect(find.text('06:28:00'), findsOneWidget);
+      expect(find.textContaining('موعد الأذان: 4:57'), findsNothing);
     });
   });
 
@@ -84,6 +91,10 @@ void main() {
       final st = tester.state(find.byType(RafiqTab)) as dynamic;
       final exact = _cairoTimes(DateTime(2026, 11, 26)).fajr;
       expect(st.debugTomorrowFajr as DateTime, exact);
+
+      // Behavioral: home hero shows the exact time, marked as tomorrow.
+      expect(find.text('الصلاة القادمة: الفجر'), findsOneWidget);
+      expect(find.text('موعد الأذان: 4:58 ص غدًا • نسائم الفجر'), findsOneWidget);
     });
   });
 }
