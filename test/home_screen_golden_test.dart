@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:clock/clock.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -71,6 +73,21 @@ Future<void> _loadRealFonts() async {
   final icons = FontLoader('MaterialIcons')
     ..addFont(Future.value(ByteData.view(iconBytes.buffer)));
   await icons.load();
+
+  // Amiri / Amiri Quran (dhikr and quran screens): register the pinned
+  // bytes directly so glyphs are present before the first frame instead of
+  // racing the google_fonts runtime fetch during a golden capture.
+  for (final entry in {
+    'Amiri': ['Amiri-Regular.ttf', 'Amiri-Bold.ttf'],
+    'AmiriQuran': ['AmiriQuran-Regular.ttf'],
+  }.entries) {
+    final loader = FontLoader(entry.key);
+    for (final file in entry.value) {
+      final bytes = File('test/fonts/$file').readAsBytesSync();
+      loader.addFont(Future.value(ByteData.view(bytes.buffer)));
+    }
+    await loader.load();
+  }
 }
 
 /// Pins every theme text style to the synchronously-loaded ReadexPro family
@@ -116,12 +133,23 @@ void _mockPluginChannels() {
     const MethodChannel('dexterous.com/flutter/local_notifications'),
     (call) async {
       if (call.method == 'pendingNotificationRequests') return <dynamic>[];
+      // bool-returning plugin calls must not get null (init crashes).
+      if (call.method == 'initialize' ||
+          call.method == 'requestNotificationsPermission' ||
+          call.method == 'requestExactAlarmsPermission' ||
+          call.method == 'canScheduleExactNotifications') return true;
       return null;
     },
   );
   messenger.setMockMethodCallHandler(
     const MethodChannel('plugins.flutter.io/path_provider'),
-    (call) async => '/tmp/gfonts',
+    (call) async {
+      // google_fonts caches fetched fonts under this directory; it must
+      // exist on a clean machine or the async font save races throw
+      // PathNotFoundException mid-test.
+      Directory('/tmp/gfonts').createSync(recursive: true);
+      return '/tmp/gfonts';
+    },
   );
 }
 
@@ -158,13 +186,13 @@ void main() {
     ('dark', () => _withRealFont(ThalabTheme.darkTheme)),
   ]) {
     testWidgets('home screen renders with real Arabic font (${cfg.$1})',
-        (tester) async {
+        (tester) => withClock(debugFixedClock, () async {
       _requireFontFiles();
       _mockPluginChannels();
       _installFontHttpMock();
       await _loadRealFonts();
 
-      final today = _todayKey(DateTime.now());
+      final today = _todayKey(clock.now());
       SharedPreferences.setMockInitialValues({
         'tasbih_daily_count': 47,
         'tasbih_daily_date': today,
@@ -212,10 +240,13 @@ void main() {
       await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 600)));
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
-    });
+    }));
   }
 }
 
+
+/// Deterministic wall clock for golden/smoke captures: 2026-11-25 14:30.
+final Clock debugFixedClock = Clock.fixed(DateTime(2026, 11, 25, 14, 30));
 
 /// Shared harness entry for sibling golden tests: fonts + plugin mocks.
 Future<void> debugSetupHarness() async {
