@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:adhan/adhan.dart';
@@ -18,8 +19,18 @@ class RafiqNotificationsService {
   RafiqNotificationsService._();
   static final RafiqNotificationsService instance = RafiqNotificationsService._();
 
+  /// عدد الأيام التي تُجدوَل مسبقاً لمواقيت الصلاة.
+  static const int _daysAhead = 7;
+
+  /// اللاحقة تُغيَّر عند تعديل إعدادات القنوات، لأن أندرويد يثبّت صوت القناة
+  /// وأهميتها عند أول إنشاء ولا يحدّثها لاحقاً.
+  static const String _cv = 'v3';
+
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+
+  /// طابور لمنع تداخل عمليات المزامنة (cancelAll + schedule) المتزامنة.
+  Future<void> _queue = Future<void>.value();
 
   static const List<MuezzinOption> fajrMuezzins = [
     MuezzinOption('fajr_egypt', 'أذان الفجر — مصر', 'نبرة الفجر المصرية الأصيلة'),
@@ -39,62 +50,72 @@ class RafiqNotificationsService {
     MuezzinOption('default', 'تنبيه النظام الافتراضي', 'نغمة إشعار قياسية'),
   ];
 
+  // ---------------------------------------------------------------------------
+  // التهيئة والأذونات
+  // ---------------------------------------------------------------------------
+
   Future<void> init() async {
     if (_initialized) return;
     try {
       tz.initializeTimeZones();
-      _configureLocalTimeZone();
+      await _configureLocalTimeZone();
 
-      const AndroidInitializationSettings androidSettings =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-
-      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
+      const initSettings = InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        ),
       );
-
-      const InitializationSettings initSettings = InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      );
-
       await _plugin.initialize(initSettings);
-      await _requestPermissions();
+
+      // إذن الإشعارات فقط (أندرويد 13+). إذن الأذان الدقيق يُطلب من الواجهة
+      // عند الحاجة، وليس عند كل تشغيل للتطبيق.
+      await _android?.requestNotificationsPermission();
       _initialized = true;
     } catch (e) {
       debugPrint('RafiqNotificationsService init error: $e');
     }
   }
 
-  void _configureLocalTimeZone() {
-    final offset = DateTime.now().timeZoneOffset;
-    if (offset.inHours == 2) {
-      tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
-      return;
-    }
-    if (offset.inHours == 3) {
-      tz.setLocalLocation(tz.getLocation('Asia/Riyadh'));
-      return;
-    }
-    final matching = tz.timeZoneDatabase.locations.values.where(
-      (loc) => loc.currentTimeZone.offset == offset.inMilliseconds,
-    );
-    if (matching.isNotEmpty) {
-      tz.setLocalLocation(matching.first);
-    } else {
-      tz.setLocalLocation(tz.UTC);
+  AndroidFlutterLocalNotificationsPlugin? get _android => _plugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+  /// هل يسمح النظام بالتنبيهات الدقيقة؟ إذا لا، ستُجدوَل الأذانات بتوقيت تقريبي
+  /// وقد تتأخر دقائق — يجب إبلاغ المستخدم بذلك.
+  Future<bool> canScheduleExactAlarms() async {
+    try {
+      return (await _android?.canScheduleExactNotifications()) ?? false;
+    } catch (_) {
+      return false;
     }
   }
 
-  Future<void> _requestPermissions() async {
+  /// يفتح شاشة إعداد "المنبهات والتذكيرات" في النظام.
+  Future<void> requestExactAlarmPermission() async {
+    await _android?.requestExactAlarmsPermission();
+  }
+
+  Future<void> _configureLocalTimeZone() async {
     try {
-      final androidImplementation = _plugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-      await androidImplementation?.requestNotificationsPermission();
-      await androidImplementation?.requestExactAlarmsPermission();
+      // اسم المنطقة الحقيقي (IANA) — يحترم التوقيت الصيفي تلقائياً.
+      final name = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(name));
     } catch (e) {
-      debugPrint('Permission request error: $e');
+      debugPrint('Timezone detection failed, falling back by offset: $e');
+      _fallbackTimeZoneByOffset();
+    }
+  }
+
+  void _fallbackTimeZoneByOffset() {
+    final offset = DateTime.now().timeZoneOffset;
+    if (offset.inHours == 2) {
+      tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
+    } else if (offset.inHours == 3) {
+      tz.setLocalLocation(tz.getLocation('Asia/Riyadh'));
+    } else {
+      tz.setLocalLocation(tz.UTC);
     }
   }
 
@@ -104,72 +125,181 @@ class RafiqNotificationsService {
     return name.isEmpty ? 'صديقي' : name;
   }
 
+  // ---------------------------------------------------------------------------
+  // القنوات (Channels) — الصوت وخصائص الصوت تُحدَّد هنا وليس في كل إشعار
+  // ---------------------------------------------------------------------------
+
+  Future<void> _ensureChannel({
+    required String id,
+    required String name,
+    String? description,
+    String? rawSound,
+    bool alarmUsage = false,
+    Importance importance = Importance.max,
+  }) async {
+    final channel = AndroidNotificationChannel(
+      id,
+      name,
+      description: description,
+      importance: importance,
+      playSound: true,
+      sound: rawSound == null ? null : RawResourceAndroidNotificationSound(rawSound),
+      audioAttributesUsage:
+          alarmUsage ? AudioAttributesUsage.alarm : AudioAttributesUsage.notification,
+      enableVibration: true,
+    );
+    await _android?.createNotificationChannel(channel);
+  }
+
+  // ---------------------------------------------------------------------------
+  // الجدولة الأساسية
+  // ---------------------------------------------------------------------------
+
+  /// يجدول إشعاراً واحداً (لمرة واحدة) أو متكرراً يومياً إذا مُرِّر [repeat].
+  Future<void> _schedule({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime when,
+    required String channelId,
+    required String channelName,
+    String? channelDescription,
+    String? rawSound,
+    bool isAdhan = false,
+    DateTimeComponents? repeat,
+  }) async {
+    if (!_initialized) return;
+    if (repeat == null && !when.isAfter(tz.TZDateTime.now(tz.local))) return;
+
+    try {
+      await _ensureChannel(
+        id: channelId,
+        name: channelName,
+        description: channelDescription,
+        rawSound: rawSound,
+        alarmUsage: isAdhan,
+      );
+
+      final details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.max,
+          priority: Priority.max,
+          playSound: true,
+          sound: rawSound == null ? null : RawResourceAndroidNotificationSound(rawSound),
+          audioAttributesUsage:
+              isAdhan ? AudioAttributesUsage.alarm : AudioAttributesUsage.notification,
+          enableVibration: true,
+        ),
+        iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true),
+      );
+
+      final mode = (await canScheduleExactAlarms())
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
+
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        when,
+        details,
+        androidScheduleMode: mode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: repeat,
+      );
+    } catch (e) {
+      debugPrint('Schedule notification error (id=$id): $e');
+    }
+  }
+
+  tz.TZDateTime _toTz(DateTime d) => tz.TZDateTime.from(d, tz.local);
+
+  // ---------------------------------------------------------------------------
+  // الاختبارات
+  // ---------------------------------------------------------------------------
+
   Future<void> sendTestNotification() async {
     await init();
     final userName = await _getUserName();
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'rafiq_prayers_channel_v2',
-      'تنبيهات رفيق الإيمانية',
-      channelDescription: 'تنبيهات الأذان والأذكار والمناسبات',
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
+    await _ensureChannel(
+      id: 'rafiq_prayers_$_cv',
+      name: 'تنبيهات رفيق الإيمانية',
+      description: 'تنبيهات الأذان والأذكار والمناسبات',
     );
     await _plugin.show(
       999,
       'رفيق — الواحة الإيمانية',
       'أهلاً يا $userName، منظومة الإشعارات الدقيقة تعمل الآن بنجاح.',
-      const NotificationDetails(android: androidDetails),
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'rafiq_prayers_$_cv',
+          'تنبيهات رفيق الإيمانية',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
     );
   }
 
-  Future<void> sendTestScheduledAdhan({
-    int delaySeconds = 5,
-    String? muezzinId,
-  }) async {
+  Future<void> sendTestScheduledAdhan({int delaySeconds = 5, String? muezzinId}) async {
     await init();
     final prefs = await SharedPreferences.getInstance();
     final userName = await _getUserName();
-    final selectedMuezzin =
-        muezzinId ?? prefs.getString('prayer_muezzin_dhuhr') ?? 'mishary_afasy';
-    final scheduledTime = DateTime.now().add(Duration(seconds: delaySeconds));
+    final muezzin = muezzinId ?? prefs.getString('prayer_muezzin_dhuhr') ?? 'mishary_afasy';
 
-    await _scheduleExact(
+    await _schedule(
       id: 998,
       title: 'تجربة الأذان المجدول',
       body: 'أهلاً يا $userName، تم جدولة الأذان وتشغيله بنجاح.',
-      scheduledTime: scheduledTime,
-      channelId: 'rafiq_adhan_${selectedMuezzin}_v1',
+      when: _toTz(DateTime.now().add(Duration(seconds: delaySeconds))),
+      channelId: 'rafiq_adhan_${muezzin}_$_cv',
       channelName: 'تجربة الأذان - رفيق',
-      rawSound: selectedMuezzin == 'default' ? null : selectedMuezzin,
+      rawSound: muezzin == 'default' ? null : muezzin,
       isAdhan: true,
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // المزامنة الكاملة — تُستدعى من الواجهة، وتُنفَّذ بالتسلسل عبر الطابور
+  // ---------------------------------------------------------------------------
 
   Future<void> syncAllScheduledNotifications({
     required double lat,
     required double lng,
     required CalculationParameters params,
-  }) async {
+  }) {
+    _queue = _queue
+        .then((_) => _doSync(lat, lng, params))
+        .catchError((Object e) => debugPrint('Sync error: $e'));
+    return _queue;
+  }
+
+  Future<void> _doSync(double lat, double lng, CalculationParameters params) async {
     await init();
-    await cancelAll();
+    if (!_initialized) return;
+
+    // نلغي ما سبق ثم نُعيد الجدولة كاملة بالإعدادات الحالية.
+    await _plugin.cancelAll();
 
     final prefs = await SharedPreferences.getInstance();
-    final masterEnabled = prefs.getBool('notif_master_enabled') ?? true;
-    if (!masterEnabled) return;
+    if (!(prefs.getBool('notif_master_enabled') ?? true)) return;
 
     final userName = await _getUserName();
-
     final coords = Coordinates(lat, lng);
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
+    // ---- مواقيت الصلاة لعدة أيام ----
     int idCounter = 100;
-    for (int dayOffset = 0; dayOffset <= 1; dayOffset++) {
-      final targetDate = now.add(Duration(days: dayOffset));
-      final pt = PrayerTimes(coords, DateComponents.from(targetDate), params);
+    for (int dayOffset = 0; dayOffset < _daysAhead; dayOffset++) {
+      final date = today.add(Duration(days: dayOffset));
+      final pt = PrayerTimes(coords, DateComponents.from(date), params);
 
-      final prayers = [
+      final prayers = <(String, String, DateTime)>[
         ('fajr', 'الفجر', pt.fajr),
         ('dhuhr', 'الظهر', pt.dhuhr),
         ('asr', 'العصر', pt.asr),
@@ -180,63 +310,58 @@ class RafiqNotificationsService {
       for (final p in prayers) {
         final key = p.$1;
         final name = p.$2;
-        final adhanTime = p.$3;
+        final adhanAt = _toTz(p.$3);
 
         final adhanEnabled = prefs.getBool('prayer_notif_${key}_adhan') ?? true;
         final beforeMins = prefs.getInt('prayer_notif_${key}_before') ?? 0;
         final afterMins = prefs.getInt('prayer_notif_${key}_after') ?? 0;
 
         final defaultMuezzin = key == 'fajr' ? 'fajr_egypt' : 'mishary_afasy';
-        final prayerMuezzinId = prefs.getString('prayer_muezzin_$key') ?? defaultMuezzin;
+        final muezzinId = prefs.getString('prayer_muezzin_$key') ?? defaultMuezzin;
         final muezzinList = key == 'fajr' ? fajrMuezzins : generalMuezzins;
         final muezzinName = muezzinList
-            .firstWhere((m) => m.id == prayerMuezzinId, orElse: () => muezzinList.first)
+            .firstWhere((m) => m.id == muezzinId, orElse: () => muezzinList.first)
             .name;
 
         if (beforeMins > 0) {
-          final beforeTime = adhanTime.subtract(Duration(minutes: beforeMins));
-          if (beforeTime.isAfter(now)) {
-            await _scheduleExact(
-              id: idCounter++,
-              title: 'اقتربت صلاة $name يا $userName',
-              body: 'متبقي $beforeMins دقيقة على أذان $name — استعد للوضوء والصلاة.',
-              scheduledTime: beforeTime,
-              channelId: 'rafiq_prayers_channel_v2',
-              channelName: 'مواقيت الصلاة - رفيق',
-            );
-          }
+          await _schedule(
+            id: idCounter++,
+            title: 'اقتربت صلاة $name يا $userName',
+            body: 'متبقي $beforeMins دقيقة على أذان $name — استعد للوضوء والصلاة.',
+            when: _toTz(adhanAt.subtract(Duration(minutes: beforeMins))),
+            channelId: 'rafiq_prayers_$_cv',
+            channelName: 'مواقيت الصلاة - رفيق',
+          );
         }
 
-        if (adhanEnabled && adhanTime.isAfter(now)) {
+        if (adhanEnabled) {
           final fajrNote = key == 'fajr' ? ' • الصلاة خير من النوم' : '';
-          await _scheduleExact(
+          await _schedule(
             id: idCounter++,
             title: 'حان الآن موعد أذان $name$fajrNote',
             body: 'أقم صلاتك يا $userName ($muezzinName)',
-            scheduledTime: adhanTime,
-            channelId: 'rafiq_adhan_${prayerMuezzinId}_v1',
-            channelName: 'أذان $name - $muezzinName',
-            rawSound: prayerMuezzinId == 'default' ? null : prayerMuezzinId,
+            when: adhanAt,
+            channelId: 'rafiq_adhan_${muezzinId}_$_cv',
+            channelName: 'أذان - $muezzinName',
+            rawSound: muezzinId == 'default' ? null : muezzinId,
             isAdhan: true,
           );
         }
 
         if (afterMins > 0) {
-          final afterTime = adhanTime.add(Duration(minutes: afterMins));
-          if (afterTime.isAfter(now)) {
-            await _scheduleExact(
-              id: idCounter++,
-              title: 'أذكار ما بعد صلاة $name',
-              body: 'تقبل الله طاعتك يا $userName — لا تنسَ أذكار دُبُر الصلاة.',
-              scheduledTime: afterTime,
-              channelId: 'rafiq_prayers_channel_v2',
-              channelName: 'مواقيت الصلاة - رفيق',
-            );
-          }
+          await _schedule(
+            id: idCounter++,
+            title: 'أذكار ما بعد صلاة $name',
+            body: 'تقبل الله طاعتك يا $userName — لا تنسَ أذكار دُبُر الصلاة.',
+            when: _toTz(adhanAt.add(Duration(minutes: afterMins))),
+            channelId: 'rafiq_prayers_$_cv',
+            channelName: 'مواقيت الصلاة - رفيق',
+          );
         }
       }
     }
 
+    // ---- التذكيرات اليومية (تتكرر كل يوم عبر matchDateTimeComponents) ----
     if (prefs.getBool('notif_azkar_morning') ?? true) {
       await scheduleDailyAzkar(
         id: 501,
@@ -246,7 +371,6 @@ class RafiqNotificationsService {
         minute: prefs.getInt('notif_morning_min') ?? 30,
       );
     }
-
     if (prefs.getBool('notif_azkar_evening') ?? true) {
       await scheduleDailyAzkar(
         id: 502,
@@ -256,7 +380,6 @@ class RafiqNotificationsService {
         minute: prefs.getInt('notif_evening_min') ?? 30,
       );
     }
-
     if (prefs.getBool('notif_azkar_sleep') ?? true) {
       await scheduleDailyAzkar(
         id: 503,
@@ -266,7 +389,6 @@ class RafiqNotificationsService {
         minute: prefs.getInt('notif_sleep_min') ?? 30,
       );
     }
-
     if (prefs.getBool('notif_quran_wird') ?? true) {
       await scheduleDailyAzkar(
         id: 504,
@@ -277,38 +399,49 @@ class RafiqNotificationsService {
       );
     }
 
+    // ---- المناسبات الهجرية ----
     if (prefs.getBool('notif_hijri_events') ?? true) {
       final hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
       final todayH = HijriCalendar.fromDate(now.add(Duration(days: hijriOffset)));
-      final eventsList = [
-        (1, 1, 'رأس السنة الهجرية'),
-        (1, 9, 'تاسوعاء وعاشوراء غداً (يُستحب صيامه)'),
-        (1, 10, 'يوم عاشوراء المبارك'),
-        (8, 15, 'ليلة النصف من شعبان'),
-        (9, 1, 'بداية شهر رمضان المبارك'),
-        (9, 21, 'بداية العشر الأواخر من رمضان'),
-        (10, 1, 'عيد الفطر المبارك'),
-        (12, 8, 'يوم التروية وغداً يوم عرفة'),
-        (12, 9, 'يوم عرفة المبارك (صيامه يكفّر سنتين)'),
-        (12, 10, 'عيد الأضحى المبارك'),
+
+      // (شهر، يوم، الاسم، عدد أيام التذكير المسبق)
+      // مثال: تاسوعاء في 9 محرم، يُذكَّر قبلها بيوم لأن نصّ الإشعار يقول "غداً".
+      final events = <(int, int, String, int)>[
+        (1, 1, 'رأس السنة الهجرية', 0),
+        (1, 9, 'تاسوعاء وعاشوراء', 1),
+        (1, 10, 'يوم عاشوراء المبارك', 0),
+        (8, 15, 'ليلة النصف من شعبان', 0),
+        (9, 1, 'بداية شهر رمضان المبارك', 0),
+        (9, 21, 'بداية العشر الأواخر من رمضان', 0),
+        (10, 1, 'عيد الفطر المبارك', 0),
+        (12, 8, 'يوم التروية', 0),
+        (12, 9, 'يوم عرفة المبارك (صيامه يكفّر سنتين)', 0),
+        (12, 10, 'عيد الأضحى المبارك', 0),
       ];
 
       int eventId = 700;
-      for (final ev in eventsList) {
+      for (final ev in events) {
+        final month = ev.$1;
+        final day = ev.$2;
+        final label = ev.$3;
+        final daysBefore = ev.$4;
+
         int targetYear = todayH.hYear;
-        if (ev.$1 < todayH.hMonth || (ev.$1 == todayH.hMonth && ev.$2 < todayH.hDay)) {
+        if (month < todayH.hMonth || (month == todayH.hMonth && day < todayH.hDay)) {
           targetYear++;
         }
-        final gDate = HijriCalendar().hijriToGregorian(targetYear, ev.$1, ev.$2);
-        final notifyAt = DateTime(gDate.year, gDate.month, gDate.day, 8, 0)
-            .subtract(Duration(days: hijriOffset));
+        final gDate = HijriCalendar().hijriToGregorian(targetYear, month, day);
+        final notifyAt = DateTime(gDate.year, gDate.month, gDate.day, 8)
+            .subtract(Duration(days: hijriOffset + daysBefore));
+
         if (notifyAt.isAfter(now) && notifyAt.difference(now).inDays <= 60) {
-          await _scheduleExact(
+          final timing = daysBefore > 0 ? 'تبدأ المناسبة غداً' : 'اغتنم فضل اليوم';
+          await _schedule(
             id: eventId++,
-            title: 'مناسبة إسلامية: ${ev.$3}',
-            body: 'تذكير من تقويم الثعلب الهجري يا $userName — اغتنم فضل اليوم.',
-            scheduledTime: notifyAt,
-            channelId: 'rafiq_events_channel_v2',
+            title: 'مناسبة إسلامية: $label',
+            body: 'تذكير من تقويم الثعلب الهجري يا $userName — $timing.',
+            when: _toTz(notifyAt),
+            channelId: 'rafiq_events_$_cv',
             channelName: 'المناسبات الهجرية - رفيق',
           );
         }
@@ -316,65 +449,9 @@ class RafiqNotificationsService {
     }
   }
 
-  Future<void> _scheduleExact({
-    required int id,
-    required String title,
-    required String body,
-    required DateTime scheduledTime,
-    required String channelId,
-    required String channelName,
-    String? rawSound,
-    bool isAdhan = false,
-  }) async {
-    if (!_initialized || scheduledTime.isBefore(DateTime.now())) return;
-    try {
-      final tz.TZDateTime tzScheduled = tz.TZDateTime.from(scheduledTime, tz.local);
-
-      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        channelId,
-        channelName,
-        channelDescription: 'تنبيهات واحة رفيق الإيمانية',
-        importance: Importance.max,
-        priority: Priority.max,
-        playSound: true,
-        sound: rawSound != null ? RawResourceAndroidNotificationSound(rawSound) : null,
-        audioAttributesUsage:
-            isAdhan ? AudioAttributesUsage.alarm : AudioAttributesUsage.notification,
-        enableVibration: true,
-      );
-
-      final NotificationDetails details = NotificationDetails(
-        android: androidDetails,
-        iOS: const DarwinNotificationDetails(presentAlert: true, presentSound: true),
-      );
-
-      try {
-        await _plugin.zonedSchedule(
-          id,
-          title,
-          body,
-          tzScheduled,
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      } catch (_) {
-        await _plugin.zonedSchedule(
-          id,
-          title,
-          body,
-          tzScheduled,
-          details,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      }
-    } catch (e) {
-      debugPrint('Schedule notification error: $e');
-    }
-  }
+  // ---------------------------------------------------------------------------
+  // تذكير يومي متكرر — الإصلاح الأهم: matchDateTimeComponents يجعله يتكرر
+  // ---------------------------------------------------------------------------
 
   Future<void> scheduleDailyAzkar({
     required int id,
@@ -384,56 +461,31 @@ class RafiqNotificationsService {
     required int minute,
   }) async {
     if (!_initialized) return;
-    try {
-      final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-      tz.TZDateTime tzScheduled = tz.TZDateTime(
-        tz.local,
-        now.year,
-        now.month,
-        now.day,
-        hour,
-        minute,
-      );
-      if (tzScheduled.isBefore(now)) {
-        tzScheduled = tzScheduled.add(const Duration(days: 1));
-      }
-
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'rafiq_azkar_channel_v2',
-        'الأذكار اليومية - رفيق',
-        channelDescription: 'تذكير بأذكار الصباح والمساء والورد',
-        importance: Importance.high,
-        priority: Priority.high,
-      );
-
-      const NotificationDetails details = NotificationDetails(android: androidDetails);
-
-      try {
-        await _plugin.zonedSchedule(
-          id,
-          title,
-          body,
-          tzScheduled,
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      } catch (_) {
-        await _plugin.zonedSchedule(
-          id,
-          title,
-          body,
-          tzScheduled,
-          details,
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      }
-    } catch (e) {
-      debugPrint('Schedule azkar error: $e');
+    final now = tz.TZDateTime.now(tz.local);
+    var first = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    if (first.isBefore(now)) {
+      first = first.add(const Duration(days: 1));
     }
+
+    await _schedule(
+      id: id,
+      title: title,
+      body: body,
+      when: first,
+      channelId: 'rafiq_azkar_$_cv',
+      channelName: 'الأذكار اليومية - رفيق',
+      channelDescription: 'تذكير بأذكار الصباح والمساء والورد',
+      repeat: DateTimeComponents.time,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // أدوات مساعدة
+  // ---------------------------------------------------------------------------
+
+  Future<int> pendingCount() async {
+    final list = await _plugin.pendingNotificationRequests();
+    return list.length;
   }
 
   Future<void> cancelAll() async {
