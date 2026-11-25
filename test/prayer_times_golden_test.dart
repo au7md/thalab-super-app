@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -36,7 +37,7 @@ void main() {
   });
 
   testWidgets('prayer times screen in dark mode with real fonts',
-      (tester) async {
+      (tester) => withClock(home.debugFixedClock, () async {
     home.debugSetupHarness();
     SharedPreferences.setMockInitialValues({
       'saved_lat': 30.0444,
@@ -73,5 +74,5 @@ void main() {
     await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 600)));
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
-  });
+  }));
 }
