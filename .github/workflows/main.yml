@@ -642,6 +642,16 @@ jobs:
           sed -i 's/@android:color\/white/#FFF8F0/g; s/@android:color\/black/#121316/g' android/app/src/main/res/drawable*/launch_background.xml || true
           flutter pub get
 
+      # Quality gate: a build is only as good as its tests. Pinned,
+      # checksum-verified fonts + restored REVIEWED golden baselines make the
+      # suite deterministic on a clean checkout; the job fails here if any
+      # test or golden comparison fails, before any APK is produced.
+      - name: Test gate (pinned fonts + reviewed golden baselines)
+        run: |
+          bash test/fonts/download_fonts.sh
+          bash test/goldens/restore_goldens.sh
+          flutter test
+
       - name: Copy Adhan audio to Android raw
         run: |
           mkdir -p android/app/src/main/res/raw
@@ -653,16 +663,6 @@ jobs:
           <resources xmlns:tools="http://schemas.android.com/tools"
               tools:keep="@raw/*" />
           KEEPEOF
-
-      # Branch (non-main) builds get a distinct applicationId + label so the
-      # test APK installs side-by-side with the published app and never
-      # replaces it or touches its data (CI debug signature also differs
-      # from the published APK's, which would otherwise force uninstall).
-      - name: Mark branch builds as side-by-side test app
-        if: github.ref != 'refs/heads/main'
-        run: |
-          sed -i 's/applicationId = "com.au7md.thalab_app"/applicationId = "com.au7md.thalab_app.dev"\n        versionNameSuffix = "-dev"/' android/app/build.gradle.kts
-          sed -i 's/android:label="الثعلب"/android:label="الثعلب تجريبي"/' android/app/src/main/AndroidManifest.xml
 
       - name: Build Release APK (arm64)
         run: flutter build apk --release --split-per-abi
