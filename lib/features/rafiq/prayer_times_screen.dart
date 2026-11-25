@@ -708,7 +708,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            'موعد الأذان: ${_formatTime(nextTime)} • ${pVisual.periodBadge}',
+                            'موعد الأذان: ${_formatTime(nextTime)}${nextPrayer == Prayer.none ? ' غدًا' : ''} • ${pVisual.periodBadge}',
                             style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
                           ),
                         ],
