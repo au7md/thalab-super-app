@@ -391,7 +391,15 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   void _playNext() {
     if (_allTracks.isEmpty) return;
     if (_isShuffle) {
-      final next = math.Random().nextInt(_allTracks.length);
+      if (_allTracks.length == 1) {
+        _playTrackAt(0);
+        return;
+      }
+      // Exclude the current track so shuffle never replays it immediately.
+      int next;
+      do {
+        next = math.Random().nextInt(_allTracks.length);
+      } while (next == _currentIndex);
       _playTrackAt(next);
       return;
     }
