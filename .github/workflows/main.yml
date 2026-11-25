@@ -659,6 +659,17 @@ jobs:
           bash test/goldens/restore_goldens.sh
           flutter test
 
+      # On gate failure, upload the golden diff/failure images so the cause
+      # (layout change vs rendering difference) can be judged from measured
+      # pixel evidence instead of guesswork.
+      - name: Upload golden failure diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-failures
+          path: test/failures/**
+          if-no-files-found: ignore
+
       - name: Copy Adhan audio to Android raw
         run: |
           mkdir -p android/app/src/main/res/raw
