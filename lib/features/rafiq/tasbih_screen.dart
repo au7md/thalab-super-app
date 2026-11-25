@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -130,7 +131,7 @@ class _TasbihScreenState extends State<TasbihScreen>
     }
 
     // عدّاد تسبيح اليوم (يُصفَّر تلقائياً بتغيّر التاريخ)
-    final todayKey = DailyProgress.dateKey(DateTime.now());
+    final todayKey = DailyProgress.dateKey(clock.now());
     final savedDay = prefs.getString('tasbih_daily_date');
     final todaySoFar = savedDay == todayKey
         ? (prefs.getInt('tasbih_daily_count') ?? 0)
