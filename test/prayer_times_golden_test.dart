@@ -38,7 +38,7 @@ void main() {
 
   testWidgets('prayer times screen in dark mode with real fonts',
       (tester) => withClock(home.debugFixedClock, () async {
-    home.debugSetupHarness();
+    await home.debugSetupHarness();
     SharedPreferences.setMockInitialValues({
       'saved_lat': 30.0444,
       'saved_lng': 31.2357,
@@ -65,6 +65,8 @@ void main() {
     await tester.runAsync(() => Future.delayed(const Duration(milliseconds: 500)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 120));
+    await home.debugReloadAmiri();
+    await tester.pump();
 
     await expectLater(
       find.byType(PrayerTimesScreen),
