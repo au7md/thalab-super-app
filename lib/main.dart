@@ -614,6 +614,9 @@ class _RafiqTabState extends State<RafiqTab> {
   String _locationName = 'القاهرة، مصر';
   PrayerTimes? _prayerTimes;
   String? _prayerTimesDateKey;
+  bool _midnightRefreshInFlight = false;
+  int debugRefreshCount = 0;
+  String? get debugPrayerTimesDateKey => _prayerTimesDateKey;
 
   String get _todayDateKey {
     final now = clock.now();
@@ -643,9 +646,16 @@ class _RafiqTabState extends State<RafiqTab> {
     _refreshWidgets();
     _liveTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      // Midnight rollover: recompute prayer times for the new day.
-      if (_prayerTimesDateKey != null && _prayerTimesDateKey != _todayDateKey) {
-        _refreshWidgets();
+      // Midnight rollover: recompute prayer times for the new day. The
+      // in-flight guard stops every tick from re-triggering the async
+      // refresh (and its notification re-sync) while one is already running.
+      if (_prayerTimesDateKey != null &&
+          _prayerTimesDateKey != _todayDateKey &&
+          !_midnightRefreshInFlight) {
+        _midnightRefreshInFlight = true;
+        _refreshWidgets().whenComplete(() {
+          _midnightRefreshInFlight = false;
+        });
         return;
       }
       setState(() {});
@@ -659,6 +669,7 @@ class _RafiqTabState extends State<RafiqTab> {
   }
 
   Future<void> _refreshWidgets() async {
+    debugRefreshCount++;
     final prefs = await SharedPreferences.getInstance();
     final lat = prefs.getDouble('saved_lat') ?? prefs.getDouble('prayer_lat') ?? 30.0444;
     final lng = prefs.getDouble('saved_lng') ?? prefs.getDouble('prayer_lng') ?? 31.2357;
