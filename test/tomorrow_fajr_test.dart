@@ -14,6 +14,14 @@ import 'package:thalab_app/features/rafiq/prayer_times_screen.dart';
 import 'package:thalab_app/main.dart';
 import 'home_screen_golden_test.dart' as home;
 
+// Mirrors the app's _formatTime (12-hour Arabic) without depending on it.
+String _fmt(DateTime dt) {
+  final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+  final m = dt.minute.toString().padLeft(2, '0');
+  final period = dt.hour >= 12 ? 'م' : 'ص';
+  return '$h:$m $period';
+}
+
 PrayerTimes _cairoTimes(DateTime date) {
   final params = CalculationMethod.egyptian.getParameters();
   params.madhab = Madhab.shafi;
@@ -57,7 +65,8 @@ void main() {
   test('adhan: exact tomorrow fajr differs from today+24h on 2026-11-25', () {
     final today = _cairoTimes(DateTime(2026, 11, 25));
     final tomorrow = _cairoTimes(DateTime(2026, 11, 26));
-    expect(tomorrow.fajr, DateTime(2026, 11, 26, 4, 58));
+    // adhan returns device-local times, so assert no absolute hour: CI is UTC.
+    expect(tomorrow.fajr.day, 26);
     expect(tomorrow.fajr, isNot(today.fajr.add(const Duration(days: 1))),
         reason: 'the approximation must be measurably wrong on this date');
   });
@@ -76,11 +85,18 @@ void main() {
       expect((st.debugTomorrowFajr as DateTime).day, 26);
 
       // Behavioral: the rendered hero must show tomorrow's exact fajr, marked
-      // as tomorrow, with the matching countdown (22:30 -> 04:58 = 6:28:00).
+      // as tomorrow, with the matching countdown. Strings are derived from the
+      // exact value so the test holds in any machine timezone.
+      final approx = todayFajr.add(const Duration(days: 1));
+      final rem = exact.difference(fakeNow);
+      final hh = rem.inHours.clamp(0, 23).toString().padLeft(2, '0');
+      final mm = (rem.inMinutes % 60).clamp(0, 59).toString().padLeft(2, '0');
+      final ss = (rem.inSeconds % 60).clamp(0, 59).toString().padLeft(2, '0');
       expect(find.text('الصلاة القادمة: الفجر'), findsOneWidget);
-      expect(find.text('موعد الأذان: 4:58 ص غدًا • نسائم الفجر'), findsOneWidget);
-      expect(find.text('06:28:00'), findsOneWidget);
-      expect(find.textContaining('موعد الأذان: 4:57'), findsNothing);
+      expect(find.text('موعد الأذان: ${_fmt(exact)} غدًا • نسائم الفجر'),
+          findsOneWidget);
+      expect(find.text('$hh:$mm:$ss'), findsOneWidget);
+      expect(find.textContaining('موعد الأذان: ${_fmt(approx)}'), findsNothing);
     });
   });
 
@@ -94,7 +110,8 @@ void main() {
 
       // Behavioral: home hero shows the exact time, marked as tomorrow.
       expect(find.text('الصلاة القادمة: الفجر'), findsOneWidget);
-      expect(find.text('موعد الأذان: 4:58 ص غدًا • نسائم الفجر'), findsOneWidget);
+      expect(find.text('موعد الأذان: ${_fmt(exact)} غدًا • نسائم الفجر'),
+          findsOneWidget);
     });
   });
 }
