@@ -67,7 +67,7 @@ class _ZakatCalculatorScreenState extends State<ZakatCalculatorScreen> {
                   decoration: InputDecoration(
                     hintText: 'أدخل المبلغ الذي حال عليه الحول...',
                     filled: true,
-                    fillColor: ThalabTheme.creamBackground,
+                    fillColor: ThalabTheme.fieldOf(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -85,7 +85,7 @@ class _ZakatCalculatorScreenState extends State<ZakatCalculatorScreen> {
                   decoration: InputDecoration(
                     hintText: 'سعر الجرام...',
                     filled: true,
-                    fillColor: ThalabTheme.creamBackground,
+                    fillColor: ThalabTheme.fieldOf(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -208,7 +208,7 @@ class _UnitConverterScreenState extends State<UnitConverterScreen> {
               return ChoiceChip(
                 label: Text(cat,
                     style: TextStyle(
-                        color: active ? Colors.white : ThalabTheme.darkSlate,
+                        color: active ? Colors.white : ThalabTheme.primaryText(context),
                         fontWeight: FontWeight.bold)),
                 selected: active,
                 selectedColor: ThalabTheme.foxOrange,
@@ -241,7 +241,7 @@ class _UnitConverterScreenState extends State<UnitConverterScreen> {
                   decoration: InputDecoration(
                     labelText: 'القيمة',
                     filled: true,
-                    fillColor: ThalabTheme.creamBackground,
+                    fillColor: ThalabTheme.fieldOf(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
