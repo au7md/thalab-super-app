@@ -325,7 +325,7 @@ class _StudyScheduleTabState extends State<_StudyScheduleTab> {
                 selected: active,
                 selectedColor: ThalabTheme.foxOrange,
                 labelStyle: TextStyle(
-                  color: active ? Colors.white : ThalabTheme.darkSlate,
+                  color: active ? Colors.white : ThalabTheme.primaryText(context),
                   fontWeight: FontWeight.bold,
                 ),
                 onSelected: (_) => setState(() => _selectedDay = d),
