@@ -1016,7 +1016,7 @@ class _RafiqTabState extends State<RafiqTab> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'موعد الأذان: ${_formatTime(nextTime)} • ${pVisual.periodBadge}',
+                            'موعد الأذان: ${_formatTime(nextTime)}${nextPrayer == Prayer.none ? ' غدًا' : ''} • ${pVisual.periodBadge}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(color: pVisual.accentText, fontSize: 11.5),
