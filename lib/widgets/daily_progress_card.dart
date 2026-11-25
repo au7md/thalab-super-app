@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -44,18 +45,18 @@ class DailyProgressCardState extends State<DailyProgressCard> {
     final boundary = _boundaryKey.currentContext?.findRenderObject()
         as RenderRepaintBoundary?;
     if (boundary == null) return null;
-    // A tap's ink splash dirties the boundary; wait for one painted frame
-    // before capturing (toImage asserts on a dirty boundary in debug mode).
-    // debugNeedsPaint is false by definition in release builds, where the
-    // assert also does not exist, so gating on it is exact.
-    if (boundary.debugNeedsPaint) {
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted) return null;
-    }
+    // toImage asserts on a dirty boundary in debug mode; callers that arrive
+    // from user taps route through _share's post-frame wait first, so the
+    // boundary is clean here in both build modes.
     final image = await boundary.toImage(pixelRatio: 3.0);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     return byteData?.buffer.asUint8List();
   }
+
+  /// Test seam: when set, receives the captured PNG instead of invoking the
+  /// share_plus platform channel (which is library code and stays untested).
+  @visibleForTesting
+  static Future<void> Function(Uint8List bytes)? debugShareSink;
 
   Future<void> _share() async {
     if (_sharing) return;
@@ -64,8 +65,21 @@ class DailyProgressCardState extends State<DailyProgressCard> {
     // a dirty boundary.
     _sharing = true;
     try {
+      // Wait until the frame carrying the tap feedback has PAINTED, then
+      // capture. Post-frame callbacks run right after the paint phase, and
+      // unlike WidgetsBinding.endOfFrame they complete in every context:
+      // release builds, debug builds, and the automated test binding.
+      final painted = Completer<void>();
+      WidgetsBinding.instance.addPostFrameCallback((_) => painted.complete());
+      await painted.future;
+      if (!mounted) return;
       final bytes = await capturePng();
       if (bytes == null) return;
+      final sink = debugShareSink;
+      if (sink != null) {
+        await sink(bytes);
+        return;
+      }
       if (mounted) setState(() {}); // swap to the busy icon
       await Share.shareXFiles(
         [
@@ -215,13 +229,15 @@ class DailyStat extends StatelessWidget {
             children: [
               Icon(icon, color: ThalabTheme.foxOrange, size: 20),
               const SizedBox(height: 4),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               const SizedBox(height: 2),
