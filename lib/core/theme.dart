@@ -56,6 +56,18 @@ class ThalabTheme {
           ? darkTextMuted
           : mutedSlate;
 
+  /// سطح البطاقات حسب الوضع: أبيض في النهار، داكن في الليل.
+  static Color cardOf(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? darkCardSurface
+          : cardSurface;
+
+  /// لون الحدود الهادئة حسب الوضع.
+  static Color borderOf(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? darkBorder
+          : softBorder;
+
   static ThemeData get lightTheme {
     final baseTextTheme = GoogleFonts.readexProTextTheme();
 
