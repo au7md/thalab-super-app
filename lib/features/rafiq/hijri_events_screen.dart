@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:adhan/adhan.dart';
+import '../../core/prayer_calc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
 import '../../core/rafiq_notifications_service.dart';
@@ -222,7 +223,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     final prefs = await SharedPreferences.getInstance();
     final lat = prefs.getDouble('saved_lat') ?? 30.0444;
     final lng = prefs.getDouble('saved_lng') ?? 31.2357;
-    final params = CalculationMethod.egyptian.getParameters();
+    final params = prayerParamsFor(lat, lng);
     params.madhab = Madhab.shafi;
     await RafiqNotificationsService.instance.syncAllScheduledNotifications(
       lat: lat,
