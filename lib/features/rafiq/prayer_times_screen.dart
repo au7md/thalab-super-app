@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -156,7 +157,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   Color get _textColor => _isDark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate;
 
   String get _todayDateKey {
-    final now = DateTime.now();
+    final now = clock.now();
     return '${now.year}_${now.month}_${now.day}';
   }
 
@@ -228,7 +229,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   void _calculatePrayerTimes() {
     final params = CalculationMethod.egyptian.getParameters();
     params.madhab = Madhab.shafi;
-    final date = DateComponents.from(DateTime.now());
+    final date = DateComponents.from(clock.now());
     setState(() {
       _prayerTimes = PrayerTimes(_coords, date, params);
     });
@@ -561,19 +562,19 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   @override
   Widget build(BuildContext context) {
     final pt = _prayerTimes;
-    final nextPrayer = pt?.nextPrayer() ?? Prayer.none;
+    final nextPrayer = pt?.nextPrayerByDateTime(clock.now()) ?? Prayer.none;
     DateTime? nextTime = pt?.timeForPrayer(nextPrayer);
     if (nextPrayer == Prayer.none && pt != null) {
       nextTime = pt.fajr.add(const Duration(days: 1));
     }
 
-    final remaining = nextTime != null ? nextTime.difference(DateTime.now()) : Duration.zero;
+    final remaining = nextTime != null ? nextTime.difference(clock.now()) : Duration.zero;
     final remHours = remaining.inHours.clamp(0, 23).toString().padLeft(2, '0');
     final remMins = (remaining.inMinutes % 60).clamp(0, 59).toString().padLeft(2, '0');
     final remSecs = (remaining.inSeconds % 60).clamp(0, 59).toString().padLeft(2, '0');
     final pVisual = _prayerTheme(nextPrayer);
 
-    final todayH = HijriCalendar.fromDate(DateTime.now().add(Duration(days: _hijriOffset)));
+    final todayH = HijriCalendar.fromDate(clock.now().add(Duration(days: _hijriOffset)));
     final monthName = _hijriMonthsAr[(todayH.hMonth - 1).clamp(0, 11)];
     final hijriFullText = '${todayH.hDay} $monthName ${todayH.hYear} هـ';
 
