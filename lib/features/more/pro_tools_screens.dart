@@ -50,9 +50,9 @@ class _ZakatCalculatorScreenState extends State<ZakatCalculatorScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: ThalabTheme.cardOf(context),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: ThalabTheme.borderOf(context)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,9 +228,9 @@ class _UnitConverterScreenState extends State<UnitConverterScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: ThalabTheme.cardOf(context),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: ThalabTheme.borderOf(context)),
             ),
             child: Column(
               children: [
@@ -379,7 +379,7 @@ class _AgeCalculatorScreenState extends State<AgeCalculatorScreen> {
               child: Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: ThalabTheme.cardSurface,
+                  color: ThalabTheme.cardOf(context),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: ThalabTheme.foxOrange),
                 ),
@@ -432,9 +432,9 @@ class _AgeCalculatorScreenState extends State<AgeCalculatorScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
+                color: ThalabTheme.cardOf(context),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(color: ThalabTheme.borderOf(context)),
               ),
               child: Column(
                 children: [
@@ -571,11 +571,13 @@ class _PasswordGeneratorScreenState extends State<PasswordGeneratorScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
+                color: ThalabTheme.cardOf(context),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(color: ThalabTheme.borderOf(context)),
               ),
-              child: Column(
+              child: Material(
+                type: MaterialType.transparency,
+                child: Column(
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -617,6 +619,7 @@ class _PasswordGeneratorScreenState extends State<PasswordGeneratorScreen> {
                     },
                   ),
                 ],
+                ),
               ),
             ),
           ],
@@ -666,10 +669,10 @@ class _TextAnalyzerScreenState extends State<TextAnalyzerScreen> {
               decoration: InputDecoration(
                 hintText: 'الصق أو اكتب النص هنا لتحليله فوراً...',
                 filled: true,
-                fillColor: ThalabTheme.cardSurface,
+                fillColor: ThalabTheme.cardOf(context),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                  borderSide: BorderSide(color: ThalabTheme.borderOf(context)),
                 ),
               ),
             ),
@@ -705,9 +708,9 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: ThalabTheme.cardSurface,
+        color: ThalabTheme.cardOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ThalabTheme.softBorder),
+        border: Border.all(color: ThalabTheme.borderOf(context)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
