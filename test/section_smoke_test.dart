@@ -2,6 +2,7 @@
 // both themes at phone size must not throw (overflows, null errors, bad state).
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -44,7 +45,8 @@ void main() {
                 : null);
   });
 
-  Future<void> pumpPhone(WidgetTester tester, Widget screen, bool dark) async {
+  Future<void> pumpPhone(WidgetTester tester, Widget screen, bool dark) =>
+      withClock(home.debugFixedClock, () async {
     tester.view.physicalSize = const Size(780, 1688);
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.reset);
@@ -64,7 +66,7 @@ void main() {
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 120));
     }
-  }
+  });
 
   final screens = <String, Widget Function()>{
     'qibla': () => const QiblaScreen(),
