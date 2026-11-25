@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:adhan/adhan.dart';
 import 'core/theme.dart';
-import 'core/storage_service.dart';
+import 'core/prayer_calc.dart';
 import 'core/rafiq_notifications_service.dart';
 import 'widgets/floating_nav_bar.dart';
 import 'features/rafiq/tasbih_screen.dart';
@@ -628,7 +628,7 @@ class _RafiqTabState extends State<RafiqTab> {
     final lng = prefs.getDouble('saved_lng') ?? prefs.getDouble('prayer_lng') ?? 31.2357;
     final locLabel = prefs.getString('saved_loc_name') ?? 'القاهرة، مصر';
 
-    final params = CalculationMethod.egyptian.getParameters();
+    final params = prayerParamsFor(lat, lng);
     params.madhab = Madhab.shafi;
     final pt = PrayerTimes(Coordinates(lat, lng), DateComponents.from(DateTime.now()), params);
 
