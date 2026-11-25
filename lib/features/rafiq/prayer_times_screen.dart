@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:adhan/adhan.dart';
+import '../../core/prayer_calc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -226,7 +227,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   }
 
   void _calculatePrayerTimes() {
-    final params = CalculationMethod.egyptian.getParameters();
+    final params = prayerParamsFor(_coords.latitude, _coords.longitude);
     params.madhab = Madhab.shafi;
     final date = DateComponents.from(DateTime.now());
     setState(() {
@@ -235,7 +236,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   }
 
   Future<void> _syncNotificationsNow() async {
-    final params = CalculationMethod.egyptian.getParameters();
+    final params = prayerParamsFor(_coords.latitude, _coords.longitude);
     params.madhab = Madhab.shafi;
     await RafiqNotificationsService.instance.syncAllScheduledNotifications(
       lat: _coords.latitude,
