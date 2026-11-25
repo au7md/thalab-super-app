@@ -56,7 +56,7 @@ void main() {
   Future<void> pumpDark(WidgetTester tester, Widget screen,
           [Map<String, Object> prefs = const {}]) =>
       withClock(home.debugFixedClock, () async {
-    home.debugSetupHarness();
+    await home.debugSetupHarness();
     SharedPreferences.setMockInitialValues({'user_name': 'أحمد', ...prefs});
 
     tester.view.physicalSize = const Size(780, 1688);
@@ -72,6 +72,9 @@ void main() {
       await tester.pump();
     }
     await tester.pump(const Duration(milliseconds: 120));
+    // Override the runtime-registered subset fonts with the full builds.
+    await home.debugReloadAmiri();
+    await tester.pump();
   });
 
   Future<void> settleDown(WidgetTester tester) async {
