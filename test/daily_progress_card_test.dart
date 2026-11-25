@@ -122,8 +122,6 @@ void main() {
     expect(shared, isNotNull);
     expect(shared!.length, greaterThan(1000));
     expect(shared!.sublist(0, 4), equals(const [0x89, 0x50, 0x4E, 0x47]));
-    await tester.runAsync(
-        () => File('/tmp/share_capture.png').writeAsBytes(shared!));
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
   });
