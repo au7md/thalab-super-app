@@ -613,6 +613,12 @@ class _RafiqTabState extends State<RafiqTab> {
   int _hijriOffset = 0;
   String _locationName = 'القاهرة، مصر';
   PrayerTimes? _prayerTimes;
+  String? _prayerTimesDateKey;
+
+  String get _todayDateKey {
+    final now = clock.now();
+    return '${now.year}_${now.month}_${now.day}';
+  }
   Timer? _liveTimer;
   DailyProgress? _daily;
 
@@ -636,7 +642,13 @@ class _RafiqTabState extends State<RafiqTab> {
     super.initState();
     _refreshWidgets();
     _liveTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      // Midnight rollover: recompute prayer times for the new day.
+      if (_prayerTimesDateKey != null && _prayerTimesDateKey != _todayDateKey) {
+        _refreshWidgets();
+        return;
+      }
+      setState(() {});
     });
   }
 
@@ -670,6 +682,7 @@ class _RafiqTabState extends State<RafiqTab> {
       _hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
       _locationName = locLabel;
       _prayerTimes = pt;
+      _prayerTimesDateKey = _todayDateKey;
       _daily = daily;
     });
   }
