@@ -26,14 +26,17 @@ void _mockChannel(String name, [dynamic result]) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    home.debugSetupHarness();
+  setUp(() async {
+    await home.debugSetupHarness();
     SharedPreferences.setMockInitialValues(const {});
     _mockChannel('dev.fluttercommunity.plus/share', '');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
             const MethodChannel('plugins.flutter.io/path_provider'),
-            (call) async => '/tmp/thalab_test_cache');
+            (call) async {
+              Directory('/tmp/thalab_test_cache').createSync(recursive: true);
+              return '/tmp/thalab_test_cache';
+            });
     _mockChannel('com.ryanheise.just_audio.methods');
     _mockChannel('flutter.baseflow.com/geolocator');
     _mockChannel('hemanthraj/flutter_compass');
