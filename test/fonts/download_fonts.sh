@@ -29,12 +29,19 @@ done
 
 # Amiri / Amiri Quran, pinned by google_fonts 6.3.3 (used by the rafiq
 # screens). Same sha256 + length verification, written to the fonts root.
-AMIRI_ENTRIES="Amiri-Regular.ttf 82b49c37cfb90dd8fff8aab7508c2078bb32a200648acb2237dc02c30f4492ad 403728
-Amiri-Bold.ttf 53c460187d4f6d8fa2bde7a1a6587ca6487f807c31b094037164bb58e3b2bd4c 379988
-AmiriQuran-Regular.ttf 6fb463ac2d53b77b67d274bec99e39a4288a2d0a962437c7b1c1f6e9a9ee799f 318964"
+AMIRI_ENTRIES="Amiri-Regular.ttf ab391c4147d054c48976e98322ad0eefe1427aa0e0502a12a4c75d80a70cfcd7 431116
+Amiri-Bold.ttf cfccb794268e7d573d857e6d6a67f89cf8a053e8ffd85dfa0c8ec1bb36fc4827 413480
+AmiriQuran-Regular.ttf e2a47644762d16bdfb6d33e0d8db8c6ff30beae84150ef5a705316bbd829455c 136920"
 
 echo "$AMIRI_ENTRIES" | while read -r out hash len; do
-  curl -fsSL -o "$out" "https://fonts.gstatic.com/s/a/${hash}.ttf"
+  # Full builds from the google/fonts repo, not fonts.gstatic.com: the
+  # gstatic files are subsets whose Latin/punctuation glyphs are empty
+  # (render as boxes). Sub-path differs per family.
+  case "$out" in
+    AmiriQuran-*) src="https://github.com/google/fonts/raw/main/ofl/amiriquran/$out" ;;
+    *)            src="https://github.com/google/fonts/raw/main/ofl/amiri/$out" ;;
+  esac
+  curl -fsSL -o "$out" "$src"
   actual_hash=$(sha256sum "$out" | cut -d' ' -f1)
   actual_len=$(stat -c%s "$out")
   if [ "$actual_hash" != "$hash" ] || [ "$actual_len" != "$len" ]; then
@@ -62,3 +69,17 @@ for candidate in \
 done
 echo "Could not locate MaterialIcons-Regular.otf; set FLUTTER_ROOT." >&2
 exit 1
+
+# Subsetted gstatic builds, served by the test http mock so google_fonts'
+# runtime load passes its pinned integrity check. The full builds above are
+# what actually renders in goldens (re-registered after the runtime load).
+mkdir -p subset
+echo "$AMIRI_ENTRIES" | while read -r out hash len; do
+  curl -fsSL -o "subset/${hash}.ttf" "https://fonts.gstatic.com/s/a/${hash}.ttf"
+  actual_hash=$(sha256sum "subset/${hash}.ttf" | cut -d' ' -f1)
+  if [ "$actual_hash" != "$hash" ]; then
+    echo "CHECKSUM MISMATCH for subset/${hash}.ttf" >&2
+    exit 1
+  fi
+  echo "ok subset/$out"
+done
