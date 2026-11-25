@@ -144,7 +144,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
                           selected: selected,
                           selectedColor: ThalabTheme.foxOrange,
                           labelStyle: TextStyle(
-                            color: selected ? Colors.white : ThalabTheme.darkSlate,
+                            color: selected ? Colors.white : ThalabTheme.primaryText(context),
                             fontWeight: FontWeight.bold,
                           ),
                           onSelected: (_) => _selectWorkMinutes(min),
@@ -168,7 +168,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
                           selected: selected,
                           selectedColor: const Color(0xFF0D9488),
                           labelStyle: TextStyle(
-                            color: selected ? Colors.white : ThalabTheme.darkSlate,
+                            color: selected ? Colors.white : ThalabTheme.primaryText(context),
                             fontWeight: FontWeight.bold,
                           ),
                           onSelected: (_) => _selectBreakMinutes(min),
@@ -403,7 +403,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: ThalabTheme.creamBackground,
+      backgroundColor: ThalabTheme.cardOf(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -524,7 +524,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                     return ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ThalabTheme.cardOf(context),
-                        foregroundColor: ThalabTheme.darkSlate,
+                        foregroundColor: ThalabTheme.primaryText(context),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18)),
                       ),
@@ -548,7 +548,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: ThalabTheme.cardOf(context),
-                      foregroundColor: ThalabTheme.darkSlate,
+                      foregroundColor: ThalabTheme.primaryText(context),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18)),
                     ),
