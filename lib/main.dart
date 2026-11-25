@@ -611,6 +611,7 @@ class _RafiqTabState extends State<RafiqTab> {
   void initState() {
     super.initState();
     _refreshWidgets();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _askNotificationPermissions());
     _liveTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -620,6 +621,26 @@ class _RafiqTabState extends State<RafiqTab> {
   void dispose() {
     _liveTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _askNotificationPermissions() async {
+    final svc = RafiqNotificationsService.instance;
+    final granted = await svc.requestPermissionsFromUi();
+    if (!mounted) return;
+    if (!granted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('فعّل الإشعارات من إعدادات الهاتف حتى يصلك الأذان في وقته'),
+      ));
+      return;
+    }
+    // يُطلب إذن المنبهات الدقيقة مرة واحدة فقط (يفتح شاشة إعداد النظام)
+    final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool('exact_alarm_asked_v1') ?? false)) {
+      await prefs.setBool('exact_alarm_asked_v1', true);
+      if (!await svc.canScheduleExactAlarms()) {
+        await svc.requestExactAlarmPermission();
+      }
+    }
   }
 
   Future<void> _refreshWidgets() async {
