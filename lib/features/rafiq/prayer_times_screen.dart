@@ -30,10 +30,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   PrayerTimes? _prayerTimes;
+  DateTime? _tomorrowFajr;
   String? _prayerTimesDateKey;
   int debugCalcCount = 0;
   String? get debugPrayerTimesDateKey => _prayerTimesDateKey;
   DateTime? get debugFajrTime => _prayerTimes?.fajr;
+  DateTime? get debugTomorrowFajr => _tomorrowFajr;
   Coordinates _coords = Coordinates(30.0444, 31.2357);
   String _locationLabel = 'القاهرة، مصر';
   String _locationMode = 'أوفلاين';
@@ -240,9 +242,16 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     debugCalcCount++;
     final params = CalculationMethod.egyptian.getParameters();
     params.madhab = Madhab.shafi;
-    final date = DateComponents.from(clock.now());
+    final now = clock.now();
+    final date = DateComponents.from(now);
+    // Tomorrow's fajr must come from a real calculation for tomorrow's date:
+    // prayer times drift daily, so today+24h can be off by minutes.
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final tomorrowFajr =
+        PrayerTimes(_coords, DateComponents.from(tomorrow), params).fajr;
     setState(() {
       _prayerTimes = PrayerTimes(_coords, date, params);
+      _tomorrowFajr = tomorrowFajr;
       _prayerTimesDateKey = _todayDateKey;
     });
   }
@@ -577,7 +586,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     final nextPrayer = pt?.nextPrayerByDateTime(clock.now()) ?? Prayer.none;
     DateTime? nextTime = pt?.timeForPrayer(nextPrayer);
     if (nextPrayer == Prayer.none && pt != null) {
-      nextTime = pt.fajr.add(const Duration(days: 1));
+      nextTime = _tomorrowFajr ?? pt.fajr.add(const Duration(days: 1));
     }
 
     final remaining = nextTime != null ? nextTime.difference(clock.now()) : Duration.zero;
@@ -776,7 +785,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     final duhaEnd = pt?.dhuhr.subtract(const Duration(minutes: 15));
     DateTime? lastThirdNight;
     if (pt != null) {
-      final nextFajr = pt.fajr.add(const Duration(days: 1));
+      final nextFajr = _tomorrowFajr ?? pt.fajr.add(const Duration(days: 1));
       final nightDuration = nextFajr.difference(pt.maghrib);
       lastThirdNight = nextFajr.subtract(Duration(minutes: (nightDuration.inMinutes / 3).round()));
     }
