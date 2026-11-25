@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:thalab_app/core/theme.dart';
 import 'package:thalab_app/features/rafiq/adhkar_screen.dart';
+import 'package:thalab_app/features/rafiq/hijri_events_screen.dart';
 import 'package:thalab_app/features/rafiq/quran_screen.dart';
 import 'package:thalab_app/features/rafiq/tasbih_screen.dart';
 
@@ -93,6 +94,16 @@ void main() {
     await expectLater(
       find.byType(TasbihScreen),
       matchesGoldenFile('goldens/tasbih_dark.png'),
+    );
+    await settleDown(tester);
+  });
+
+  testWidgets('hijri events screen in dark mode with real fonts',
+      (tester) async {
+    await pumpDark(tester, const HijriEventsScreen());
+    await expectLater(
+      find.byType(HijriEventsScreen),
+      matchesGoldenFile('goldens/hijri_events_dark.png'),
     );
     await settleDown(tester);
   });
