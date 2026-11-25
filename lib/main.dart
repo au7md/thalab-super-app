@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -653,7 +654,7 @@ class _RafiqTabState extends State<RafiqTab> {
 
     final params = CalculationMethod.egyptian.getParameters();
     params.madhab = Madhab.shafi;
-    final pt = PrayerTimes(Coordinates(lat, lng), DateComponents.from(DateTime.now()), params);
+    final pt = PrayerTimes(Coordinates(lat, lng), DateComponents.from(clock.now()), params);
 
     RafiqNotificationsService.instance.syncAllScheduledNotifications(
       lat: lat,
@@ -689,7 +690,7 @@ class _RafiqTabState extends State<RafiqTab> {
     int tabIndex,
     List<Color> gradient,
   }) _getTimelyDhikrVisual() {
-    final now = DateTime.now();
+    final now = clock.now();
     final pt = _prayerTimes;
 
     if (pt != null) {
@@ -839,7 +840,7 @@ class _RafiqTabState extends State<RafiqTab> {
   }
 
   int _daysUntilRamadan() {
-    final now = DateTime.now().add(Duration(days: _hijriOffset));
+    final now = clock.now().add(Duration(days: _hijriOffset));
     final todayH = HijriCalendar.fromDate(now);
     int targetYear = todayH.hYear;
     if (9 < todayH.hMonth || (9 == todayH.hMonth && 1 < todayH.hDay)) {
@@ -855,18 +856,18 @@ class _RafiqTabState extends State<RafiqTab> {
   Widget build(BuildContext context) {
     final int khatmahPctInt = ((_khatmahRead / 604) * 100).clamp(0, 100).round();
     final timely = _getTimelyDhikrVisual();
-    final todayH = HijriCalendar.fromDate(DateTime.now().add(Duration(days: _hijriOffset)));
+    final todayH = HijriCalendar.fromDate(clock.now().add(Duration(days: _hijriOffset)));
     final monthName = _hijriMonthsAr[(todayH.hMonth - 1).clamp(0, 11)];
     final hijriFullText = '${todayH.hDay} $monthName ${todayH.hYear} هـ';
     final ramadanDays = _daysUntilRamadan();
 
     final pt = _prayerTimes;
-    final nextPrayer = pt?.nextPrayer() ?? Prayer.none;
+    final nextPrayer = pt?.nextPrayerByDateTime(clock.now()) ?? Prayer.none;
     DateTime? nextTime = pt?.timeForPrayer(nextPrayer);
     if (nextPrayer == Prayer.none && pt != null) {
       nextTime = pt.fajr.add(const Duration(days: 1));
     }
-    final remaining = nextTime != null ? nextTime.difference(DateTime.now()) : Duration.zero;
+    final remaining = nextTime != null ? nextTime.difference(clock.now()) : Duration.zero;
     final remHours = remaining.inHours.clamp(0, 23).toString().padLeft(2, '0');
     final remMins = (remaining.inMinutes % 60).clamp(0, 59).toString().padLeft(2, '0');
     final remSecs = (remaining.inSeconds % 60).clamp(0, 59).toString().padLeft(2, '0');
