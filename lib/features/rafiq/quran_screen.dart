@@ -58,7 +58,8 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
 
     setState(() {
       _lastPage = prefs.getInt('quran_last_page') ?? 1;
-      _khatmahGoalDays = prefs.getInt('khatmah_goal_days') ?? 30;
+      // Clamp: a corrupt stored 0 would divide by zero in the wird math.
+      _khatmahGoalDays = (prefs.getInt('khatmah_goal_days') ?? 30).clamp(1, 365);
       _isKhatmahMode = khatmahEntry;
       _bookmarkedPages = savedBookmarks.toSet();
       _completedPagesSet = savedCompleted.toSet();
