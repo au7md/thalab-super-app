@@ -69,21 +69,63 @@ void main() {
     expect(find.text('ابدأ يومك'), findsOneWidget);
   });
 
-  testWidgets('share button captures the card as a real PNG', (tester) async {
-    await tester.pumpWidget(_wrap(ThalabTheme.lightTheme, sample));
+  testWidgets('share button captures the RTL card as a real PNG',
+      (tester) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (call) async => '/tmp/gfonts',
+    );
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('dev.fluttercommunity.plus/share'),
+      (call) async => '',
+    );
 
-    // The share affordance is present and enabled.
-    expect(find.byTooltip('مشاركة إنجاز اليوم'), findsOneWidget);
+    // Phone-sized viewport and ambient RTL, matching the real home screen.
+    tester.view.physicalSize = const Size(780, 1688);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
 
-    final state = tester.state<DailyProgressCardState>(
-        find.byType(DailyProgressCard));
-    await tester.pump(); // complete a paint pass
-    final bytes = await tester.runAsync(() => state.capturePng());
+    Uint8List? shared;
+    DailyProgressCardState.debugShareSink = (bytes) async => shared = bytes;
+    addTearDown(() => DailyProgressCardState.debugShareSink = null);
 
-    // The shared payload is a real rendered PNG, not an empty stub.
-    expect(bytes, isNotNull);
-    expect(bytes!.length, greaterThan(1000));
-    expect(bytes.sublist(0, 4), equals(const [0x89, 0x50, 0x4E, 0x47]));
+    await tester.pumpWidget(MaterialApp(
+      theme: ThalabTheme.darkTheme,
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: DailyProgressCard(
+                progress: sample,
+                onOpenAdhkar: () {},
+                onOpenTasbih: () {},
+                onOpenQuran: () {},
+                onOpenHabits: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+
+    // Real tap path: tap -> post-frame wait -> capture -> sink.
+    await tester.tap(find.byTooltip('مشاركة إنجاز اليوم'));
+    await tester.pump(); // runs the post-frame callback, then capture
+    await tester.runAsync(() => Future.delayed(const Duration(seconds: 1)));
+    await tester.pump();
+
+    expect(shared, isNotNull);
+    expect(shared!.length, greaterThan(1000));
+    expect(shared!.sublist(0, 4), equals(const [0x89, 0x50, 0x4E, 0x47]));
+    await tester.runAsync(
+        () => File('/tmp/share_capture.png').writeAsBytes(shared!));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
   });
 
 }
