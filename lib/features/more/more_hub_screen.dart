@@ -78,7 +78,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                   width: 44,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: ThalabTheme.softBorder,
+                    color: ThalabTheme.borderOf(context),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -121,9 +121,9 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: ThalabTheme.cardSurface,
+                    color: ThalabTheme.cardOf(context),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: ThalabTheme.softBorder),
+                    border: Border.all(color: ThalabTheme.borderOf(context)),
                   ),
                   child: Column(
                     children: [
@@ -483,7 +483,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(color: ThalabTheme.borderOf(context)),
               ),
               child: Row(
                 children: [
@@ -587,7 +587,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             decoration: InputDecoration(
               labelText: 'الاسم الشخصي',
               filled: true,
-              fillColor: ThalabTheme.cardSurface,
+              fillColor: ThalabTheme.cardOf(context),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
@@ -621,9 +621,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: ThalabTheme.cardOf(context),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: ThalabTheme.borderOf(context)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
