@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hijri/hijri_calendar.dart';
@@ -186,7 +187,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final offset = prefs.getInt('hijri_day_offset') ?? 0;
-    final adjustedH = HijriCalendar.fromDate(DateTime.now().add(Duration(days: offset)));
+    final adjustedH = HijriCalendar.fromDate(clock.now().add(Duration(days: offset)));
 
     setState(() {
       _hijriOffset = offset;
@@ -207,7 +208,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     final clamped = newOffset.clamp(-2, 2);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('hijri_day_offset', clamped);
-    final adjustedH = HijriCalendar.fromDate(DateTime.now().add(Duration(days: clamped)));
+    final adjustedH = HijriCalendar.fromDate(clock.now().add(Duration(days: clamped)));
 
     setState(() {
       _hijriOffset = clamped;
@@ -238,7 +239,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
       targetYear += 1;
     }
     final targetGregorian = HijriCalendar().hijriToGregorian(targetYear, event.month, event.day);
-    final nowDate = DateTime.now().add(Duration(days: _hijriOffset));
+    final nowDate = clock.now().add(Duration(days: _hijriOffset));
     final todayMidnight = DateTime(nowDate.year, nowDate.month, nowDate.day);
     return targetGregorian.difference(todayMidnight).inDays;
   }
@@ -250,7 +251,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final adjustedNow = DateTime.now().add(Duration(days: _hijriOffset));
+    final adjustedNow = clock.now().add(Duration(days: _hijriOffset));
     final todayH = HijriCalendar.fromDate(adjustedNow);
     final todayMonthName = _hijriMonthsAr[(todayH.hMonth - 1).clamp(0, 11)];
     final sortedEvents = [..._events]
@@ -309,7 +310,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     String todayMonthName,
     List<HijriEvent> sortedEvents,
   ) {
-    final gToday = DateTime.now();
+    final gToday = clock.now();
     final isWhiteDay = todayH.hDay == 13 || todayH.hDay == 14 || todayH.hDay == 15;
     final isMonOrThu = gToday.weekday == DateTime.monday || gToday.weekday == DateTime.thursday;
 
