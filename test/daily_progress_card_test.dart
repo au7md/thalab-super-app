@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:thalab_app/core/daily_progress.dart';
 import 'package:thalab_app/core/theme.dart';
@@ -45,7 +48,7 @@ void main() {
     expect(find.text('5'), findsOneWidget); // أذكار
     expect(find.text('100'), findsOneWidget); // تسبيح
     expect(find.text('42'), findsOneWidget); // ختمة
-    expect(find.text('2/3'), findsOneWidget); // عادات
+    expect(find.text('2 من 3'), findsOneWidget); // عادات
     expect(find.text('أذكار'), findsOneWidget);
     expect(find.text('تسبيح'), findsOneWidget);
     expect(find.text('صفحات الختمة'), findsOneWidget);
@@ -64,6 +67,23 @@ void main() {
     );
     await tester.pumpWidget(_wrap(ThalabTheme.lightTheme, empty));
     expect(find.text('ابدأ يومك'), findsOneWidget);
+  });
+
+  testWidgets('share button captures the card as a real PNG', (tester) async {
+    await tester.pumpWidget(_wrap(ThalabTheme.lightTheme, sample));
+
+    // The share affordance is present and enabled.
+    expect(find.byTooltip('مشاركة إنجاز اليوم'), findsOneWidget);
+
+    final state = tester.state<DailyProgressCardState>(
+        find.byType(DailyProgressCard));
+    await tester.pump(); // complete a paint pass
+    final bytes = await tester.runAsync(() => state.capturePng());
+
+    // The shared payload is a real rendered PNG, not an empty stub.
+    expect(bytes, isNotNull);
+    expect(bytes!.length, greaterThan(1000));
+    expect(bytes.sublist(0, 4), equals(const [0x89, 0x50, 0x4E, 0x47]));
   });
 
 }
