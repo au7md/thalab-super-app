@@ -51,18 +51,23 @@ void main() {
     goldenFileComparator = _TolerantComparator();
   });
 
-  Future<void> pumpDark(WidgetTester tester, Widget screen) async {
+  Future<void> pumpDark(WidgetTester tester, Widget screen,
+      [Map<String, Object> prefs = const {}]) async {
     home.debugSetupHarness();
-    SharedPreferences.setMockInitialValues(const {'user_name': 'أحمد'});
+    SharedPreferences.setMockInitialValues({'user_name': 'أحمد', ...prefs});
 
     tester.view.physicalSize = const Size(780, 1688);
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(_darkApp(screen));
-    await tester
-        .runAsync(() => Future.delayed(const Duration(milliseconds: 500)));
-    await tester.pump();
+    // google_fonts registration completes asynchronously after the mocked
+    // fetch; settle in several rounds so glyphs are loaded before capture.
+    for (var i = 0; i < 3; i++) {
+      await tester
+          .runAsync(() => Future.delayed(const Duration(milliseconds: 400)));
+      await tester.pump();
+    }
     await tester.pump(const Duration(milliseconds: 120));
   }
 
@@ -83,7 +88,8 @@ void main() {
   });
 
   testWidgets('tasbih screen in dark mode with real fonts', (tester) async {
-    await pumpDark(tester, const TasbihScreen());
+    // Nonzero progress fixture: renders "5 من 33" (5 of 33) unambiguously.
+    await pumpDark(tester, const TasbihScreen(), {'tasbih_current': 5});
     await expectLater(
       find.byType(TasbihScreen),
       matchesGoldenFile('goldens/tasbih_dark.png'),
@@ -92,7 +98,11 @@ void main() {
   });
 
   testWidgets('quran screen in dark mode with real fonts', (tester) async {
-    await pumpDark(tester, const QuranScreen());
+    // Nonzero progress fixture: renders "المنجز 37 من 604".
+    await pumpDark(tester, const QuranScreen(), {
+      'quran_completed_pages':
+          List<String>.generate(37, (i) => '${i + 1}'),
+    });
     await expectLater(
       find.byType(QuranScreen),
       matchesGoldenFile('goldens/quran_dark.png'),
