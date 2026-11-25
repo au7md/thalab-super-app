@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,7 +54,8 @@ void main() {
   });
 
   Future<void> pumpDark(WidgetTester tester, Widget screen,
-      [Map<String, Object> prefs = const {}]) async {
+          [Map<String, Object> prefs = const {}]) =>
+      withClock(home.debugFixedClock, () async {
     home.debugSetupHarness();
     SharedPreferences.setMockInitialValues({'user_name': 'أحمد', ...prefs});
 
@@ -70,7 +72,7 @@ void main() {
       await tester.pump();
     }
     await tester.pump(const Duration(milliseconds: 120));
-  }
+  });
 
   Future<void> settleDown(WidgetTester tester) async {
     await tester
