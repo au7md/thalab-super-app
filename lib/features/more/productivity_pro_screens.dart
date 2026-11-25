@@ -123,9 +123,9 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: ThalabTheme.cardOf(context),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: ThalabTheme.borderOf(context)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,7 +189,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
               height: 246,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: ThalabTheme.cardSurface,
+                color: ThalabTheme.cardOf(context),
                 boxShadow: [
                   BoxShadow(
                     color: activeColor.withOpacity(0.14),
@@ -207,7 +207,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
                     child: CircularProgressIndicator(
                       value: progress,
                       strokeWidth: 11,
-                      backgroundColor: ThalabTheme.softBorder,
+                      backgroundColor: ThalabTheme.borderOf(context),
                       color: activeColor,
                     ),
                   ),
@@ -282,9 +282,9 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: ThalabTheme.cardOf(context),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: ThalabTheme.borderOf(context)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -422,7 +422,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
               decoration: InputDecoration(
                 hintText: 'عنوان الملاحظة...',
                 filled: true,
-                fillColor: ThalabTheme.cardSurface,
+                fillColor: ThalabTheme.cardOf(context),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
@@ -433,7 +433,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
               decoration: InputDecoration(
                 hintText: 'اكتب تفاصيل ملاحظتك هنا...',
                 filled: true,
-                fillColor: ThalabTheme.cardSurface,
+                fillColor: ThalabTheme.cardOf(context),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
@@ -523,7 +523,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                   ...List.generate(9, (i) => '${i + 1}').map((d) {
                     return ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: ThalabTheme.cardSurface,
+                        backgroundColor: ThalabTheme.cardOf(context),
                         foregroundColor: ThalabTheme.darkSlate,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18)),
@@ -547,7 +547,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                     const SizedBox.shrink(),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: ThalabTheme.cardSurface,
+                      backgroundColor: ThalabTheme.cardOf(context),
                       foregroundColor: ThalabTheme.darkSlate,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18)),
@@ -619,9 +619,9 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: ThalabTheme.cardSurface,
+                        color: ThalabTheme.cardOf(context),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: ThalabTheme.softBorder),
+                        border: Border.all(color: ThalabTheme.borderOf(context)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -745,9 +745,9 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: ThalabTheme.cardOf(context),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: ThalabTheme.borderOf(context)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -767,7 +767,7 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
                   value: pct,
                   minHeight: 8,
                   borderRadius: BorderRadius.circular(8),
-                  backgroundColor: ThalabTheme.softBorder,
+                  backgroundColor: ThalabTheme.borderOf(context),
                   color: ThalabTheme.foxOrange,
                 ),
               ],
@@ -783,10 +783,10 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
                     decoration: InputDecoration(
                       hintText: 'أضف عادة جديدة...',
                       filled: true,
-                      fillColor: ThalabTheme.cardSurface,
+                      fillColor: ThalabTheme.cardOf(context),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                        borderSide: BorderSide(color: ThalabTheme.borderOf(context)),
                       ),
                     ),
                   ),
@@ -821,10 +821,10 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
                 final route = item['route'] as String?;
                 return Container(
                   decoration: BoxDecoration(
-                    color: ThalabTheme.cardSurface,
+                    color: ThalabTheme.cardOf(context),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: done ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                      color: done ? ThalabTheme.foxOrange : ThalabTheme.borderOf(context),
                     ),
                   ),
                   child: ListTile(
