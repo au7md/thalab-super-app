@@ -6,6 +6,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:adhan/adhan.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'prayer_calc.dart';
 
 class MuezzinOption {
   final String id;
@@ -72,7 +73,6 @@ class RafiqNotificationsService {
 
       // إذن الإشعارات فقط (أندرويد 13+). إذن الأذان الدقيق يُطلب من الواجهة
       // عند الحاجة، وليس عند كل تشغيل للتطبيق.
-      await _android?.requestNotificationsPermission();
       _initialized = true;
     } catch (e) {
       debugPrint('RafiqNotificationsService init error: $e');
@@ -95,6 +95,36 @@ class RafiqNotificationsService {
   /// يفتح شاشة إعداد "المنبهات والتذكيرات" في النظام.
   Future<void> requestExactAlarmPermission() async {
     await _android?.requestExactAlarmsPermission();
+  }
+
+  /// يُستدعى من الواجهة بعد أول إطار (وليس من main) لأن طلب الإذن يحتاج Activity.
+  /// يعيد true إذا كان الإشعار مسموحاً، ويعيد جدولة كل شيء عند المنح.
+  Future<bool> requestPermissionsFromUi() async {
+    await init();
+    final granted = (await _android?.requestNotificationsPermission()) ?? false;
+    if (granted) await resyncFromSavedLocation();
+    return granted;
+  }
+
+  /// هل الإشعارات مسموحة فعلاً على مستوى النظام؟
+  Future<bool> notificationsEnabled() async {
+    try {
+      return (await _android?.areNotificationsEnabled()) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// إعادة الجدولة باستخدام الموقع المحفوظ (يُستعمل بعد منح الإذن).
+  Future<void> resyncFromSavedLocation() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lat = prefs.getDouble('saved_lat') ?? 30.0444;
+    final lng = prefs.getDouble('saved_lng') ?? 31.2357;
+    await syncAllScheduledNotifications(
+      lat: lat,
+      lng: lng,
+      params: prayerParamsFor(lat, lng),
+    );
   }
 
   Future<void> _configureLocalTimeZone() async {
