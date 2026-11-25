@@ -251,7 +251,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: _textColor),
                 ),
                 Text(
-                  'المتبقي لإنهاء الختمة: $estimatedDaysLeft يوماً ($_completedPagesCount / 604 صفحة)',
+                  'المتبقي لإنهاء الختمة: $estimatedDaysLeft يوماً ($_completedPagesCount من 604 صفحة)',
                   style: TextStyle(fontSize: 12, color: ThalabTheme.mutedText(context)),
                 ),
                 const SizedBox(height: 12),
@@ -425,7 +425,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'جاري تنزيل المصحف المصور للعمل بدون إنترنت: $_downloadedOfflineCount / 604',
+                      'جاري تنزيل المصحف المصور للعمل بدون إنترنت: $_downloadedOfflineCount من 604',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -485,7 +485,7 @@ class _QuranScreenState extends State<QuranScreen> with SingleTickerProviderStat
                             ),
                           ),
                           Text(
-                            'الورد اليومي ($pagesPerDay ص) • المنجز $_completedPagesCount / 604',
+                            'الورد اليومي ($pagesPerDay ص) • المنجز $_completedPagesCount من 604',
                             style: const TextStyle(color: Colors.white70, fontSize: 11),
                           ),
                         ],
@@ -1460,7 +1460,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'صفحة $_currentPage / 604',
+                            'صفحة $_currentPage من 604',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
