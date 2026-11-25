@@ -30,6 +30,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   PrayerTimes? _prayerTimes;
+  String? _prayerTimesDateKey;
   Coordinates _coords = Coordinates(30.0444, 31.2357);
   String _locationLabel = 'القاهرة، مصر';
   String _locationMode = 'أوفلاين';
@@ -139,7 +140,13 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     );
     _initAllData();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      // Midnight rollover: recompute prayer times for the new day.
+      if (_prayerTimesDateKey != null && _prayerTimesDateKey != _todayDateKey) {
+        _calculatePrayerTimes();
+        return;
+      }
+      setState(() {});
     });
   }
 
@@ -232,6 +239,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     final date = DateComponents.from(clock.now());
     setState(() {
       _prayerTimes = PrayerTimes(_coords, date, params);
+      _prayerTimesDateKey = _todayDateKey;
     });
   }
 
