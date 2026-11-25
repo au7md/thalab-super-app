@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -57,7 +58,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
   }
 
   String get _todayDateKey {
-    final now = DateTime.now();
+    final now = clock.now();
     return '${now.year}-${now.month}-${now.day}';
   }
 
