@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // real Readex Pro font offline. The served bytes are the exact files
 // google_fonts pins (sha256 + length verified at download time).
 // ignore: implementation_imports
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_fonts/src/google_fonts_base.dart' as gfb;
 
 import 'package:thalab_app/main.dart';
@@ -47,8 +48,14 @@ void _installFontHttpMock() {
     bytesByHash[_gstaticHashes[i]] =
         File('test/fonts/gstatic/${_gstaticWeights[i]}.ttf').readAsBytesSync();
   }
+  // Amiri/AmiriQuran runtime loads must SUCCEED (a failed fetch throws
+  // asynchronously and fails the test) and must pass google_fonts' pinned
+  // integrity check, so serve the original gstatic subset bytes. Those
+  // subsets have empty Latin/punctuation outlines, so AFTER the runtime
+  // registration settles, callers re-register the full-outline builds via
+  // debugReloadAmiri() before any golden capture.
   _amiriHashes.forEach((hash, file) {
-    bytesByHash[hash] = File('test/fonts/$file').readAsBytesSync();
+    bytesByHash[hash] = File('test/fonts/subset/$hash.ttf').readAsBytesSync();
   });
   gfb.httpClient = MockClient((request) async {
     final hash = request.url.pathSegments.isEmpty
@@ -74,12 +81,17 @@ Future<void> _loadRealFonts() async {
     ..addFont(Future.value(ByteData.view(iconBytes.buffer)));
   await icons.load();
 
-  // Amiri / Amiri Quran (dhikr and quran screens): register the pinned
-  // bytes directly so glyphs are present before the first frame instead of
-  // racing the google_fonts runtime fetch during a golden capture.
+  // Amiri / Amiri Quran (dhikr, tasbih, quran screens). Full-outline
+  // builds from the google/fonts repo (the gstatic files google_fonts pins
+  // are subsets with empty Latin/punctuation glyphs -> boxes). Registered
+  // under both the plain family and the dynamic names google_fonts 6.2.1
+  // generates ('<family>_<weight>'), so no glyph falls back to a box.
   for (final entry in {
     'Amiri': ['Amiri-Regular.ttf', 'Amiri-Bold.ttf'],
+    'Amiri_regular': ['Amiri-Regular.ttf'],
+    'Amiri_700': ['Amiri-Bold.ttf'],
     'AmiriQuran': ['AmiriQuran-Regular.ttf'],
+    'AmiriQuran_regular': ['AmiriQuran-Regular.ttf'],
   }.entries) {
     final loader = FontLoader(entry.key);
     for (final file in entry.value) {
@@ -258,3 +270,24 @@ Future<void> debugSetupHarness() async {
 
 /// Public wrapper around [_withRealFont] for sibling golden tests.
 ThemeData debugThemeWithRealFont(ThemeData base) => _withRealFont(base);
+
+/// Re-registers the full-outline Amiri/AmiriQuran builds under the dynamic
+/// '<family>_<weight>' names AFTER the google_fonts runtime load has settled
+/// (the runtime registers subsetted bytes; the last registration wins, so
+/// this must run after the settle pumps and before the golden capture).
+Future<void> debugReloadAmiri() async {
+  for (final entry in {
+    'Amiri': ['Amiri-Regular.ttf', 'Amiri-Bold.ttf'],
+    'Amiri_regular': ['Amiri-Regular.ttf'],
+    'Amiri_700': ['Amiri-Bold.ttf'],
+    'AmiriQuran': ['AmiriQuran-Regular.ttf'],
+    'AmiriQuran_regular': ['AmiriQuran-Regular.ttf'],
+  }.entries) {
+    final loader = FontLoader(entry.key);
+    for (final file in entry.value) {
+      final bytes = File('test/fonts/$file').readAsBytesSync();
+      loader.addFont(Future.value(ByteData.view(bytes.buffer)));
+    }
+    await loader.load();
+  }
+}
