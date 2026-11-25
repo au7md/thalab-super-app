@@ -21,9 +21,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # Pinned, not "stable": the reviewed golden baselines are renderer- and
+      # toolchain-sensitive, so CI must use the exact Flutter they were
+      # generated and reviewed with (3.50.1).
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.50.1'
           channel: 'stable'
           cache: true
 
@@ -641,6 +645,9 @@ jobs:
           for dir in android/app/src/main/res/mipmap-*; do cp /tmp/ic_launcher.png "$dir/ic_launcher.png"; done
           sed -i 's/@android:color\/white/#FFF8F0/g; s/@android:color\/black/#121316/g' android/app/src/main/res/drawable*/launch_background.xml || true
           flutter pub get
+          # flutter create regenerates the default counter template test,
+          # which cannot compile against this app (no MyApp/material_ui).
+          rm -f test/widget_test.dart
 
       # Quality gate: a build is only as good as its tests. Pinned,
       # checksum-verified fonts + restored REVIEWED golden baselines make the
