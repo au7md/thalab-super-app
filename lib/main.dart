@@ -613,10 +613,12 @@ class _RafiqTabState extends State<RafiqTab> {
   int _hijriOffset = 0;
   String _locationName = 'القاهرة، مصر';
   PrayerTimes? _prayerTimes;
+  DateTime? _tomorrowFajr;
   String? _prayerTimesDateKey;
   bool _midnightRefreshInFlight = false;
   int debugRefreshCount = 0;
   String? get debugPrayerTimesDateKey => _prayerTimesDateKey;
+  DateTime? get debugTomorrowFajr => _tomorrowFajr;
 
   String get _todayDateKey {
     final now = clock.now();
@@ -677,7 +679,13 @@ class _RafiqTabState extends State<RafiqTab> {
 
     final params = CalculationMethod.egyptian.getParameters();
     params.madhab = Madhab.shafi;
-    final pt = PrayerTimes(Coordinates(lat, lng), DateComponents.from(clock.now()), params);
+    final now = clock.now();
+    final pt = PrayerTimes(Coordinates(lat, lng), DateComponents.from(now), params);
+    // Exact fajr for tomorrow's date (drifts daily; today+24h is off by minutes).
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final tomorrowFajr = PrayerTimes(
+            Coordinates(lat, lng), DateComponents.from(tomorrow), params)
+        .fajr;
 
     RafiqNotificationsService.instance.syncAllScheduledNotifications(
       lat: lat,
@@ -693,6 +701,7 @@ class _RafiqTabState extends State<RafiqTab> {
       _hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
       _locationName = locLabel;
       _prayerTimes = pt;
+      _tomorrowFajr = tomorrowFajr;
       _prayerTimesDateKey = _todayDateKey;
       _daily = daily;
     });
@@ -889,7 +898,7 @@ class _RafiqTabState extends State<RafiqTab> {
     final nextPrayer = pt?.nextPrayerByDateTime(clock.now()) ?? Prayer.none;
     DateTime? nextTime = pt?.timeForPrayer(nextPrayer);
     if (nextPrayer == Prayer.none && pt != null) {
-      nextTime = pt.fajr.add(const Duration(days: 1));
+      nextTime = _tomorrowFajr ?? pt.fajr.add(const Duration(days: 1));
     }
     final remaining = nextTime != null ? nextTime.difference(clock.now()) : Duration.zero;
     final remHours = remaining.inHours.clamp(0, 23).toString().padLeft(2, '0');
