@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -70,7 +71,7 @@ class DailyProgress {
     SharedPreferences prefs, {
     DateTime? now,
   }) async {
-    final today = now ?? DateTime.now();
+    final today = now ?? clock.now();
     final habits = parseHabits(prefs.getString('thalab_habits_v2_json'), today);
     return DailyProgress(
       adhkarCompleted:
