@@ -68,6 +68,18 @@ class ThalabTheme {
           ? darkBorder
           : softBorder;
 
+  /// لون النص الأساسي حسب الوضع: كحلي في النهار، فاتح في الليل.
+  static Color primaryText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? darkTextPrimary
+          : darkSlate;
+
+  /// تعبئة حقول الإدخال حسب الوضع: كريمي في النهار، أغمق من البطاقة في الليل.
+  static Color fieldOf(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? darkBackground
+          : creamBackground;
+
   static ThemeData get lightTheme {
     final baseTextTheme = GoogleFonts.readexProTextTheme();
 
