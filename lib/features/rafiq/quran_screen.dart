@@ -1452,9 +1452,12 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
                       decoration: BoxDecoration(
                         color: _isNightPaper
                             ? const Color(0xFF282522)
-                            : ThalabTheme.cardSurface,
+                            : ThalabTheme.cardOf(context),
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: ThalabTheme.softBorder),
+                        border: Border.all(
+                            color: _isNightPaper
+                                ? ThalabTheme.darkBorder
+                                : ThalabTheme.borderOf(context)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
