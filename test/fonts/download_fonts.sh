@@ -50,6 +50,24 @@ echo "$AMIRI_ENTRIES" | while read -r out hash len; do
   fi
   echo "ok $out ($len bytes, sha256 verified)"
 done
+# Subsetted gstatic builds (the original google_fonts pins), served by the
+# test http mock so google_fonts' runtime load passes its pinned integrity
+# check. The full builds above are what actually renders in goldens
+# (re-registered after the runtime load).
+SUBSET_ENTRIES="Amiri-Regular.ttf 82b49c37cfb90dd8fff8aab7508c2078bb32a200648acb2237dc02c30f4492ad
+Amiri-Bold.ttf 53c460187d4f6d8fa2bde7a1a6587ca6487f807c31b094037164bb58e3b2bd4c
+AmiriQuran-Regular.ttf 6fb463ac2d53b77b67d274bec99e39a4288a2d0a962437c7b1c1f6e9a9ee799f"
+mkdir -p subset
+echo "$SUBSET_ENTRIES" | while read -r out hash; do
+  curl -fsSL -o "subset/${hash}.ttf" "https://fonts.gstatic.com/s/a/${hash}.ttf"
+  actual_hash=$(sha256sum "subset/${hash}.ttf" | cut -d' ' -f1)
+  if [ "$actual_hash" != "$hash" ]; then
+    echo "CHECKSUM MISMATCH for subset/${hash}.ttf" >&2
+    exit 1
+  fi
+  echo "ok subset/$out"
+done
+
 
 # The golden harness also uses these legacy copies for the synchronous
 # 'ReadexPro' family registration (same typeface, gstatic v27 static cuts).
@@ -69,17 +87,3 @@ for candidate in \
 done
 echo "Could not locate MaterialIcons-Regular.otf; set FLUTTER_ROOT." >&2
 exit 1
-
-# Subsetted gstatic builds, served by the test http mock so google_fonts'
-# runtime load passes its pinned integrity check. The full builds above are
-# what actually renders in goldens (re-registered after the runtime load).
-mkdir -p subset
-echo "$AMIRI_ENTRIES" | while read -r out hash len; do
-  curl -fsSL -o "subset/${hash}.ttf" "https://fonts.gstatic.com/s/a/${hash}.ttf"
-  actual_hash=$(sha256sum "subset/${hash}.ttf" | cut -d' ' -f1)
-  if [ "$actual_hash" != "$hash" ]; then
-    echo "CHECKSUM MISMATCH for subset/${hash}.ttf" >&2
-    exit 1
-  fi
-  echo "ok subset/$out"
-done
