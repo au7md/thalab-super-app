@@ -1,0 +1,35 @@
+name: Apply Patch
+
+# يفكّ أي ملف patch-*.zip موجود في جذر المستودع فوق المشروع ويحفظه كـ commit
+# ثم يحذف الـ zip. (لا يلمس .github)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply patch zips
+        run: |
+          shopt -s nullglob
+          zips=(patch-*.zip)
+          if [ ${#zips[@]} -eq 0 ]; then
+            echo "لم أجد ملف patch-*.zip في جذر المستودع"
+            exit 1
+          fi
+          for z in "${zips[@]}"; do
+            echo "Applying $z"
+            unzip -o "$z" -x ".github/*" "__MACOSX/*"
+            git rm -q "$z"
+          done
+          git config user.name "thalab-bot"
+          git config user.email "thalab-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply ${zips[*]}"
+          git push
