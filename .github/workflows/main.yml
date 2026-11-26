@@ -45,6 +45,13 @@ jobs:
           }
           GRADLE
 
+      # يوقف تقليص الكود والموارد في نسخة release: كان يحذف ملفات صوت الأذان
+      # من res/raw ويكسر جدولة الإشعارات (Gson) بصمت.
+      - name: Disable R8 / resource shrinking for release
+        run: |
+          sed -i '/release {/a\            isMinifyEnabled = false\n            isShrinkResources = false' android/app/build.gradle.kts
+          grep -n -B1 -A5 "release {" android/app/build.gradle.kts
+
       # يوحّد Java و Kotlin على 17 لكل المكتبات (flutter_timezone وغيرها)
       # لتفادي خطأ "Inconsistent JVM Target Compatibility".
       - name: Align JVM target and compileSdk for all plugins
