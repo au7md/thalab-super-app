@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -20,8 +21,33 @@ class RafiqNotificationsService {
   RafiqNotificationsService._();
   static final RafiqNotificationsService instance = RafiqNotificationsService._();
 
+  /// القناة مع نظام الأذان الأصلي (AdhanSystem.kt).
+  static const MethodChannel _adhanChannel =
+      MethodChannel('com.au7md.thalab_app/adhan');
+  static const int _nativeIdBase = 20000;
+
+  /// يسجّل آخر خطأ في الجدولة (كان يُبتلع بصمت في نسخة release).
+  Future<void> _logError(String where, Object e) async {
+    debugPrint('Notifications [$where]: $e');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          'notif_last_error', '[${DateTime.now().toIso8601String()}] $where: $e');
+    } catch (_) {}
+  }
+
+  Future<String> lastError() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('notif_last_error') ?? '';
+  }
+
+  Future<void> clearLastError() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('notif_last_error');
+  }
+
   /// عدد الأيام التي تُجدوَل مسبقاً لمواقيت الصلاة.
-  static const int _daysAhead = 7;
+  static const int _daysAhead = 14;
 
   /// اللاحقة تُغيَّر عند تعديل إعدادات القنوات، لأن أندرويد يثبّت صوت القناة
   /// وأهميتها عند أول إنشاء ولا يحدّثها لاحقاً.
@@ -242,7 +268,7 @@ class RafiqNotificationsService {
         matchDateTimeComponents: repeat,
       );
     } catch (e) {
-      debugPrint('Schedule notification error (id=$id): $e');
+      await _logError('schedule id=$id', e);
     }
   }
 
@@ -280,17 +306,98 @@ class RafiqNotificationsService {
     final prefs = await SharedPreferences.getInstance();
     final userName = await _getUserName();
     final muezzin = muezzinId ?? prefs.getString('prayer_muezzin_dhuhr') ?? 'mishary_afasy';
+    final follow = prefs.getBool('adhan_follow_ringer') ?? true;
+    try {
+      await _adhanChannel.invokeMethod('scheduleTest', {
+        'delaySeconds': delaySeconds,
+        'title': 'تجربة الأذان المجدول',
+        'body': 'أهلاً يا $userName، الأذان يعمل بنظام الثعلب الجديد.',
+        'muezzin': muezzin == 'default' ? '' : muezzin,
+        'followRinger': follow,
+      });
+    } catch (e) {
+      await _logError('scheduleTest', e);
+    }
+  }
 
+  /// اختبار جدولة المكتبة (flutter_local_notifications) بشكل منفصل لعزل المشكلة.
+  Future<void> sendTestPluginScheduled({int delaySeconds = 10}) async {
+    await init();
+    final userName = await _getUserName();
     await _schedule(
-      id: 998,
-      title: 'تجربة الأذان المجدول',
-      body: 'أهلاً يا $userName، تم جدولة الأذان وتشغيله بنجاح.',
+      id: 997,
+      title: 'اختبار الإشعار المجدول',
+      body: 'أهلاً يا $userName، جدولة المكتبة تعمل.',
       when: _toTz(DateTime.now().add(Duration(seconds: delaySeconds))),
-      channelId: 'rafiq_adhan_${muezzin}_$_cv',
-      channelName: 'تجربة الأذان - رفيق',
-      rawSound: muezzin == 'default' ? null : muezzin,
-      isAdhan: true,
+      channelId: 'rafiq_prayers_$_cv',
+      channelName: 'تنبيهات رفيق الإيمانية',
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // نظام الأذان الأصلي + التشخيص
+  // ---------------------------------------------------------------------------
+
+  Future<void> _nativeCancelAll() async {
+    try {
+      await _adhanChannel.invokeMethod('cancelAll');
+    } catch (e) {
+      await _logError('native cancelAll', e);
+    }
+  }
+
+  Future<void> _nativeSchedule(List<Map<String, Object>> entries) async {
+    try {
+      await _adhanChannel.invokeMethod('schedule', {'entries': entries});
+    } catch (e) {
+      await _logError('native schedule', e);
+    }
+  }
+
+  /// يستدعي أمراً أصلياً ويعيد نجاحه (فتح إعدادات، تشغيل، إيقاف...).
+  Future<bool> nativeAction(String method, [Map<String, Object?>? args]) async {
+    try {
+      final r = await _adhanChannel.invokeMethod<bool>(method, args);
+      return r ?? false;
+    } catch (e) {
+      await _logError('native $method', e);
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> diagnostics() async {
+    final ids = <String>{
+      ...fajrMuezzins.map((m) => m.id),
+      ...generalMuezzins.map((m) => m.id),
+    }..remove('default');
+
+    Map<String, dynamic> native = {};
+    String nativeError = '';
+    try {
+      final r = await _adhanChannel.invokeMapMethod<String, dynamic>(
+        'diagnostics',
+        {'muezzinIds': ids.toList()},
+      );
+      native = r ?? {};
+    } catch (e) {
+      nativeError = '$e';
+    }
+
+    int pending = -1;
+    try {
+      pending = await pendingCount();
+    } catch (e) {
+      await _logError('pendingCount', e);
+    }
+
+    return {
+      ...native,
+      'nativeError': nativeError,
+      'pluginNotificationsEnabled': await notificationsEnabled(),
+      'pluginExactAllowed': await canScheduleExactAlarms(),
+      'pluginPending': pending,
+      'lastError': await lastError(),
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -314,6 +421,7 @@ class RafiqNotificationsService {
 
     // نلغي ما سبق ثم نُعيد الجدولة كاملة بالإعدادات الحالية.
     await _plugin.cancelAll();
+    await _nativeCancelAll();
 
     final prefs = await SharedPreferences.getInstance();
     if (!(prefs.getBool('notif_master_enabled') ?? true)) return;
@@ -325,6 +433,9 @@ class RafiqNotificationsService {
 
     // ---- مواقيت الصلاة لعدة أيام ----
     int idCounter = 100;
+    final nativeEntries = <Map<String, Object>>[];
+    int nativeId = _nativeIdBase;
+    final followRinger = prefs.getBool('adhan_follow_ringer') ?? true;
     for (int dayOffset = 0; dayOffset < _daysAhead; dayOffset++) {
       final date = today.add(Duration(days: dayOffset));
       final pt = PrayerTimes(coords, DateComponents.from(date), params);
@@ -366,16 +477,16 @@ class RafiqNotificationsService {
 
         if (adhanEnabled) {
           final fajrNote = key == 'fajr' ? ' • الصلاة خير من النوم' : '';
-          await _schedule(
-            id: idCounter++,
-            title: 'حان الآن موعد أذان $name$fajrNote',
-            body: 'أقم صلاتك يا $userName ($muezzinName)',
-            when: adhanAt,
-            channelId: 'rafiq_adhan_${muezzinId}_$_cv',
-            channelName: 'أذان - $muezzinName',
-            rawSound: muezzinId == 'default' ? null : muezzinId,
-            isAdhan: true,
-          );
+          if (adhanAt.isAfter(tz.TZDateTime.now(tz.local))) {
+            nativeEntries.add({
+              'id': nativeId++,
+              'whenMs': adhanAt.millisecondsSinceEpoch,
+              'title': 'حان الآن موعد أذان $name$fajrNote',
+              'body': 'أقم صلاتك يا $userName ($muezzinName)',
+              'muezzin': muezzinId == 'default' ? '' : muezzinId,
+              'followRinger': followRinger,
+            });
+          }
         }
 
         if (afterMins > 0) {
@@ -390,6 +501,9 @@ class RafiqNotificationsService {
         }
       }
     }
+
+    // الأذان يُجدوَل عبر النظام الأصلي (يحترم وضع الصامت)
+    await _nativeSchedule(nativeEntries);
 
     // ---- التذكيرات اليومية (تتكرر كل يوم عبر matchDateTimeComponents) ----
     if (prefs.getBool('notif_azkar_morning') ?? true) {

@@ -72,6 +72,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         createNotificationChannels()
         initMediaSession()
+        AdhanChannel.register(flutterEngine, this)
 
         val filter = IntentFilter().apply {
             addAction("THALAB_REC_PAUSE_RESUME")

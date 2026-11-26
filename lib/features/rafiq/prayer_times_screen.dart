@@ -8,6 +8,7 @@ import 'package:hijri/hijri_calendar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
 import '../../core/rafiq_notifications_service.dart';
+import 'adhan_diagnostics_screen.dart';
 
 class OfflineCityPreset {
   final String name;
@@ -1155,6 +1156,23 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
       children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdhanDiagnosticsScreen()),
+              ),
+              icon: const Icon(Icons.health_and_safety_rounded, size: 20),
+              label: const Text(
+                'تشخيص الأذان والإشعارات',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Row(
