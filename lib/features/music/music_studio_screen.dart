@@ -10,7 +10,9 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/fox_mascot.dart';
 import '../../core/theme.dart';
+import '../../core/ui_kit.dart';
 
 /// ينظّف أسماء الملفات: يحذف اللاحقة وأسماء مواقع التحميل ويحوّل _ إلى مسافة.
 String cleanAudioTitle(String raw) {
@@ -1338,6 +1340,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                           title: 'مسجل الصوت',
                           subtitle: 'تسجيل وقص وتحرير',
                           icon: Icons.mic_rounded,
+                          accent: const Color(0xFFEF4444),
+                          emoji: '🎙️',
                           onTap: _openVoiceRecorder,
                         ),
                       ),
@@ -1349,6 +1353,8 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                               ? '$_activeRelaxLabel • ${_fmtSec(_sleepSecondsLeft)}'
                               : 'مؤقت النوم والتركيز',
                           icon: Icons.spa_rounded,
+                          accent: const Color(0xFF14B8A6),
+                          emoji: '🌿',
                           onTap: _openFocusRelaxSheet,
                         ),
                       ),
@@ -1441,9 +1447,14 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Text(
+                                      const FoxMascot(size: 96, mood: FoxMood.listening),
+                                      const SizedBox(height: 14),
+                                      Text(
                                         'لا توجد ملفات صوتية في هذا القسم',
-                                        style: TextStyle(color: ThalabTheme.mutedSlate),
+                                        style: TextStyle(
+                                          color: thalabMuted(context),
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                       const SizedBox(height: 12),
                                       OutlinedButton.icon(
@@ -1506,15 +1517,17 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                                     ThalabTheme.foxOrange.withOpacity(0.14),
                                                 borderRadius: BorderRadius.circular(14),
                                               ),
-                                              child: Icon(
-                                                isSelected
-                                                    ? Icons.check_circle_rounded
-                                                    : (isCurrent && _isPlaying)
-                                                        ? Icons.graphic_eq_rounded
-                                                        : track.sourceType == 'recording'
-                                                            ? Icons.mic_rounded
-                                                            : Icons.music_note_rounded,
-                                                color: ThalabTheme.foxOrange,
+                                              child: Center(
+                                                child: (!isSelected && isCurrent && _isPlaying)
+                                                    ? const _EqualizerBars()
+                                                    : Icon(
+                                                        isSelected
+                                                            ? Icons.check_circle_rounded
+                                                            : track.sourceType == 'recording'
+                                                                ? Icons.mic_rounded
+                                                                : Icons.music_note_rounded,
+                                                        color: ThalabTheme.foxOrange,
+                                                      ),
                                               ),
                                             ),
                                             const SizedBox(width: 12),
@@ -2872,52 +2885,70 @@ class _TopAudioActionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final Color accent;
+  final String emoji;
   final VoidCallback onTap;
 
   const _TopAudioActionCard({
     required this.title,
     required this.subtitle,
     required this.icon,
+    required this.accent,
+    required this.emoji,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return PressableScale(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        height: 92,
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
+          gradient: LinearGradient(
+            colors: [accent.withOpacity(isDark ? 0.24 : 0.14), theme.cardColor],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
           ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: accent.withOpacity(isDark ? 0.34 : 0.28)),
         ),
-        child: Row(
+        child: Stack(
           children: [
-            Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                color: ThalabTheme.foxOrange.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
+            PositionedDirectional(
+              start: -6,
+              bottom: -12,
+              child: Opacity(
+                opacity: 0.16,
+                child: Text(emoji, style: const TextStyle(fontSize: 58)),
               ),
-              child: Icon(icon, color: ThalabTheme.foxOrange, size: 22),
             ),
-            const SizedBox(width: 10),
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(0.18),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: accent, size: 18),
+                  ),
+                  const Spacer(),
                   Text(title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
                   Text(
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 10.5),
+                    style: TextStyle(color: thalabMuted(context), fontSize: 10.5),
                   ),
                 ],
               ),
@@ -2925,6 +2956,55 @@ class _TopAudioActionCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// موجات صوت متحركة تظهر على المقطع الذي يعمل الآن.
+class _EqualizerBars extends StatefulWidget {
+  const _EqualizerBars();
+
+  @override
+  State<_EqualizerBars> createState() => _EqualizerBarsState();
+}
+
+class _EqualizerBarsState extends State<_EqualizerBars> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: List.generate(4, (i) {
+            final h = 6 + 16 * (0.5 + 0.5 * math.sin(2 * math.pi * (_c.value + i * 0.23)));
+            return Container(
+              width: 4,
+              height: h,
+              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+              decoration: BoxDecoration(
+                color: ThalabTheme.foxOrange,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }
