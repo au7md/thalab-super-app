@@ -29,6 +29,9 @@ class PrayerTimesScreen extends StatefulWidget {
 
 class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     with SingleTickerProviderStateMixin {
+  /// تنبيه "خدمة الموقع غير مفعّلة" يظهر مرة واحدة فقط في كل تشغيل.
+  static bool _locationWarned = false;
+
   late TabController _tabController;
   PrayerTimes? _prayerTimes;
   Coordinates _coords = Coordinates(30.0444, 31.2357);
@@ -274,7 +277,8 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (mounted) {
+        if (mounted && !_locationWarned) {
+          _locationWarned = true;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('خدمة الموقع غير مفعّلة — يمكنك اختيار محافظتك أوفلاين من القائمة'),

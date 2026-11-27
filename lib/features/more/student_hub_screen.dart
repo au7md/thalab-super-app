@@ -48,8 +48,8 @@ class _StudentHubScreenState extends State<StudentHubScreen>
           unselectedLabelColor: ThalabTheme.mutedSlate,
           indicatorColor: ThalabTheme.foxOrange,
           tabs: const [
-            Tab(icon: Icon(Icons.track_changes_rounded), text: 'الأهداف والمواد'),
-            Tab(icon: Icon(Icons.calendar_view_week_rounded), text: 'جدول المذاكرة'),
+            Tab(icon: Icon(Icons.track_changes_rounded), text: 'الأهداف'),
+            Tab(icon: Icon(Icons.calendar_view_week_rounded), text: 'المذاكرة'),
             Tab(icon: Icon(Icons.calculate_rounded), text: 'حاسبة GPA'),
           ],
         ),

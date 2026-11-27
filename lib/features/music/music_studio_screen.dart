@@ -12,6 +12,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme.dart';
 
+/// ينظّف أسماء الملفات: يحذف اللاحقة وأسماء مواقع التحميل ويحوّل _ إلى مسافة.
+String cleanAudioTitle(String raw) {
+  var t = raw.trim();
+  t = t.replaceAll(RegExp(r'\.(mp3|m4a|aac|wav|ogg|opus|flac|mp4)$', caseSensitive: false), '');
+  t = t.replaceAll(RegExp(r'(www\.)?[a-z0-9\-]+\.(com|net|org|io|me|cc|co|app)\b', caseSensitive: false), '');
+  t = t.replaceAll(RegExp(r'_+'), ' ');
+  t = t.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
+  t = t.replaceAll(RegExp(r'^[\-–—:|•\s]+|[\-–—:|•\s]+$'), '');
+  return t.isEmpty ? raw.trim() : t;
+}
+
 class ThalabAudioTrack {
   final String id;
   final String title;
@@ -287,7 +298,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
             collected.add(
               ThalabAudioTrack(
                 id: item['id']?.toString() ?? path,
-                title: item['title']?.toString() ?? 'ملف صوتي',
+                title: cleanAudioTitle(item['title']?.toString() ?? 'ملف صوتي'),
                 subtitle: isThalabRec
                     ? 'تسجيلات الثعلب • Music'
                     : (item['artist']?.toString() ?? folder),

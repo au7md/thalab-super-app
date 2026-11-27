@@ -471,7 +471,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  daysToWhiteDays == 0 ? 'الآن' : 'بعد $daysToWhiteDays ي',
+                  daysToWhiteDays == 0 ? 'الآن' : _afterDaysAr(daysToWhiteDays),
                   style: const TextStyle(
                     color: ThalabTheme.foxOrange,
                     fontWeight: FontWeight.bold,
@@ -628,7 +628,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
             children: [
               IconButton(
                 tooltip: 'الشهر السابق',
-                icon: const Icon(Icons.chevron_left_rounded, color: ThalabTheme.foxOrange),
+                icon: const Icon(Icons.chevron_right_rounded, color: ThalabTheme.foxOrange, textDirection: TextDirection.ltr),
                 onPressed: () {
                   setState(() {
                     if (_viewHijriMonth == 1) {
@@ -655,7 +655,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
               ),
               IconButton(
                 tooltip: 'الشهر التالي',
-                icon: const Icon(Icons.chevron_right_rounded, color: ThalabTheme.foxOrange),
+                icon: const Icon(Icons.chevron_left_rounded, color: ThalabTheme.foxOrange, textDirection: TextDirection.ltr),
                 onPressed: () {
                   setState(() {
                     if (_viewHijriMonth == 12) {
@@ -1132,4 +1132,12 @@ class _NotifToggleCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// صيغة عربية صحيحة لعدد الأيام: بعد يوم / يومين / 5 أيام / 26 يوماً.
+String _afterDaysAr(int d) {
+  if (d == 1) return 'بعد يوم';
+  if (d == 2) return 'بعد يومين';
+  if (d >= 3 && d <= 10) return 'بعد $d أيام';
+  return 'بعد $d يوماً';
 }

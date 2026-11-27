@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../core/fox_mascot.dart';
 import '../core/theme.dart';
 
 class ThalabFloatingNavBar extends StatelessWidget {
@@ -12,8 +13,43 @@ class ThalabFloatingNavBar extends StatelessWidget {
     required this.onTap,
   });
 
+  static const List<FoxMood> _moods = [
+    FoxMood.praying,
+    FoxMood.camera,
+    FoxMood.listening,
+    FoxMood.studying,
+  ];
+
   @override
   Widget build(BuildContext context) {
+    // الثعلب يطلّ من فوق الشريط ويتحرك إلى القسم المختار (يحترم اتجاه RTL).
+    final x = ((currentIndex + 0.5) / 4) * 2 - 1;
+    return SizedBox(
+      height: 70 + 20 + 28,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(left: 0, right: 0, bottom: 0, child: _buildBar(context)),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 20 + 70 - 12,
+            height: 44,
+            child: IgnorePointer(
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOutBack,
+                alignment: AlignmentDirectional(x, 0),
+                child: FoxMascot(size: 40, mood: _moods[currentIndex.clamp(0, 3)]),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBar(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
