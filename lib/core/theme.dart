@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'page_transitions.dart';
 
 class ThemeController {
   ThemeController._();
@@ -54,6 +55,12 @@ class ThalabTheme {
 
     return ThemeData(
       useMaterial3: true,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ThalabPageTransitionsBuilder(),
+          TargetPlatform.iOS: ThalabPageTransitionsBuilder(),
+        },
+      ),
       brightness: Brightness.light,
       scaffoldBackgroundColor: creamBackground,
       cardColor: cardSurface,
@@ -99,6 +106,12 @@ class ThalabTheme {
 
     return ThemeData(
       useMaterial3: true,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ThalabPageTransitionsBuilder(),
+          TargetPlatform.iOS: ThalabPageTransitionsBuilder(),
+        },
+      ),
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBackground,
       cardColor: darkCardSurface,
