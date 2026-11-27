@@ -89,8 +89,23 @@ class _MainShellScreenState extends State<MainShellScreen> {
       body: SafeArea(
         bottom: false,
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 260),
-          child: _pages[_selectedIndex],
+          duration: const Duration(milliseconds: 320),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.025),
+                end: Offset.zero,
+              ).animate(anim),
+              child: child,
+            ),
+          ),
+          child: KeyedSubtree(
+            key: ValueKey(_selectedIndex),
+            child: _pages[_selectedIndex],
+          ),
         ),
       ),
       bottomNavigationBar: ThalabFloatingNavBar(
@@ -114,10 +129,10 @@ class RafiqTab extends StatefulWidget {
 class _RafiqTabState extends State<RafiqTab> {
   int _khatmahRead = 0;
   int _hijriOffset = 0;
-  String _userName = '';
   String _locationName = 'القاهرة، مصر';
   PrayerTimes? _prayerTimes;
   Timer? _liveTimer;
+  String _userName = '';
 
   static const List<String> _hijriMonthsAr = [
     'محرم',
@@ -138,6 +153,9 @@ class _RafiqTabState extends State<RafiqTab> {
   void initState() {
     super.initState();
     _refreshWidgets();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) setState(() => _userName = (p.getString('user_name') ?? '').trim());
+    });
     // الأذونات تُطلب الآن في شاشة الترحيب؛ هذا احتياط لمن تخطّاها فقط.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final prefs = await SharedPreferences.getInstance();
@@ -197,7 +215,6 @@ class _RafiqTabState extends State<RafiqTab> {
       _khatmahRead = prefs.getInt('khatmah_pages_read') ?? 0;
       _hijriOffset = prefs.getInt('hijri_day_offset') ?? 0;
       _locationName = locLabel;
-      _userName = prefs.getString('user_name')?.trim() ?? '';
       _prayerTimes = pt;
     });
   }
@@ -380,44 +397,51 @@ class _RafiqTabState extends State<RafiqTab> {
     return targetClean.difference(todayClean).inDays;
   }
 
-  String _greeting() {
+  String _greetingLine() =>
+      _userName.isEmpty ? 'السلام عليكم ورحمة الله' : 'السلام عليكم يا $_userName';
+
+  String _phaseLine() {
     final h = DateTime.now().hour;
-    if (h >= 5 && h < 12) return 'صباح الخير';
-    if (h >= 12 && h < 17) return 'طاب يومك';
-    if (h >= 17 && h < 20) return 'مساء الخير';
-    return 'مساء النور';
+    if (h >= 4 && h < 7) return 'بارك الله في فجرك 🌅';
+    if (h >= 7 && h < 12) return 'صباحك نور وبركة ☀️';
+    if (h >= 12 && h < 15) return 'ظهيرة هادئة وذكر دائم 🌤️';
+    if (h >= 15 && h < 18) return 'عصرك طيّب ومبارك 🍂';
+    if (h >= 18 && h < 21) return 'مساؤك طمأنينة 🌇';
+    return 'ليلتك سكينة 🌙';
   }
 
-  String _greetingEmoji() {
+  FoxMood _foxMood() {
     final h = DateTime.now().hour;
-    if (h >= 5 && h < 12) return '☀️';
-    if (h >= 12 && h < 17) return '🌤️';
-    if (h >= 17 && h < 20) return '🌇';
-    return '🌙';
+    return (h >= 22 || h < 4) ? FoxMood.sleepy : FoxMood.idle;
   }
 
-  FoxMood _foxMood(Duration remaining) {
-    final h = DateTime.now().hour;
-    if (remaining.inMinutes <= 10 && remaining.inSeconds > 0) return FoxMood.praying;
-    if (h >= 23 || h < 4) return FoxMood.sleepy;
-    return FoxMood.idle;
-  }
-
-  String _prayerEmoji(Prayer p) {
-    switch (p) {
-      case Prayer.fajr:
-      case Prayer.none:
-        return '🌅';
-      case Prayer.sunrise:
-      case Prayer.dhuhr:
-        return '☀️';
-      case Prayer.asr:
-        return '🌤️';
-      case Prayer.maghrib:
-        return '🌇';
-      case Prayer.isha:
-        return '🌙';
-    }
+  Widget _sectionTitle(String emoji, String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
+      child: Row(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: 8),
+          Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              height: 1.4,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    ThalabTheme.foxOrange.withOpacity(0.35),
+                    ThalabTheme.foxOrange.withOpacity(0.0),
+                  ],
+                  begin: AlignmentDirectional.centerStart,
+                  end: AlignmentDirectional.centerEnd,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -440,15 +464,6 @@ class _RafiqTabState extends State<RafiqTab> {
     final remMins = (remaining.inMinutes % 60).clamp(0, 59).toString().padLeft(2, '0');
     final remSecs = (remaining.inSeconds % 60).clamp(0, 59).toString().padLeft(2, '0');
     final pVisual = _prayerTheme(nextPrayer);
-    double prayerProgress = 0;
-    if (pt != null && nextTime != null) {
-      final cur = pt.currentPrayer();
-      final prev = pt.timeForPrayer(cur) ?? pt.isha.subtract(const Duration(days: 1));
-      final total = nextTime.difference(prev).inSeconds;
-      if (total > 0) {
-        prayerProgress = (DateTime.now().difference(prev).inSeconds / total).clamp(0.0, 1.0);
-      }
-    }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 115),
@@ -456,26 +471,38 @@ class _RafiqTabState extends State<RafiqTab> {
         FadeSlideIn(
           child: Row(
             children: [
-              FoxMascot(size: 58, mood: _foxMood(remaining)),
-              const SizedBox(width: 14),
+              FoxMascot(size: 60, mood: _foxMood()),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_greeting()}${_userName.isEmpty ? '' : ' يا $_userName'} ${_greetingEmoji()}',
+                      _greetingLine(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'رفيق — الواحة الإيمانية',
-                      style: TextStyle(fontSize: 12.5, color: thalabMuted(context)),
+                      _phaseLine(),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: ThalabTheme.foxOrange,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$hijriFullText • $_locationName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11.5, color: thalabMuted(context)),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               PressableScale(
                 onTap: () => _open(const HijriEventsScreen(initialTab: 2)),
                 child: Container(
@@ -492,14 +519,11 @@ class _RafiqTabState extends State<RafiqTab> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        FadeSlideIn(
-          delay: const Duration(milliseconds: 120),
-          child: InkWell(
-          borderRadius: BorderRadius.circular(26),
+        const SizedBox(height: 10),
+        InkWell(
+          borderRadius: BorderRadius.circular(24),
           onTap: () => _open(const PrayerTimesScreen(initialTab: 0)),
           child: Container(
-            clipBehavior: Clip.antiAlias,
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -507,18 +531,16 @@ class _RafiqTabState extends State<RafiqTab> {
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
               ),
-              borderRadius: BorderRadius.circular(26),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: pVisual.gradient.first.withOpacity(0.32),
-                  blurRadius: 22,
-                  offset: const Offset(0, 8),
+                  color: pVisual.gradient.first.withOpacity(0.28),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: CustomPaint(
-              painter: _EmojiWatermarkPainter(_prayerEmoji(nextPrayer)),
-              child: Column(
+            child: Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -607,16 +629,6 @@ class _RafiqTabState extends State<RafiqTab> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: prayerProgress,
-                    minHeight: 5,
-                    backgroundColor: Colors.white.withOpacity(0.22),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                   decoration: BoxDecoration(
@@ -636,14 +648,10 @@ class _RafiqTabState extends State<RafiqTab> {
                 ),
               ],
             ),
-            ),
           ),
         ),
-        ),
         const SizedBox(height: 12),
-        FadeSlideIn(
-          delay: const Duration(milliseconds: 240),
-          child: InkWell(
+        InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: () => _open(AdhkarScreen(initialTabIndex: timely.tabIndex)),
           child: Container(
@@ -725,13 +733,8 @@ class _RafiqTabState extends State<RafiqTab> {
             ),
           ),
         ),
-        ),
-        const SizedBox(height: 20),
-        const FadeSlideIn(
-          delay: Duration(milliseconds: 320),
-          child: _SectionLabel('خدماتك اليومية', '🧭'),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 16),
+        _sectionTitle('🕌', 'خدماتك الإيمانية'),
         GridView.count(
           padding: EdgeInsets.zero,
           shrinkWrap: true,
@@ -739,13 +742,13 @@ class _RafiqTabState extends State<RafiqTab> {
           crossAxisCount: 2,
           mainAxisSpacing: 10,
           crossAxisSpacing: 10,
-          childAspectRatio: 1.28,
+          childAspectRatio: 1.38,
           children: [
             _RafiqServiceCard(
               title: 'المصحف الشريف',
-              index: 0,
-              accent: const Color(0xFF0F766E),
+              accent: const Color(0xFF1E7E6C),
               emoji: '📖',
+              index: 0,
               subtitle: _khatmahRead > 0
                   ? 'الختمة: $_khatmahRead/604 ($khatmahPctInt%)'
                   : 'تلاوة حرة وفهرس السور',
@@ -755,45 +758,45 @@ class _RafiqTabState extends State<RafiqTab> {
             ),
             _RafiqServiceCard(
               title: 'أذكاري',
+              accent: const Color(0xFFF59E0B),
+              emoji: '☀️',
               index: 1,
-              accent: const Color(0xFFE86A17),
-              emoji: '🌅',
               subtitle: 'الصباح، المساء، النوم، الصلاة',
               icon: Icons.wb_sunny_outlined,
               onTap: () => _open(const AdhkarScreen(initialTabIndex: 0)),
             ),
             _RafiqServiceCard(
               title: 'السبحة الذكية',
-              index: 2,
-              accent: const Color(0xFF7C3AED),
+              accent: const Color(0xFFE86A17),
               emoji: '📿',
+              index: 2,
               subtitle: 'عداد تفاعلي وإجمالي دائم',
               icon: Icons.radio_button_checked_rounded,
               onTap: () => _open(const TasbihScreen()),
             ),
             _RafiqServiceCard(
               title: 'اتجاه القبلة',
-              index: 3,
-              accent: const Color(0xFF0284C7),
+              accent: const Color(0xFF2563EB),
               emoji: '🧭',
+              index: 3,
               subtitle: 'بوصلة هندسية دقيقة',
               icon: Icons.explore_rounded,
               onTap: () => _open(const QiblaScreen()),
             ),
             _RafiqServiceCard(
               title: 'حصن المسلم',
-              index: 4,
-              accent: const Color(0xFFD97706),
+              accent: const Color(0xFF7C3AED),
               emoji: '🛡️',
+              index: 4,
               subtitle: 'الأدعية، الرقية، الأسماء الحسنى',
               icon: Icons.auto_stories_rounded,
               onTap: () => _open(const AdhkarScreen(initialTabIndex: 5)),
             ),
             _RafiqServiceCard(
               title: 'التقويم والمناسبات',
-              index: 5,
-              accent: const Color(0xFFDB2777),
+              accent: const Color(0xFF0F766E),
               emoji: '🗓️',
+              index: 5,
               subtitle: ramadanDays == 0 ? 'رمضان كريم اليوم!' : 'رمضان: $ramadanDays يوم • الهجري',
               icon: Icons.calendar_month_rounded,
               onTap: () => _open(const HijriEventsScreen(initialTab: 0)),
@@ -801,9 +804,7 @@ class _RafiqTabState extends State<RafiqTab> {
           ],
         ),
         const SizedBox(height: 12),
-        FadeSlideIn(
-          delay: const Duration(milliseconds: 760),
-          child: InkWell(
+        InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: () => _open(const PrayerTimesScreen(initialTab: 1)),
           child: Container(
@@ -846,7 +847,6 @@ class _RafiqTabState extends State<RafiqTab> {
             ),
           ),
         ),
-        ),
       ],
     );
   }
@@ -878,31 +878,28 @@ class _RafiqServiceCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     return FadeSlideIn(
-      delay: Duration(milliseconds: 380 + index * 90),
+      delay: Duration(milliseconds: 120 + index * 90),
       child: PressableScale(
         onTap: onTap,
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             gradient: LinearGradient(
+              colors: [accent.withOpacity(isDark ? 0.22 : 0.13), theme.cardColor],
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
-              colors: [
-                accent.withOpacity(isDark ? 0.24 : 0.16),
-                theme.cardColor,
-              ],
             ),
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: accent.withOpacity(isDark ? 0.35 : 0.26), width: 1.2),
+            border: Border.all(color: accent.withOpacity(isDark ? 0.35 : 0.28), width: 1.3),
           ),
           child: Stack(
             children: [
               PositionedDirectional(
-                start: -6,
+                start: -4,
                 bottom: -12,
                 child: Opacity(
                   opacity: isDark ? 0.14 : 0.16,
-                  child: Text(emoji, style: const TextStyle(fontSize: 64)),
+                  child: Text(emoji, style: const TextStyle(fontSize: 62)),
                 ),
               ),
               Padding(
@@ -914,30 +911,18 @@ class _RafiqServiceCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          width: 40,
-                          height: 40,
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [accent, accent.withOpacity(0.72)],
-                              begin: Alignment.topRight,
-                              end: Alignment.bottomLeft,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: accent.withOpacity(0.35),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                            color: accent.withOpacity(0.18),
+                            shape: BoxShape.circle,
                           ),
-                          child: Icon(icon, color: Colors.white, size: 21),
+                          child: Icon(icon, color: accent, size: 22),
                         ),
                         if (badgeText != null)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: accent.withOpacity(0.16),
+                              color: accent.withOpacity(0.18),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
@@ -969,53 +954,6 @@ class _RafiqServiceCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  final String emoji;
-  const _SectionLabel(this.text, this.emoji);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 18)),
-        const SizedBox(width: 8),
-        Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Container(
-            height: 1.2,
-            color: Theme.of(context).dividerColor.withOpacity(0.5),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// يرسم رمزاً تعبيرياً كبيراً شفافاً خلف بطاقة الصلاة (فجر/شمس/غروب/ليل).
-class _EmojiWatermarkPainter extends CustomPainter {
-  final String emoji;
-  _EmojiWatermarkPainter(this.emoji);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final tp = TextPainter(
-      text: TextSpan(text: emoji, style: const TextStyle(fontSize: 120)),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    canvas.saveLayer(
-      Offset.zero & size,
-      Paint()..color = Colors.white.withOpacity(0.16),
-    );
-    tp.paint(canvas, Offset(-14, size.height - 96));
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _EmojiWatermarkPainter old) => old.emoji != emoji;
 }
 
 class _MiniPrayerSlot extends StatelessWidget {
