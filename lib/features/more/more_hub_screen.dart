@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/fox_mascot.dart';
 import '../../core/theme.dart';
+import '../../core/ui_kit.dart';
 import 'pro_tools_screens.dart';
 import 'student_hub_screen.dart';
 import 'productivity_pro_screens.dart';
@@ -288,21 +290,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.22),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      _userGender == 'أنثى'
-                          ? Icons.face_3_rounded
-                          : Icons.face_rounded,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
+                  const FoxMascot(size: 56, mood: FoxMood.studying),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -753,7 +741,23 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Icon(icon, color: ThalabTheme.foxOrange, size: 20),
         const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold)),
+        Text(title, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Container(
+            height: 1.4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  ThalabTheme.foxOrange.withOpacity(0.35),
+                  ThalabTheme.foxOrange.withOpacity(0.0),
+                ],
+                begin: AlignmentDirectional.centerStart,
+                end: AlignmentDirectional.centerEnd,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -772,43 +776,70 @@ class _ToolGridCard extends StatelessWidget {
     required this.onTap,
   });
 
+  static const List<Color> _palette = [
+    Color(0xFFE86A17),
+    Color(0xFF2563EB),
+    Color(0xFF16A34A),
+    Color(0xFF7C3AED),
+    Color(0xFFDB2777),
+    Color(0xFF0F766E),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: ThalabTheme.foxOrange.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: ThalabTheme.foxOrange, size: 22),
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final h = title.codeUnits.fold<int>(0, (a, b) => a + b);
+    final accent = _palette[h % _palette.length];
+    return FadeSlideIn(
+      delay: Duration(milliseconds: 80 + (h % 5) * 70),
+      child: PressableScale(
+        onTap: onTap,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [accent.withOpacity(isDark ? 0.20 : 0.11), theme.cardColor],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
             ),
-            const Spacer(),
-            Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-            Text(subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
-          ],
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: accent.withOpacity(isDark ? 0.32 : 0.25)),
+          ),
+          child: Stack(
+            children: [
+              PositionedDirectional(
+                start: -10,
+                bottom: -14,
+                child: Icon(icon, size: 70, color: accent.withOpacity(0.10)),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: accent.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Icon(icon, color: accent, size: 22),
+                    ),
+                    const Spacer(),
+                    Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+                    Text(subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: thalabMuted(context), fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

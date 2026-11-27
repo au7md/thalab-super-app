@@ -397,6 +397,20 @@ class _RafiqTabState extends State<RafiqTab> {
     return targetClean.difference(todayClean).inDays;
   }
 
+  /// نسبة الوقت المنقضي بين الصلاة السابقة والقادمة (لشريط التقدم).
+  double _prayerProgress(PrayerTimes? pt, DateTime? nextTime) {
+    if (pt == null || nextTime == null) return 0;
+    final now = DateTime.now();
+    final times = [pt.fajr, pt.sunrise, pt.dhuhr, pt.asr, pt.maghrib, pt.isha];
+    DateTime prev = pt.isha.subtract(const Duration(days: 1));
+    for (final t in times) {
+      if (!t.isAfter(now)) prev = t;
+    }
+    final total = nextTime.difference(prev).inSeconds;
+    if (total <= 0) return 0;
+    return (now.difference(prev).inSeconds / total).clamp(0.0, 1.0);
+  }
+
   String _greetingLine() =>
       _userName.isEmpty ? 'السلام عليكم ورحمة الله' : 'السلام عليكم يا $_userName';
 
@@ -520,8 +534,7 @@ class _RafiqTabState extends State<RafiqTab> {
           ),
         ),
         const SizedBox(height: 10),
-        InkWell(
-          borderRadius: BorderRadius.circular(24),
+        PressableScale(
           onTap: () => _open(const PrayerTimesScreen(initialTab: 0)),
           child: Container(
             padding: const EdgeInsets.all(18),
@@ -628,7 +641,22 @@ class _RafiqTabState extends State<RafiqTab> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: _prayerProgress(pt, nextTime)),
+                    duration: const Duration(milliseconds: 900),
+                    curve: Curves.easeOutCubic,
+                    builder: (_, v, __) => LinearProgressIndicator(
+                      value: v,
+                      minHeight: 5,
+                      backgroundColor: Colors.white.withOpacity(0.22),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                   decoration: BoxDecoration(
