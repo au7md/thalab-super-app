@@ -8,7 +8,9 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../core/fox_mascot.dart';
 import '../../core/theme.dart';
+import '../../core/ui_kit.dart';
 import 'media_viewer_screen.dart';
 
 enum _GallerySortType { newest, oldest, nameAsc, nameDesc }
@@ -464,15 +466,24 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
-                          color: _cardBg,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: _borderColor),
+                          gradient: LinearGradient(
+                            colors: [
+                              ThalabTheme.foxOrange.withOpacity(
+                                  Theme.of(context).brightness == Brightness.dark ? 0.22 : 0.12),
+                              _cardBg,
+                            ],
+                            begin: Alignment.topRight,
+                            end: Alignment.bottomLeft,
+                          ),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: ThalabTheme.foxOrange.withOpacity(0.28)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
+                            const FoxMascot(size: 46, mood: FoxMood.camera),
                             _MiniStatChip(
                               icon: Icons.photo_rounded,
                               label: 'الصور',
@@ -553,14 +564,22 @@ class _GalleryScreenState extends State<GalleryScreen> {
                           ? _buildAlbumsGrid()
                           : currentList.isEmpty
                               ? Center(
-                                  child: Text(
-                                    _selectedCategory == 4
-                                        ? 'لا توجد صور أو فيديوهات في المفضلة بعد'
-                                        : 'لا توجد وسائط في هذا القسم',
-                                    style: const TextStyle(
-                                      color: ThalabTheme.mutedSlate,
-                                      fontSize: 14,
-                                    ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const FoxMascot(size: 96, mood: FoxMood.sleepy),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        _selectedCategory == 4
+                                            ? 'لا توجد صور أو فيديوهات في المفضلة بعد 💛'
+                                            : 'لا توجد وسائط في هذا القسم',
+                                        style: TextStyle(
+                                          color: thalabMuted(context),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 )
                               : _buildMediaGrid(currentList),
@@ -577,15 +596,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: ThalabTheme.foxOrange.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.photo_library_rounded,
-                  size: 46, color: ThalabTheme.foxOrange),
-            ),
+            const FoxMascot(size: 120, mood: FoxMood.camera),
             const SizedBox(height: 16),
             const Text(
               'السماح بالوصول إلى الصور والفيديوهات',
@@ -634,8 +645,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
           future: album.assetCountAsync,
           builder: (context, countSnap) {
             final count = countSnap.data ?? 0;
-            return InkWell(
-              borderRadius: BorderRadius.circular(22),
+            return FadeSlideIn(
+              delay: Duration(milliseconds: (index % 8) * 55),
+              child: PressableScale(
               onTap: () => _openAlbum(album),
               child: Container(
                 decoration: BoxDecoration(
@@ -695,6 +707,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     ),
                   ],
                 ),
+              ),
               ),
             );
           },
@@ -814,22 +827,27 @@ class _MiniStatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return PressableScale(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 17, color: ThalabTheme.foxOrange),
-            const SizedBox(width: 6),
-            Text(
-              '$label: ',
-              style: const TextStyle(fontSize: 12, color: ThalabTheme.mutedSlate),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: ThalabTheme.foxOrange),
+                const SizedBox(width: 4),
+                Text(
+                  count,
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                ),
+              ],
             ),
             Text(
-              count,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              label,
+              style: TextStyle(fontSize: 11, color: thalabMuted(context)),
             ),
           ],
         ),
