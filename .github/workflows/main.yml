@@ -80,7 +80,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y imagemagick
           convert assets/images/app_logo.png -gravity center -crop 78%x78%+0+0 +repage -resize 192x192! -alpha remove -alpha off PNG24:/tmp/ic_launcher.png
-          for dir in android/app/src/main/res/mipmap-*; do cp /tmp/ic_launcher.png "$dir/ic_launcher.png"; done
+          for dir in android/app/src/main/res/mipmap-*dpi; do cp /tmp/ic_launcher.png "$dir/ic_launcher.png"; done
 
       - name: Flutter dependencies
         run: flutter pub get
