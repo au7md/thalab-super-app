@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -428,7 +427,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   }
 
   Future<void> _toggleFavorite(String id) async {
-    Haptics.selectionClick();
+    HapticFeedback.selectionClick();
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       if (_favoriteIds.contains(id)) {
@@ -441,7 +440,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   }
 
   void _toggleSelection(String id) {
-    Haptics.mediumImpact();
+    HapticFeedback.mediumImpact();
     setState(() {
       if (_selectedTrackIds.contains(id)) {
         _selectedTrackIds.remove(id);
@@ -1707,16 +1706,15 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     ),
                   ],
                 ),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: ThalabTheme.foxOrange,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.music_note_rounded,
-                          color: Colors.white, size: 20),
+                    Row(
+                  children: [
+                    FoxMascot(
+                      size: 40,
+                      mood: _isPlaying ? FoxMood.happy : FoxMood.listening,
+                      showBadge: false,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1753,6 +1751,22 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                       icon: const Icon(Icons.skip_next_rounded,
                           color: Colors.white, size: 26),
                       onPressed: _playNext,
+                    ),
+                  ],
+                ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: _duration.inMilliseconds == 0
+                            ? 0.0
+                            : (_position.inMilliseconds / _duration.inMilliseconds)
+                                .clamp(0.0, 1.0)
+                                .toDouble(),
+                        minHeight: 3,
+                        backgroundColor: Colors.white.withOpacity(0.18),
+                        valueColor: const AlwaysStoppedAnimation<Color>(ThalabTheme.foxOrange),
+                      ),
                     ),
                   ],
                 ),
@@ -2186,7 +2200,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                         icon: const Icon(Icons.flag_rounded,
                             color: ThalabTheme.foxOrange, size: 28),
                         onPressed: () {
-                          Haptics.selectionClick();
+                          HapticFeedback.selectionClick();
                           setState(() => _bookmarksSec.add(_stopwatch.elapsed.inSeconds));
                         },
                       ),
