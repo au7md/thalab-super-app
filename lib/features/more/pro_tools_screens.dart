@@ -294,7 +294,7 @@ class _UnitConverterScreenState extends State<UnitConverterScreen> {
           Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurface,
+              color: const Color(0xFF22252A),
               borderRadius: BorderRadius.circular(22),
             ),
             child: Column(
@@ -519,7 +519,7 @@ class _PasswordGeneratorScreenState extends State<PasswordGeneratorScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface,
+                color: const Color(0xFF22252A),
                 borderRadius: BorderRadius.circular(22),
               ),
               child: Column(

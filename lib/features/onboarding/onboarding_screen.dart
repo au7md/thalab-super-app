@@ -247,7 +247,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const FoxMascot(size: 170, mood: FoxMood.happy),
+          const FoxMascot(size: 170, mood: FoxMood.idle, showBadge: false),
           const SizedBox(height: 30),
           FadeSlideIn(delay: const Duration(milliseconds: 200), child: _title('أهلاً بك في الثعلب 🦊')),
           const SizedBox(height: 10),

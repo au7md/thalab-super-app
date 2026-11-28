@@ -11,6 +11,7 @@ import 'package:video_player/video_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../core/haptics.dart';
 import '../../core/theme.dart';
 
 class MediaViewerScreen extends StatefulWidget {
@@ -33,13 +34,19 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   late int _currentIndex;
   bool _chromeVisible = true;
   bool _isScreenLocked = false;
+  bool _photoZoomed = false;
+
+  int _safeIndex(int i) {
+    if (_items.isEmpty) return 0;
+    return i.clamp(0, _items.length - 1).toInt();
+  }
   Set<String> _favoriteIds = {};
 
   @override
   void initState() {
     super.initState();
     _items = List<AssetEntity>.from(widget.assets);
-    _currentIndex = widget.initialIndex.clamp(0, _items.length - 1);
+    _currentIndex = _safeIndex(widget.initialIndex);
     _pageController = PageController(initialPage: _currentIndex);
     _loadFavorites();
   }
@@ -190,7 +197,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               elevation: 0,
               iconTheme: const IconThemeData(color: Colors.white),
               title: Text(
-                '${_currentIndex + 1} / ${_items.length}',
+                '${_safeIndex(_currentIndex) + 1} / ${_items.length}',
                 style: const TextStyle(color: Colors.white, fontSize: 14.5),
               ),
               actions: [
@@ -273,11 +280,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         children: [
           PageView.builder(
             controller: _pageController,
-            physics: _isScreenLocked
+            physics: (_isScreenLocked || _photoZoomed)
                 ? const NeverScrollableScrollPhysics()
                 : const BouncingScrollPhysics(),
             itemCount: _items.length,
-            onPageChanged: (idx) => setState(() => _currentIndex = idx),
+            onPageChanged: (idx) => setState(() {
+              _currentIndex = idx;
+              _photoZoomed = false;
+            }),
             itemBuilder: (context, index) {
               final asset = _items[index];
               if (asset.type == AssetType.video) {
@@ -295,9 +305,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   onOpenEditor: () => _openEditor(asset),
                 );
               }
-              return GestureDetector(
-                onTap: () => setState(() => _chromeVisible = !_chromeVisible),
-                child: _IntegratedPhotoPage(asset: asset),
+              return _ZoomablePhotoPage(
+                key: ValueKey(asset.id),
+                asset: asset,
+                onToggleChrome: () => setState(() => _chromeVisible = !_chromeVisible),
+                onZoomChanged: (z) {
+                  if (z != _photoZoomed) setState(() => _photoZoomed = z);
+                },
               );
             },
           ),
@@ -377,31 +391,122 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 // =========================================================================
 // صفحة عرض الصورة بالتكبير السلس
 // =========================================================================
-class _IntegratedPhotoPage extends StatelessWidget {
+class _ZoomablePhotoPage extends StatefulWidget {
   final AssetEntity asset;
-  const _IntegratedPhotoPage({required this.asset});
+  final VoidCallback onToggleChrome;
+  final ValueChanged<bool> onZoomChanged;
+
+  const _ZoomablePhotoPage({
+    super.key,
+    required this.asset,
+    required this.onToggleChrome,
+    required this.onZoomChanged,
+  });
+
+  @override
+  State<_ZoomablePhotoPage> createState() => _ZoomablePhotoPageState();
+}
+
+class _ZoomablePhotoPageState extends State<_ZoomablePhotoPage>
+    with SingleTickerProviderStateMixin {
+  final TransformationController _tc = TransformationController();
+  late final AnimationController _anim;
+  Animation<Matrix4>? _tween;
+  Offset _doubleTapPos = Offset.zero;
+  bool _zoomed = false;
+  File? _file;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 260))
+      ..addListener(() {
+        if (_tween != null) _tc.value = _tween!.value;
+      });
+    _load();
+  }
+
+  Future<void> _load() async {
+    final f = await (widget.asset.originFile ?? widget.asset.file);
+    if (mounted) setState(() => _file = f);
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    _tc.dispose();
+    super.dispose();
+  }
+
+  void _animateTo(Matrix4 target) {
+    _tween = Matrix4Tween(begin: _tc.value, end: target)
+        .chain(CurveTween(curve: Curves.easeOutCubic))
+        .animate(_anim);
+    _anim
+      ..reset()
+      ..forward();
+  }
+
+  void _setZoomed(bool z) {
+    if (_zoomed == z) return;
+    _zoomed = z;
+    widget.onZoomChanged(z);
+  }
+
+  void _onDoubleTap() {
+    if (_zoomed) {
+      _animateTo(Matrix4.identity());
+      _setZoomed(false);
+    } else {
+      final p = _doubleTapPos;
+      const scale = 2.6;
+      final m = Matrix4.identity()
+        ..translate(-p.dx * (scale - 1), -p.dy * (scale - 1))
+        ..scale(scale);
+      _animateTo(m);
+      _setZoomed(true);
+    }
+    Haptics.lightImpact();
+  }
+
+  void _onInteractionEnd() {
+    final scale = _tc.value.getMaxScaleOnAxis();
+    if (scale <= 1.02) {
+      _animateTo(Matrix4.identity());
+      _setZoomed(false);
+    } else {
+      _setZoomed(true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<File?>(
-      future: asset.file,
-      builder: (context, snap) {
-        if (!snap.hasData || snap.data == null) {
-          return const Center(
-            child: CircularProgressIndicator(color: ThalabTheme.foxOrange),
-          );
-        }
-        return InteractiveViewer(
-          minScale: 1.0,
-          maxScale: 4.5,
-          child: Center(
-            child: Image.file(
-              snap.data!,
-              fit: BoxFit.contain,
-            ),
+    if (_file == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: ThalabTheme.foxOrange),
+      );
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onToggleChrome,
+      onDoubleTapDown: (d) => _doubleTapPos = d.localPosition,
+      onDoubleTap: _onDoubleTap,
+      child: InteractiveViewer(
+        transformationController: _tc,
+        minScale: 1.0,
+        maxScale: 6.0,
+        clipBehavior: Clip.none,
+        panEnabled: _zoomed,
+        onInteractionEnd: (_) => _onInteractionEnd(),
+        child: Center(
+          child: Image.file(
+            _file!,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+            gaplessPlayback: true,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
