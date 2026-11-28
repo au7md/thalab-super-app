@@ -195,6 +195,35 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     return '$h12:$mm ${h < 12 ? 'صباحاً' : 'مساءً'}';
   }
 
+  /// يفتح منتقي الوقت، يحفظ الاختيار، ويعيد جدولة التنبيهات فوراً.
+  Future<void> _pickReminderTime({
+    required String hourKey,
+    required String minKey,
+    required int curH,
+    required int curM,
+    required void Function(int h, int m) apply,
+  }) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: curH, minute: curM),
+      helpText: 'اختر موعد التذكير',
+      cancelText: 'إلغاء',
+      confirmText: 'حفظ',
+      builder: (ctx, child) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: child ?? const SizedBox.shrink(),
+      ),
+    );
+    if (picked == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(hourKey, picked.hour);
+    await prefs.setInt(minKey, picked.minute);
+    if (!mounted) return;
+    setState(() => apply(picked.hour, picked.minute));
+    Haptics.selectionClick();
+    await _resyncAllNotifications();
+  }
+
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final offset = prefs.getInt('hijri_day_offset') ?? 0;
@@ -1017,6 +1046,13 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         _NotifToggleCard(
           title: 'تذكير أذكار الصباح',
           index: 0,
+          onTimeTap: () => _pickReminderTime(
+            hourKey: 'notif_morning_hour',
+            minKey: 'notif_morning_min',
+            curH: _mH,
+            curM: _mM,
+            apply: (h, m) { _mH = h; _mM = m; },
+          ),
           subtitle: 'يومياً الساعة ${_timeAr(_mH, _mM)}',
           icon: Icons.wb_sunny_rounded,
           value: _morningAzkarNotif,
@@ -1030,6 +1066,13 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         _NotifToggleCard(
           title: 'تذكير أذكار المساء',
           index: 1,
+          onTimeTap: () => _pickReminderTime(
+            hourKey: 'notif_evening_hour',
+            minKey: 'notif_evening_min',
+            curH: _eH,
+            curM: _eM,
+            apply: (h, m) { _eH = h; _eM = m; },
+          ),
           subtitle: 'يومياً الساعة ${_timeAr(_eH, _eM)}',
           icon: Icons.nights_stay_rounded,
           value: _eveningAzkarNotif,
@@ -1043,6 +1086,13 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         _NotifToggleCard(
           title: 'تذكير أذكار النوم',
           index: 2,
+          onTimeTap: () => _pickReminderTime(
+            hourKey: 'notif_sleep_hour',
+            minKey: 'notif_sleep_min',
+            curH: _sH,
+            curM: _sM,
+            apply: (h, m) { _sH = h; _sM = m; },
+          ),
           subtitle: 'يومياً الساعة ${_timeAr(_sH, _sM)}',
           icon: Icons.bedtime_rounded,
           value: _sleepAzkarNotif,
@@ -1056,6 +1106,13 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         _NotifToggleCard(
           title: 'تذكير الورد القرآني اليومي',
           index: 3,
+          onTimeTap: () => _pickReminderTime(
+            hourKey: 'notif_wird_hour',
+            minKey: 'notif_wird_min',
+            curH: _wH,
+            curM: _wM,
+            apply: (h, m) { _wH = h; _wM = m; },
+          ),
           subtitle: 'يومياً الساعة ${_timeAr(_wH, _wM)} لمتابعة الختمة',
           icon: Icons.menu_book_rounded,
           value: _quranWirdNotif,
@@ -1136,6 +1193,7 @@ class _NotifToggleCard extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
   final int index;
+  final VoidCallback? onTimeTap;
 
   const _NotifToggleCard({
     required this.title,
@@ -1144,6 +1202,7 @@ class _NotifToggleCard extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.index = 0,
+    this.onTimeTap,
   });
 
   @override
@@ -1198,6 +1257,13 @@ class _NotifToggleCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (onTimeTap != null)
+              IconButton(
+                tooltip: 'تغيير الموعد',
+                visualDensity: VisualDensity.compact,
+                onPressed: onTimeTap,
+                icon: const Icon(Icons.schedule_rounded, color: ThalabTheme.foxOrange, size: 20),
+              ),
             Switch(
               value: value,
               activeColor: ThalabTheme.foxOrange,
