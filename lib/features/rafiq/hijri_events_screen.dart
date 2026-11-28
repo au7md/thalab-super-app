@@ -5,7 +5,9 @@ import 'package:hijri/hijri_calendar.dart';
 import 'package:adhan/adhan.dart';
 import '../../core/prayer_calc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/fox_mascot.dart';
 import '../../core/theme.dart';
+import '../../core/ui_kit.dart';
 import '../../core/rafiq_notifications_service.dart';
 import 'prayer_times_screen.dart';
 
@@ -350,9 +352,19 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'التاريخ الهجري اليوم',
+                  Row(
+                    children: [
+                      FoxMascot(
+                        size: 34,
+                        mood: isWhiteDay ? FoxMood.happy : FoxMood.praying,
+                        showBadge: false,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'التاريخ الهجري اليوم',
                     style: TextStyle(color: Colors.white70, fontSize: 12.5),
+                      ),
+                    ],
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -460,7 +472,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                       isMonOrThu
                           ? 'اليوم يُستحب صيامه (سنة الإثنين والخميس)'
                           : 'صيام ثلاثة أيام من كل شهر يعدل صيام الدهر كله',
-                      style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                      style: TextStyle(fontSize: 11.5, color: thalabMuted(context)),
                     ),
                   ],
                 ),
@@ -541,7 +553,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                           ),
                           Text(
                             '${event.day} $eventMonthName • يوافق ${_formatGregorianAr(gTarget)}',
-                            style: const TextStyle(fontSize: 11, color: ThalabTheme.mutedSlate),
+                            style: TextStyle(fontSize: 11, color: thalabMuted(context)),
                           ),
                         ],
                       ),
@@ -584,9 +596,9 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                   ),
                   child: Text(
                     event.virtue,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11.5,
-                      color: ThalabTheme.mutedSlate,
+                      color: thalabMuted(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -650,7 +662,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                   ),
                   Text(
                     'يوافق ${_gregorianMonthsAr[firstDayGregorian.month - 1]} ${firstDayGregorian.year} م',
-                    style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate),
+                    style: TextStyle(fontSize: 11.5, color: thalabMuted(context)),
                   ),
                 ],
               ),
@@ -690,10 +702,10 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                         child: Center(
                           child: Text(
                             d,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: ThalabTheme.mutedSlate,
+                              color: thalabMuted(context),
                             ),
                           ),
                         ),
@@ -763,7 +775,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                             '${gDate.day}',
                             style: TextStyle(
                               fontSize: 9.5,
-                              color: isSelected ? Colors.white70 : ThalabTheme.mutedSlate,
+                              color: isSelected ? Colors.white70 : thalabMuted(context),
                             ),
                           ),
                         ],
@@ -848,9 +860,9 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                   style: TextStyle(fontSize: 13, color: ThalabTheme.foxOrange, fontWeight: FontWeight.bold),
                 )
               else
-                const Text(
+                Text(
                   'يوم عادي من الشهر الهجري — اغتنمه بالذكر وتلاوة الورد القرآني.',
-                  style: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate),
+                  style: TextStyle(fontSize: 12.5, color: thalabMuted(context)),
                 ),
             ],
           ),
