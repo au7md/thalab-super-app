@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -265,7 +264,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   void _toggleSelection(String id) {
-    Haptics.selectionClick();
+    HapticFeedback.selectionClick();
     setState(() {
       if (_selectedAssetIds.contains(id)) {
         _selectedAssetIds.remove(id);
@@ -604,10 +603,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'لعرض صورك وفيديوهاتك وتنظيم الألبومات وتحريرها مباشرة داخل تطبيق الثعلب، يرجى منح صلاحية الوصول للوسائط.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 13, height: 1.5),
+              style: TextStyle(color: thalabMuted(context), fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
@@ -628,6 +627,15 @@ class _GalleryScreenState extends State<GalleryScreen> {
         ),
       ),
     );
+  }
+
+  /// صيغة عربية صحيحة للعدد: عنصر / عنصران / 3 عناصر / 11 عنصراً
+  String _countAr(int n) {
+    if (n == 0) return 'فارغ';
+    if (n == 1) return 'عنصر واحد';
+    if (n == 2) return 'عنصران';
+    if (n >= 3 && n <= 10) return '$n عناصر';
+    return '$n عنصراً';
   }
 
   Widget _buildAlbumsGrid() {
@@ -699,9 +707,21 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                           ),
-                          Text(
-                            '$count عنصر',
-                            style: const TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: ThalabTheme.foxOrange.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              _countAr(count),
+                              style: const TextStyle(
+                                color: ThalabTheme.foxOrange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ],
                       ),
