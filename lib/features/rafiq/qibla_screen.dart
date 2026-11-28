@@ -493,7 +493,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                       ),
                     ),
 
-                  const Text(
+                  Text(
                     'ضع الهاتف أفقياً بعيداً عن المعادن وأدِره حتى ينطبق رمز الكعبة مع المؤشر العلوي ويهتز الهاتف',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12.5, color: thalabMuted(context), height: 1.5),
