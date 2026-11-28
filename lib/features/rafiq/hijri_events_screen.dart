@@ -51,6 +51,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
   bool _eveningAzkarNotif = true;
   bool _sleepAzkarNotif = true;
   bool _quranWirdNotif = true;
+  int _mH = 6, _mM = 30, _eH = 17, _eM = 30, _sH = 22, _sM = 30, _wH = 20, _wM = 0;
   bool _hijriEventsNotif = true;
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
@@ -187,6 +188,13 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
     super.dispose();
   }
 
+  /// وقت بصيغة عربية 12 ساعة: 6:30 صباحاً / 5:30 مساءً
+  String _timeAr(int h, int m) {
+    final h12 = h % 12 == 0 ? 12 : h % 12;
+    final mm = m.toString().padLeft(2, '0');
+    return '$h12:$mm ${h < 12 ? 'صباحاً' : 'مساءً'}';
+  }
+
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final offset = prefs.getInt('hijri_day_offset') ?? 0;
@@ -203,6 +211,14 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
       _sleepAzkarNotif = prefs.getBool('notif_azkar_sleep') ?? true;
       _quranWirdNotif = prefs.getBool('notif_quran_wird') ?? true;
       _hijriEventsNotif = prefs.getBool('notif_hijri_events') ?? true;
+      _mH = prefs.getInt('notif_morning_hour') ?? 6;
+      _mM = prefs.getInt('notif_morning_min') ?? 30;
+      _eH = prefs.getInt('notif_evening_hour') ?? 17;
+      _eM = prefs.getInt('notif_evening_min') ?? 30;
+      _sH = prefs.getInt('notif_sleep_hour') ?? 22;
+      _sM = prefs.getInt('notif_sleep_min') ?? 30;
+      _wH = prefs.getInt('notif_wird_hour') ?? 20;
+      _wM = prefs.getInt('notif_wird_min') ?? 0;
     });
   }
 
@@ -889,7 +905,11 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
             children: [
               Row(
                 children: [
-                  const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 28),
+                  FoxMascot(
+                    size: 46,
+                    mood: _masterNotifEnabled ? FoxMood.happy : FoxMood.sleepy,
+                    showBadge: false,
+                  ),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Column(
@@ -926,6 +946,23 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
                 ],
               ),
               const SizedBox(height: 12),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    _masterNotifEnabled
+                        ? 'مفعّل: ${[_morningAzkarNotif, _eveningAzkarNotif, _sleepAzkarNotif, _quranWirdNotif, _hijriEventsNotif].where((e) => e).length} من 5 تذكيرات يومية'
+                        : 'كل التنبيهات موقوفة الآن',
+                    style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
@@ -979,7 +1016,8 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
 
         _NotifToggleCard(
           title: 'تذكير أذكار الصباح',
-          subtitle: 'يومياً الساعة 6:30 صباحاً',
+          index: 0,
+          subtitle: 'يومياً الساعة ${_timeAr(_mH, _mM)}',
           icon: Icons.wb_sunny_rounded,
           value: _morningAzkarNotif,
           onChanged: (val) async {
@@ -991,7 +1029,8 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         ),
         _NotifToggleCard(
           title: 'تذكير أذكار المساء',
-          subtitle: 'يومياً الساعة 5:30 مساءً',
+          index: 1,
+          subtitle: 'يومياً الساعة ${_timeAr(_eH, _eM)}',
           icon: Icons.nights_stay_rounded,
           value: _eveningAzkarNotif,
           onChanged: (val) async {
@@ -1003,7 +1042,8 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         ),
         _NotifToggleCard(
           title: 'تذكير أذكار النوم',
-          subtitle: 'يومياً الساعة 10:30 مساءً',
+          index: 2,
+          subtitle: 'يومياً الساعة ${_timeAr(_sH, _sM)}',
           icon: Icons.bedtime_rounded,
           value: _sleepAzkarNotif,
           onChanged: (val) async {
@@ -1015,7 +1055,8 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         ),
         _NotifToggleCard(
           title: 'تذكير الورد القرآني اليومي',
-          subtitle: 'يومياً الساعة 8:00 مساءً لمتابعة الختمة',
+          index: 3,
+          subtitle: 'يومياً الساعة ${_timeAr(_wH, _wM)} لمتابعة الختمة',
           icon: Icons.menu_book_rounded,
           value: _quranWirdNotif,
           onChanged: (val) async {
@@ -1027,6 +1068,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
         ),
         _NotifToggleCard(
           title: 'تنبيهات المناسبات الهجرية والأيام البيض',
+          index: 4,
           subtitle: 'تذكير تلقائي في عاشوراء، رمضان، عرفة، والعيدين',
           icon: Icons.event_available_rounded,
           value: _hijriEventsNotif,
@@ -1093,6 +1135,7 @@ class _NotifToggleCard extends StatelessWidget {
   final IconData icon;
   final bool value;
   final ValueChanged<bool> onChanged;
+  final int index;
 
   const _NotifToggleCard({
     required this.title,
@@ -1100,48 +1143,71 @@ class _NotifToggleCard extends StatelessWidget {
     required this.icon,
     required this.value,
     required this.onChanged,
+    this.index = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? ThalabTheme.darkBorder : ThalabTheme.softBorder,
-          width: 1.2,
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return FadeSlideIn(
+      delay: Duration(milliseconds: 120 + index * 80),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOut,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: value
+              ? LinearGradient(
+                  colors: [
+                    ThalabTheme.foxOrange.withOpacity(isDark ? 0.20 : 0.10),
+                    theme.cardColor,
+                  ],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                )
+              : null,
+          color: value ? null : theme.cardColor,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: value
+                ? ThalabTheme.foxOrange.withOpacity(0.45)
+                : theme.dividerColor,
+            width: 1.2,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              color: ThalabTheme.foxOrange.withOpacity(0.12),
-              shape: BoxShape.circle,
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 260),
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: ThalabTheme.foxOrange.withOpacity(value ? 0.22 : 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: ThalabTheme.foxOrange, size: 20),
             ),
-            child: Icon(icon, color: ThalabTheme.foxOrange, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text(subtitle, style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate)),
-              ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(subtitle, style: TextStyle(fontSize: 11.5, color: thalabMuted(context))),
+                ],
+              ),
             ),
-          ),
-          Switch(
-            value: value,
-            activeColor: ThalabTheme.foxOrange,
-            onChanged: onChanged,
-          ),
-        ],
+            Switch(
+              value: value,
+              activeColor: ThalabTheme.foxOrange,
+              onChanged: (v) {
+                Haptics.selectionClick();
+                onChanged(v);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
