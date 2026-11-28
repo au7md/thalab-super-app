@@ -147,11 +147,11 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'اللهم اغفر لي ولوالديّ وللمسلمين أجمعين، واجعل هذا العمل خالصاً لوجهك الكريم ونافعاً لكل من يستخدمه.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            color: ThalabTheme.mutedSlate, fontSize: 12.5, height: 1.5),
+                            color: thalabMuted(context), fontSize: 12.5, height: 1.5),
                       ),
                       const SizedBox(height: 12),
                       ElevatedButton.icon(
@@ -316,7 +316,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
 
           // 2. قسم الإنتاجية والتركيز + ركن الطلاب
           const _SectionHeader(
-              title: 'الإنتاجية والتركيز (Pro)', icon: Icons.bolt_rounded),
+              title: 'الإنتاجية والتركيز', icon: Icons.bolt_rounded),
           const SizedBox(height: 10),
           GridView.count(
             padding: EdgeInsets.zero,
@@ -328,6 +328,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
             childAspectRatio: 1.48,
             children: [
               _ToolGridCard(
+                accent: const Color(0xFFE86A17),
                 title: 'مؤقت بومودورو',
                 subtitle: 'جلسات متعددة وتركيز هادئ',
                 icon: Icons.timer_rounded,
@@ -337,6 +338,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 ),
               ),
               _ToolGridCard(
+                accent: const Color(0xFFE86A17),
                 title: 'خزنة الملاحظات',
                 subtitle: 'محمية برقم سري وبصمة',
                 icon: Icons.lock_person_rounded,
@@ -346,6 +348,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 ),
               ),
               _ToolGridCard(
+                accent: const Color(0xFFE86A17),
                 title: 'متتبع العادات',
                 subtitle: 'مربوط بمهام التطبيق',
                 icon: Icons.checklist_rounded,
@@ -355,6 +358,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 ),
               ),
               _ToolGridCard(
+                accent: const Color(0xFFE86A17),
                 title: 'ركن الطلاب',
                 subtitle: 'أهداف، GPA، وجدول المذاكرة',
                 icon: Icons.school_rounded,
@@ -381,6 +385,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
             childAspectRatio: 1.48,
             children: [
               _ToolGridCard(
+                accent: const Color(0xFF16A34A),
                 title: 'محول الوحدات',
                 subtitle: 'طول، وزن، مساحة، حرارة',
                 icon: Icons.swap_horiz_rounded,
@@ -390,6 +395,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 ),
               ),
               _ToolGridCard(
+                accent: const Color(0xFF16A34A),
                 title: 'حاسبة العمر',
                 subtitle: 'بالسنة والشهر واليوم',
                 icon: Icons.cake_rounded,
@@ -399,6 +405,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 ),
               ),
               _ToolGridCard(
+                accent: const Color(0xFF16A34A),
                 title: 'مولد كلمات المرور',
                 subtitle: 'تشفير وأمان عالي',
                 icon: Icons.password_rounded,
@@ -408,6 +415,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 ),
               ),
               _ToolGridCard(
+                accent: const Color(0xFF16A34A),
                 title: 'محلل النصوص',
                 subtitle: 'كلمات، أحرف، وقت قراءة',
                 icon: Icons.text_fields_rounded,
@@ -433,6 +441,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
             childAspectRatio: 1.48,
             children: [
               _ToolGridCard(
+                accent: const Color(0xFF2563EB),
                 title: 'الإعدادات',
                 subtitle: 'المظهر، اللغة، الإشعارات',
                 icon: Icons.settings_rounded,
@@ -445,6 +454,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 },
               ),
               _ToolGridCard(
+                accent: const Color(0xFF2563EB),
                 title: 'مشاركة التطبيق',
                 subtitle: 'انشر الخير مع غيرك',
                 icon: Icons.share_rounded,
@@ -479,18 +489,18 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                         color: ThalabTheme.foxOrange, size: 22),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('عن المطور والصدقة الجارية',
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
                         Text('تطوير: أحمد تعلب (au7md) • اضغط للتواصل',
-                            style: TextStyle(color: ThalabTheme.mutedSlate, fontSize: 11)),
+                            style: TextStyle(color: thalabMuted(context), fontSize: 11)),
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: ThalabTheme.mutedSlate),
+                  Icon(Icons.chevron_right_rounded, color: thalabMuted(context)),
                 ],
               ),
             ),
@@ -944,12 +954,14 @@ class _ToolGridCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final VoidCallback onTap;
+  final Color? accent;
 
   const _ToolGridCard({
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.onTap,
+    this.accent,
   });
 
   static const List<Color> _palette = [
@@ -966,7 +978,7 @@ class _ToolGridCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final h = title.codeUnits.fold<int>(0, (a, b) => a + b);
-    final accent = _palette[h % _palette.length];
+    final cardAccent = accent ?? _palette[h % _palette.length];
     return FadeSlideIn(
       delay: Duration(milliseconds: 80 + (h % 5) * 70),
       child: PressableScale(
@@ -975,19 +987,19 @@ class _ToolGridCard extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [accent.withOpacity(isDark ? 0.20 : 0.11), theme.cardColor],
+              colors: [cardAccent.withOpacity(isDark ? 0.20 : 0.11), theme.cardColor],
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
             ),
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: accent.withOpacity(isDark ? 0.32 : 0.25)),
+            border: Border.all(color: cardAccent.withOpacity(isDark ? 0.32 : 0.25)),
           ),
           child: Stack(
             children: [
               PositionedDirectional(
                 start: -10,
                 bottom: -14,
-                child: Icon(icon, size: 70, color: accent.withOpacity(0.10)),
+                child: Icon(icon, size: 70, color: cardAccent.withOpacity(0.10)),
               ),
               Padding(
                 padding: const EdgeInsets.all(14),
@@ -997,10 +1009,10 @@ class _ToolGridCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: accent.withOpacity(0.16),
+                        color: cardAccent.withOpacity(0.16),
                         borderRadius: BorderRadius.circular(13),
                       ),
-                      child: Icon(icon, color: accent, size: 22),
+                      child: Icon(icon, color: cardAccent, size: 22),
                     ),
                     const Spacer(),
                     Text(title,
