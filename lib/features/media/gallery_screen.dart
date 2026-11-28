@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -264,7 +265,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   void _toggleSelection(String id) {
-    HapticFeedback.selectionClick();
+    Haptics.selectionClick();
     setState(() {
       if (_selectedAssetIds.contains(id)) {
         _selectedAssetIds.remove(id);

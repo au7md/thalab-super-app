@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -427,7 +428,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   }
 
   Future<void> _toggleFavorite(String id) async {
-    HapticFeedback.selectionClick();
+    Haptics.selectionClick();
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       if (_favoriteIds.contains(id)) {
@@ -440,7 +441,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
   }
 
   void _toggleSelection(String id) {
-    HapticFeedback.mediumImpact();
+    Haptics.mediumImpact();
     setState(() {
       if (_selectedTrackIds.contains(id)) {
         _selectedTrackIds.remove(id);
@@ -2185,7 +2186,7 @@ class _ProVoiceRecorderScreenState extends State<_ProVoiceRecorderScreen> {
                         icon: const Icon(Icons.flag_rounded,
                             color: ThalabTheme.foxOrange, size: 28),
                         onPressed: () {
-                          HapticFeedback.selectionClick();
+                          Haptics.selectionClick();
                           setState(() => _bookmarksSec.add(_stopwatch.elapsed.inSeconds));
                         },
                       ),

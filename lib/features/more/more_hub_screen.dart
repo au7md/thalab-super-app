@@ -1,5 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../rafiq/adhan_diagnostics_screen.dart';
+import '../rafiq/hijri_events_screen.dart';
+import '../rafiq/prayer_times_screen.dart';
+import '../../core/rafiq_notifications_service.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
@@ -43,7 +48,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
   }
 
   Future<void> _incrementDua() async {
-    HapticFeedback.lightImpact();
+    Haptics.lightImpact();
     final prefs = await SharedPreferences.getInstance();
     setState(() => _sadaqahDuaCount++);
     await prefs.setInt('sadaqah_dua_count', _sadaqahDuaCount);
@@ -65,7 +70,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: ThalabTheme.creamBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
@@ -80,7 +85,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                   width: 44,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: ThalabTheme.softBorder,
+                    color: Theme.of(context).dividerColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -123,9 +128,9 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: ThalabTheme.cardSurface,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: ThalabTheme.softBorder),
+                    border: Border.all(color: Theme.of(context).dividerColor),
                   ),
                   child: Column(
                     children: [
@@ -239,21 +244,10 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
                   ),
                 ),
                 onPressed: () {
-                  HapticFeedback.selectionClick();
+                  Haptics.selectionClick();
                   ThemeController.instance.toggle();
                 },
               );
-            },
-          ),
-          IconButton(
-            tooltip: 'الإعدادات',
-            icon: const Icon(Icons.settings_rounded, color: ThalabTheme.darkSlate),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
-              );
-              _loadUserData();
             },
           ),
         ],
@@ -471,7 +465,7 @@ class _MoreHubScreenState extends State<MoreHubScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(color: Theme.of(context).dividerColor),
               ),
               child: Row(
                 children: [
@@ -575,7 +569,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             decoration: InputDecoration(
               labelText: 'الاسم الشخصي',
               filled: true,
-              fillColor: ThalabTheme.cardSurface,
+              fillColor: Theme.of(context).cardColor,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),
@@ -589,7 +583,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   label: const Center(child: Text('ذكر')),
                   selected: _gender == 'ذكر',
                   selectedColor: ThalabTheme.foxOrange,
-                  labelStyle: TextStyle(color: _gender == 'ذكر' ? Colors.white : ThalabTheme.darkSlate),
+                  labelStyle: TextStyle(color: _gender == 'ذكر' ? Colors.white : Theme.of(context).colorScheme.onSurface),
                   onSelected: (_) => setState(() => _gender = 'ذكر'),
                 ),
               ),
@@ -599,7 +593,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   label: const Center(child: Text('أنثى')),
                   selected: _gender == 'أنثى',
                   selectedColor: ThalabTheme.foxOrange,
-                  labelStyle: TextStyle(color: _gender == 'أنثى' ? Colors.white : ThalabTheme.darkSlate),
+                  labelStyle: TextStyle(color: _gender == 'أنثى' ? Colors.white : Theme.of(context).colorScheme.onSurface),
                   onSelected: (_) => setState(() => _gender = 'أنثى'),
                 ),
               ),
@@ -609,9 +603,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -664,9 +658,9 @@ class AppSettingsScreen extends StatefulWidget {
 }
 
 class _AppSettingsScreenState extends State<AppSettingsScreen> {
-  bool _notificationsEnabled = true;
-  bool _hapticEnabled = true;
-  String _appLang = 'العربية';
+  bool _notifMaster = true;
+  bool _followRinger = true;
+  bool _haptic = true;
 
   @override
   void initState() {
@@ -676,11 +670,175 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
-      _notificationsEnabled = prefs.getBool('settings_notifications') ?? true;
-      _hapticEnabled = prefs.getBool('settings_haptic') ?? true;
-      _appLang = prefs.getString('settings_lang') ?? 'العربية';
+      _notifMaster = prefs.getBool('notif_master_enabled') ?? true;
+      _followRinger = prefs.getBool('adhan_follow_ringer') ?? true;
+      _haptic = prefs.getBool('settings_haptic') ?? true;
     });
+  }
+
+  Future<void> _setMaster(bool v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notif_master_enabled', v);
+    setState(() => _notifMaster = v);
+    await RafiqNotificationsService.instance.resyncFromSavedLocation();
+  }
+
+  Future<void> _setFollowRinger(bool v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('adhan_follow_ringer', v);
+    setState(() => _followRinger = v);
+    await RafiqNotificationsService.instance.resyncFromSavedLocation();
+  }
+
+  Future<void> _setHaptic(bool v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('settings_haptic', v);
+    Haptics.setEnabled(v);
+    setState(() => _haptic = v);
+  }
+
+  Widget _group(String emoji, String title, List<Widget> kids, int index) {
+    final theme = Theme.of(context);
+    return FadeSlideIn(
+      delay: Duration(milliseconds: 80 + index * 110),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: theme.dividerColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
+                    color: ThalabTheme.foxOrange,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ...kids,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navTile(IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return PressableScale(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: ThalabTheme.foxOrange.withOpacity(0.14),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: ThalabTheme.foxOrange, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  Text(subtitle, style: TextStyle(fontSize: 12, color: thalabMuted(context))),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_left_rounded,
+                color: thalabMuted(context), textDirection: TextDirection.ltr),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _switchTile(String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      activeColor: ThalabTheme.foxOrange,
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      value: value,
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _themeCard(String label, bool dark, bool selected, VoidCallback onTap) {
+    final bg = dark ? ThalabTheme.darkBackground : ThalabTheme.creamBackground;
+    final card = dark ? ThalabTheme.darkCardSurface : ThalabTheme.cardSurface;
+    final line = dark ? ThalabTheme.darkBorder : ThalabTheme.softBorder;
+    return PressableScale(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? ThalabTheme.foxOrange : line,
+            width: selected ? 2.2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              height: 46,
+              decoration: BoxDecoration(
+                color: card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: line),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: const BoxDecoration(
+                      color: ThalabTheme.foxOrange,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 36,
+                    height: 6,
+                    decoration: BoxDecoration(color: line, borderRadius: BorderRadius.circular(3)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: dark ? ThalabTheme.darkTextPrimary : ThalabTheme.darkSlate,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -688,42 +846,60 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('الإعدادات')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
-          SwitchListTile(
-            activeColor: ThalabTheme.foxOrange,
-            title: const Text('تنبيهات الأذان والأذكار', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('تفعيل أو إيقاف الإشعارات اليومية'),
-            value: _notificationsEnabled,
-            onChanged: (v) async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('settings_notifications', v);
-              setState(() => _notificationsEnabled = v);
-            },
-          ),
-          const Divider(),
-          SwitchListTile(
-            activeColor: ThalabTheme.foxOrange,
-            title: const Text('الاهتزاز التفاعلي (Haptic)', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('اهتزاز خفيف عند التسبيح والضغط'),
-            value: _hapticEnabled,
-            onChanged: (v) async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('settings_haptic', v);
-              setState(() => _hapticEnabled = v);
-            },
-          ),
-          const Divider(),
-          ListTile(
-            title: const Text('لغة التطبيق', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(_appLang),
-            trailing: const Icon(Icons.language_rounded, color: ThalabTheme.foxOrange),
-            onTap: () {
+          _group('🎨', 'المظهر', [
+            const SizedBox(height: 6),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: ThemeController.instance.mode,
+              builder: (_, mode, __) => Row(
+                children: [
+                  Expanded(
+                    child: _themeCard('☀️ فاتح', false, mode != ThemeMode.dark,
+                        () => ThemeController.instance.setTheme(ThemeMode.light)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _themeCard('🌙 ليلي', true, mode == ThemeMode.dark,
+                        () => ThemeController.instance.setTheme(ThemeMode.dark)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+          ], 0),
+          _group('🔔', 'الأذان والتنبيهات', [
+            _switchTile('تفعيل كل التنبيهات', 'الأذان والأذكار والورد والمناسبات', _notifMaster, _setMaster),
+            const Divider(height: 1),
+            _switchTile('الأذان يحترم وضع الصامت', 'عند الصامت أو الاهتزاز: إشعار بدون صوت أذان', _followRinger,
+                _setFollowRinger),
+            const Divider(height: 1),
+            _navTile(Icons.mosque_rounded, 'تنبيهات الصلوات والأذان', 'المؤذن، تنبيه الاستعداد، الإقامة', () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const PrayerTimesScreen(initialTab: 2)));
+            }),
+            const Divider(height: 1),
+            _navTile(Icons.event_available_rounded, 'تذكيرات الأذكار والمناسبات', 'الصباح والمساء والنوم والورد', () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const HijriEventsScreen(initialTab: 2)));
+            }),
+            const Divider(height: 1),
+            _navTile(Icons.health_and_safety_rounded, 'تشخيص الأذان والإشعارات', 'اختبارات وأذونات وإعدادات أوبو', () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const AdhanDiagnosticsScreen()));
+            }),
+          ], 1),
+          _group('✨', 'التجربة', [
+            _switchTile('الاهتزاز التفاعلي', 'اهتزاز خفيف عند التسبيح والضغط والتنقل', _haptic, _setHaptic),
+          ], 2),
+          _group('ℹ️', 'عن التطبيق', [
+            _navTile(Icons.language_rounded, 'لغة التطبيق', 'العربية', () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('اللغة العربية هي اللغة الأساسية للتطبيق حالياً')),
               );
-            },
-          ),
+            }),
+            const SizedBox(height: 4),
+          ], 3),
         ],
       ),
     );

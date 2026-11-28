@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -863,7 +864,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
   }
 
   Future<void> _togglePageCompleted() async {
-    HapticFeedback.mediumImpact();
+    Haptics.mediumImpact();
     final prefs = await SharedPreferences.getInstance();
     final key = _currentPage.toString();
     setState(() {
@@ -931,7 +932,7 @@ class _QuranPageReaderScreenState extends State<QuranPageReaderScreen> {
   }
 
   void _showVerseActionsSheet(int surahNum, int verseNum, String verseText) {
-    HapticFeedback.selectionClick();
+    Haptics.selectionClick();
     final surahName = quran.getSurahNameArabic(surahNum);
     final formattedVerse =
         '﴿$verseText﴾\n— سورة $surahName • آية ${_toArabicDigits(verseNum)} (صفحة $_currentPage)';

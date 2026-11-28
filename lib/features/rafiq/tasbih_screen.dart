@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -107,7 +108,7 @@ class _TasbihScreenState extends State<TasbihScreen>
   Future<void> _incrementTasbih() async {
     _beadAnimController.forward(from: 0.0);
     if (_vibrationEnabled) {
-      HapticFeedback.lightImpact();
+      Haptics.lightImpact();
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -125,7 +126,7 @@ class _TasbihScreenState extends State<TasbihScreen>
     });
 
     if (roundJustCompleted && _vibrationEnabled) {
-      HapticFeedback.heavyImpact();
+      Haptics.heavyImpact();
     }
 
     await prefs.setInt('tasbih_current', _tasbihCount);
@@ -135,7 +136,7 @@ class _TasbihScreenState extends State<TasbihScreen>
 
   Future<void> _resetTasbih() async {
     if (_vibrationEnabled) {
-      HapticFeedback.mediumImpact();
+      Haptics.mediumImpact();
     }
     final prefs = await SharedPreferences.getInstance();
     setState(() {

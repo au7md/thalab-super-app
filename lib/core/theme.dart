@@ -64,6 +64,7 @@ class ThalabTheme {
       brightness: Brightness.light,
       scaffoldBackgroundColor: creamBackground,
       cardColor: cardSurface,
+      dividerColor: softBorder,
       primaryColor: foxOrange,
       colorScheme: ColorScheme.fromSeed(
         seedColor: foxOrange,
@@ -115,6 +116,7 @@ class ThalabTheme {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBackground,
       cardColor: darkCardSurface,
+      dividerColor: darkBorder,
       primaryColor: foxOrange,
       colorScheme: ColorScheme.fromSeed(
         seedColor: foxOrange,

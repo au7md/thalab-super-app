@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/haptics.dart';
 import 'package:flutter/services.dart';
 import '../core/fox_mascot.dart';
 import '../core/theme.dart';
@@ -101,7 +102,7 @@ class ThalabFloatingNavBar extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        HapticFeedback.selectionClick();
+        Haptics.selectionClick();
         onTap(idx);
       },
       behavior: HitTestBehavior.opaque,

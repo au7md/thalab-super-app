@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
+import '../../core/ui_kit.dart';
+import '../../core/fox_mascot.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
@@ -69,7 +72,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
   }
 
   void _toggleTimer() {
-    HapticFeedback.lightImpact();
+    Haptics.lightImpact();
     if (_isRunning) {
       _timer?.cancel();
       setState(() => _isRunning = false);
@@ -80,7 +83,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
           setState(() => _secondsLeft--);
         } else {
           t.cancel();
-          HapticFeedback.heavyImpact();
+          Haptics.heavyImpact();
           setState(() => _isRunning = false);
           if (_isWorkMode) {
             final prefs = await SharedPreferences.getInstance();
@@ -112,9 +115,9 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,7 +136,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
                           selected: selected,
                           selectedColor: ThalabTheme.foxOrange,
                           labelStyle: TextStyle(
-                            color: selected ? Colors.white : ThalabTheme.darkSlate,
+                            color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                           ),
                           onSelected: (_) => _selectWorkMinutes(min),
@@ -157,7 +160,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
                           selected: selected,
                           selectedColor: const Color(0xFF0D9488),
                           labelStyle: TextStyle(
-                            color: selected ? Colors.white : ThalabTheme.darkSlate,
+                            color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                           ),
                           onSelected: (_) => _selectBreakMinutes(min),
@@ -178,7 +181,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
               height: 246,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: ThalabTheme.cardSurface,
+                color: Theme.of(context).cardColor,
                 boxShadow: [
                   BoxShadow(
                     color: activeColor.withOpacity(0.14),
@@ -196,7 +199,7 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
                     child: CircularProgressIndicator(
                       value: progress,
                       strokeWidth: 11,
-                      backgroundColor: ThalabTheme.softBorder,
+                      backgroundColor: Theme.of(context).dividerColor,
                       color: activeColor,
                     ),
                   ),
@@ -271,9 +274,9 @@ class _PomodoroProScreenState extends State<PomodoroProScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -350,7 +353,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
   }
 
   void _onDigitTap(String digit) async {
-    HapticFeedback.selectionClick();
+    Haptics.selectionClick();
     if (_enteredPin.length >= 4) return;
     setState(() => _enteredPin += digit);
 
@@ -374,7 +377,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
           _enteredPin = '';
         });
       } else {
-        HapticFeedback.heavyImpact();
+        Haptics.heavyImpact();
         setState(() => _enteredPin = '');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -392,7 +395,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: ThalabTheme.creamBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -411,7 +414,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
               decoration: InputDecoration(
                 hintText: 'عنوان الملاحظة...',
                 filled: true,
-                fillColor: ThalabTheme.cardSurface,
+                fillColor: Theme.of(context).cardColor,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
@@ -422,7 +425,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
               decoration: InputDecoration(
                 hintText: 'اكتب تفاصيل ملاحظتك هنا...',
                 filled: true,
-                fillColor: ThalabTheme.cardSurface,
+                fillColor: Theme.of(context).cardColor,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
             ),
@@ -512,8 +515,8 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                   ...List.generate(9, (i) => '${i + 1}').map((d) {
                     return ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: ThalabTheme.cardSurface,
-                        foregroundColor: ThalabTheme.darkSlate,
+                        backgroundColor: Theme.of(context).cardColor,
+                        foregroundColor: Theme.of(context).colorScheme.onSurface,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18)),
                       ),
@@ -528,7 +531,7 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                       icon: const Icon(Icons.fingerprint_rounded,
                           size: 34, color: ThalabTheme.foxOrange),
                       onPressed: () {
-                        HapticFeedback.mediumImpact();
+                        Haptics.mediumImpact();
                         setState(() => _isUnlocked = true);
                       },
                     )
@@ -536,8 +539,8 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                     const SizedBox.shrink(),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: ThalabTheme.cardSurface,
-                      foregroundColor: ThalabTheme.darkSlate,
+                      backgroundColor: Theme.of(context).cardColor,
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18)),
                     ),
@@ -595,9 +598,10 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
       body: Stack(
         children: [
           _notes.isEmpty
-              ? const Center(
-                  child: Text('الخزنة فارغة — اضغط على القلم بالأسفل لإضافة ملاحظة',
-                      style: TextStyle(color: ThalabTheme.mutedSlate)),
+              ? const FoxEmptyState(
+                  mood: FoxMood.sleepy,
+                  title: 'الخزنة فارغة 🔒',
+                  subtitle: 'اضغط على القلم بالأسفل لإضافة أول ملاحظة سرية.',
                 )
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
@@ -608,9 +612,9 @@ class _SecureNotesVaultScreenState extends State<SecureNotesVaultScreen> {
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: ThalabTheme.cardSurface,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: ThalabTheme.softBorder),
+                        border: Border.all(color: Theme.of(context).dividerColor),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -692,11 +696,13 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
       setState(() =>
           _habits = List<Map<String, dynamic>>.from(jsonDecode(raw)));
     } else {
-      _habits = [
-        {'title': 'أذكار الصباح والمساء', 'done': false, 'route': 'adhkar'},
-        {'title': 'قراءة ورد القرآن اليومي', 'done': false, 'route': 'quran'},
-        {'title': 'جلسة تركيز بومودورو', 'done': false, 'route': 'pomodoro'},
-      ];
+      setState(() {
+        _habits = [
+          {'title': 'أذكار الصباح والمساء', 'done': false, 'route': 'adhkar'},
+          {'title': 'قراءة ورد القرآن اليومي', 'done': false, 'route': 'quran'},
+          {'title': 'جلسة تركيز بومودورو', 'done': false, 'route': 'pomodoro'},
+        ];
+      });
     }
   }
 
@@ -729,9 +735,9 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -751,7 +757,7 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
                   value: pct,
                   minHeight: 8,
                   borderRadius: BorderRadius.circular(8),
-                  backgroundColor: ThalabTheme.softBorder,
+                  backgroundColor: Theme.of(context).dividerColor,
                   color: ThalabTheme.foxOrange,
                 ),
               ],
@@ -767,10 +773,10 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
                     decoration: InputDecoration(
                       hintText: 'أضف عادة جديدة...',
                       filled: true,
-                      fillColor: ThalabTheme.cardSurface,
+                      fillColor: Theme.of(context).cardColor,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                        borderSide: BorderSide(color: Theme.of(context).dividerColor),
                       ),
                     ),
                   ),
@@ -805,10 +811,10 @@ class _IntegratedHabitScreenState extends State<IntegratedHabitScreen> {
                 final route = item['route'] as String?;
                 return Container(
                   decoration: BoxDecoration(
-                    color: ThalabTheme.cardSurface,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: done ? ThalabTheme.foxOrange : ThalabTheme.softBorder,
+                      color: done ? ThalabTheme.foxOrange : Theme.of(context).dividerColor,
                     ),
                   ),
                   child: ListTile(

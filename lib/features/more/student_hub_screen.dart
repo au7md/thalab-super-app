@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../core/ui_kit.dart';
+import '../../core/fox_mascot.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme.dart';
 import 'productivity_pro_screens.dart';
@@ -165,11 +167,10 @@ class _StudyGoalsTabState extends State<_StudyGoalsTab> {
         label: const Text('إضافة مادة'),
       ),
       body: _subjects.isEmpty
-          ? const Center(
-              child: Text(
-                'أضف موادك الدراسية وحدد ساعات المذاكرة المستهدفة',
-                style: TextStyle(color: ThalabTheme.mutedSlate),
-              ),
+          ? const FoxEmptyState(
+              mood: FoxMood.studying,
+              title: 'ابدأ رحلتك الدراسية 📚',
+              subtitle: 'أضف موادك وحدّد ساعات المذاكرة المستهدفة، وسأتابع تقدمك معك.',
             )
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
@@ -184,9 +185,9 @@ class _StudyGoalsTabState extends State<_StudyGoalsTab> {
                 return Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: ThalabTheme.cardSurface,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: ThalabTheme.softBorder),
+                    border: Border.all(color: Theme.of(context).dividerColor),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,7 +212,7 @@ class _StudyGoalsTabState extends State<_StudyGoalsTab> {
                         value: pct,
                         minHeight: 8,
                         borderRadius: BorderRadius.circular(8),
-                        backgroundColor: ThalabTheme.softBorder,
+                        backgroundColor: Theme.of(context).dividerColor,
                         color: ThalabTheme.foxOrange,
                       ),
                       const SizedBox(height: 10),
@@ -325,7 +326,7 @@ class _StudyScheduleTabState extends State<_StudyScheduleTab> {
                 selected: active,
                 selectedColor: ThalabTheme.foxOrange,
                 labelStyle: TextStyle(
-                  color: active ? Colors.white : ThalabTheme.darkSlate,
+                  color: active ? Colors.white : Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
                 onSelected: (_) => setState(() => _selectedDay = d),
@@ -343,10 +344,10 @@ class _StudyScheduleTabState extends State<_StudyScheduleTab> {
                   decoration: InputDecoration(
                     hintText: 'أضف حصة أو مهمة ليوم $_selectedDay...',
                     filled: true,
-                    fillColor: ThalabTheme.cardSurface,
+                    fillColor: Theme.of(context).cardColor,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                      borderSide: BorderSide(color: Theme.of(context).dividerColor),
                     ),
                   ),
                 ),
@@ -382,9 +383,9 @@ class _StudyScheduleTabState extends State<_StudyScheduleTab> {
                   itemBuilder: (ctx, i) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: ThalabTheme.cardSurface,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: ThalabTheme.softBorder),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     child: Row(
                       children: [
@@ -485,9 +486,9 @@ class _GpaCalculatorTabState extends State<_GpaCalculatorTab> {
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Row(
               children: [

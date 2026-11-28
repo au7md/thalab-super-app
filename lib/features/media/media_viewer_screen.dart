@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -62,7 +63,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   Future<void> _toggleFavorite(AssetEntity asset) async {
-    HapticFeedback.selectionClick();
+    Haptics.selectionClick();
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       if (_favoriteIds.contains(asset.id)) {

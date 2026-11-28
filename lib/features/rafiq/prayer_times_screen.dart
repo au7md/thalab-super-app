@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:adhan/adhan.dart';
 import '../../core/prayer_calc.dart';
@@ -526,7 +527,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   }
 
   Future<void> _updatePrayerLogStatus(String prayerKey, int newStatus) async {
-    HapticFeedback.selectionClick();
+    Haptics.selectionClick();
     final prefs = await SharedPreferences.getInstance();
     final dateKey = _todayDateKey;
     final oldStatus = _todayPrayerStatus[prayerKey] ?? 0;
@@ -550,7 +551,7 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen>
   }
 
   Future<void> _toggleSunnahLog(String prayerKey) async {
-    HapticFeedback.lightImpact();
+    Haptics.lightImpact();
     final prefs = await SharedPreferences.getInstance();
     final dateKey = _todayDateKey;
     final nextVal = !(_todaySunnahDone[prayerKey] ?? false);

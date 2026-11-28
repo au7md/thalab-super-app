@@ -84,13 +84,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     ),
                     TweenAnimationBuilder<double>(
                       tween: Tween(begin: 0.0, end: 1.0),
-                      duration: const Duration(milliseconds: 950),
+                      duration: const Duration(milliseconds: 1250),
                       curve: Curves.easeOutBack,
                       builder: (_, v, child) => Opacity(
                         opacity: v.clamp(0.0, 1.0),
-                        child: Transform.scale(scale: 0.6 + 0.4 * v, child: child),
+                        child: Transform.rotate(
+                          angle: (1 - v) * -0.5,
+                          child: Transform.scale(scale: 0.5 + 0.5 * v, child: child),
+                        ),
                       ),
-                      child: const FoxMascot(size: 140, mood: FoxMood.happy),
+                      child: const FoxMascot(size: 140, mood: FoxMood.idle, showBadge: false),
                     ),
                   ],
                 ),

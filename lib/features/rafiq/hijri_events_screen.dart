@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:adhan/adhan.dart';
@@ -204,7 +205,7 @@ class _HijriEventsScreenState extends State<HijriEventsScreen>
   }
 
   Future<void> _updateHijriOffset(int newOffset) async {
-    HapticFeedback.selectionClick();
+    Haptics.selectionClick();
     final clamped = newOffset.clamp(-2, 2);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('hijri_day_offset', clamped);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -105,7 +106,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
   }
 
   Future<void> _toggleFavorite(String text) async {
-    HapticFeedback.selectionClick();
+    Haptics.selectionClick();
     final id = text.hashCode.toString();
     setState(() {
       if (_favoriteKeys.contains(id)) {
@@ -202,7 +203,7 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
     _persistProgress();
 
     if (next == item.count) {
-      HapticFeedback.mediumImpact();
+      Haptics.mediumImpact();
       if (index + 1 < totalCount) {
         Future.delayed(const Duration(milliseconds: 350), () {
           if (mounted && _pageController.hasClients) {
@@ -215,12 +216,12 @@ class _AdhkarScreenState extends State<AdhkarScreen> {
         });
       }
     } else {
-      HapticFeedback.selectionClick();
+      Haptics.selectionClick();
     }
   }
 
   void _resetTabProgress() {
-    HapticFeedback.mediumImpact();
+    Haptics.mediumImpact();
     setState(() {
       _progress.removeWhere((k, _) => k.startsWith('$_selectedTab-'));
       _currentCardIndex = 0;

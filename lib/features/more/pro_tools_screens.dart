@@ -50,9 +50,9 @@ class _ZakatCalculatorScreenState extends State<ZakatCalculatorScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,7 +67,7 @@ class _ZakatCalculatorScreenState extends State<ZakatCalculatorScreen> {
                   decoration: InputDecoration(
                     hintText: 'أدخل المبلغ الذي حال عليه الحول...',
                     filled: true,
-                    fillColor: ThalabTheme.creamBackground,
+                    fillColor: Theme.of(context).scaffoldBackgroundColor,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -85,7 +85,7 @@ class _ZakatCalculatorScreenState extends State<ZakatCalculatorScreen> {
                   decoration: InputDecoration(
                     hintText: 'سعر الجرام...',
                     filled: true,
-                    fillColor: ThalabTheme.creamBackground,
+                    fillColor: Theme.of(context).scaffoldBackgroundColor,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -208,7 +208,7 @@ class _UnitConverterScreenState extends State<UnitConverterScreen> {
               return ChoiceChip(
                 label: Text(cat,
                     style: TextStyle(
-                        color: active ? Colors.white : ThalabTheme.darkSlate,
+                        color: active ? Colors.white : Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.bold)),
                 selected: active,
                 selectedColor: ThalabTheme.foxOrange,
@@ -228,9 +228,9 @@ class _UnitConverterScreenState extends State<UnitConverterScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: ThalabTheme.cardSurface,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: ThalabTheme.softBorder),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Column(
               children: [
@@ -241,7 +241,7 @@ class _UnitConverterScreenState extends State<UnitConverterScreen> {
                   decoration: InputDecoration(
                     labelText: 'القيمة',
                     filled: true,
-                    fillColor: ThalabTheme.creamBackground,
+                    fillColor: Theme.of(context).scaffoldBackgroundColor,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -294,7 +294,7 @@ class _UnitConverterScreenState extends State<UnitConverterScreen> {
           Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: ThalabTheme.darkSlate,
+              color: Theme.of(context).colorScheme.onSurface,
               borderRadius: BorderRadius.circular(22),
             ),
             child: Column(
@@ -379,7 +379,7 @@ class _AgeCalculatorScreenState extends State<AgeCalculatorScreen> {
               child: Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: ThalabTheme.cardSurface,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: ThalabTheme.foxOrange),
                 ),
@@ -432,9 +432,9 @@ class _AgeCalculatorScreenState extends State<AgeCalculatorScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(color: Theme.of(context).dividerColor),
               ),
               child: Column(
                 children: [
@@ -519,7 +519,7 @@ class _PasswordGeneratorScreenState extends State<PasswordGeneratorScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: ThalabTheme.darkSlate,
+                color: Theme.of(context).colorScheme.onSurface,
                 borderRadius: BorderRadius.circular(22),
               ),
               child: Column(
@@ -571,9 +571,9 @@ class _PasswordGeneratorScreenState extends State<PasswordGeneratorScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: ThalabTheme.cardSurface,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: ThalabTheme.softBorder),
+                border: Border.all(color: Theme.of(context).dividerColor),
               ),
               child: Column(
                 children: [
@@ -666,10 +666,10 @@ class _TextAnalyzerScreenState extends State<TextAnalyzerScreen> {
               decoration: InputDecoration(
                 hintText: 'الصق أو اكتب النص هنا لتحليله فوراً...',
                 filled: true,
-                fillColor: ThalabTheme.cardSurface,
+                fillColor: Theme.of(context).cardColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(color: ThalabTheme.softBorder),
+                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
                 ),
               ),
             ),
@@ -705,9 +705,9 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: ThalabTheme.cardSurface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ThalabTheme.softBorder),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

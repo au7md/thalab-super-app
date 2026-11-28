@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'fox_mascot.dart';
+import 'haptics.dart';
 import 'theme.dart';
 
 /// لون النص الفرعي المتوافق مع الوضعين.
@@ -64,7 +66,7 @@ class _PressableScaleState extends State<PressableScale> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (widget.haptic) HapticFeedback.selectionClick();
+              if (widget.haptic) Haptics.selectionClick();
               widget.onTap!();
             },
       onLongPress: widget.onLongPress,
@@ -119,6 +121,59 @@ class _FadeSlideInState extends State<FadeSlideIn> {
         duration: widget.duration,
         curve: Curves.easeOutCubic,
         child: widget.child,
+      ),
+    );
+  }
+}
+
+/// حالة فارغة موحّدة: الثعلب + عنوان + وصف (+ زر اختياري).
+class FoxEmptyState extends StatelessWidget {
+  final FoxMood mood;
+  final String title;
+  final String subtitle;
+  final Widget? action;
+
+  const FoxEmptyState({
+    super.key,
+    required this.mood,
+    required this.title,
+    required this.subtitle,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FadeSlideIn(child: FoxMascot(size: 112, mood: mood)),
+            const SizedBox(height: 18),
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 150),
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(height: 6),
+            FadeSlideIn(
+              delay: const Duration(milliseconds: 300),
+              child: Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, height: 1.6, color: thalabMuted(context)),
+              ),
+            ),
+            if (action != null) ...[
+              const SizedBox(height: 16),
+              FadeSlideIn(delay: const Duration(milliseconds: 450), child: action!),
+            ],
+          ],
+        ),
       ),
     );
   }

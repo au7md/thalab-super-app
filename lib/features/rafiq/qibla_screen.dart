@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
@@ -224,7 +225,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
           final isAligned = hasCompass && normalizedDiff.abs() < 5.0;
 
           if (isAligned && !_wasAligned) {
-            HapticFeedback.mediumImpact();
+            Haptics.mediumImpact();
           }
           _wasAligned = isAligned;
 
