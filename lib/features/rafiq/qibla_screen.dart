@@ -6,7 +6,9 @@ import 'package:adhan/adhan.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/fox_mascot.dart';
 import '../../core/theme.dart';
+import '../../core/ui_kit.dart';
 
 class QiblaScreen extends StatefulWidget {
   const QiblaScreen({super.key});
@@ -235,30 +237,76 @@ class _QiblaScreenState extends State<QiblaScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: _openCityPickerSheet,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _cardBg,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: _borderColor),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.location_on_rounded, size: 16, color: ThalabTheme.foxOrange),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              _locationLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-                            ),
+                  FadeSlideIn(
+                    child: PressableScale(
+                      onTap: _openCityPickerSheet,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              ThalabTheme.foxOrange.withOpacity(_isDark ? 0.24 : 0.14),
+                              _cardBg,
+                            ],
+                            begin: Alignment.topRight,
+                            end: Alignment.bottomLeft,
                           ),
-                        ],
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: ThalabTheme.foxOrange.withOpacity(0.28)),
+                        ),
+                        child: Row(
+                          children: [
+                            FoxMascot(
+                              size: 56,
+                              mood: isAligned ? FoxMood.happy : FoxMood.praying,
+                              showBadge: false,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'اتجاه القبلة',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.location_on_rounded,
+                                          size: 14, color: ThalabTheme.foxOrange),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          _locationLabel,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontSize: 12, color: thalabMuted(context)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: ThalabTheme.foxOrange,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Text(
+                                '${qiblaDirection.toStringAsFixed(0)}°',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -448,7 +496,7 @@ class _QiblaScreenState extends State<QiblaScreen> {
                   const Text(
                     'ضع الهاتف أفقياً بعيداً عن المعادن وأدِره حتى ينطبق رمز الكعبة مع المؤشر العلوي ويهتز الهاتف',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12.5, color: ThalabTheme.mutedSlate, height: 1.5),
+                    style: TextStyle(fontSize: 12.5, color: thalabMuted(context), height: 1.5),
                   ),
                 ],
               ),
@@ -474,7 +522,7 @@ class _QiblaInfoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
+    return FadeSlideIn(child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
@@ -490,7 +538,7 @@ class _QiblaInfoTile extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 11.5, color: ThalabTheme.mutedSlate)),
+              Text(label, style: TextStyle(fontSize: 11.5, color: thalabMuted(context))),
               Text(
                 value,
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
@@ -499,7 +547,7 @@ class _QiblaInfoTile extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
