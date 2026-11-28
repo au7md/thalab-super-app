@@ -1498,7 +1498,10 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                     final isFav = _favoriteIds.contains(track.id);
                                     final isSelected = _selectedTrackIds.contains(track.id);
 
-                                    return InkWell(
+                                    return FadeSlideIn(
+                                      delay: Duration(
+                                          milliseconds: 30 + (idx < 10 ? idx : 10) * 35),
+                                      child: InkWell(
                                       borderRadius: BorderRadius.circular(18),
                                       onLongPress: () => _toggleSelection(track.id),
                                       onTap: () {
@@ -1570,9 +1573,9 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                                     '${track.folder} • ${_fmtSec(track.durationSeconds)}',
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontSize: 11,
-                                                      color: ThalabTheme.mutedSlate,
+                                                      color: thalabMuted(context),
                                                     ),
                                                   ),
                                                 ],
@@ -1586,14 +1589,14 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                                 size: 20,
                                                 color: isFav
                                                     ? Colors.redAccent
-                                                    : ThalabTheme.mutedSlate,
+                                                    : thalabMuted(context),
                                               ),
                                               onPressed: () => _toggleFavorite(track.id),
                                             ),
                                             PopupMenuButton<String>(
-                                              icon: const Icon(Icons.more_vert_rounded,
+                                              icon: Icon(Icons.more_vert_rounded,
                                                   size: 20,
-                                                  color: ThalabTheme.mutedSlate),
+                                                  color: thalabMuted(context)),
                                               color: _cardBg,
                                               onSelected: (val) async {
                                                 if (val == 'trim') _openAudioEditor(track);
@@ -1698,6 +1701,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                                             ),
                                           ],
                                         ),
+                                      ),
                                       ),
                                     );
                                   },
