@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/fox_mascot.dart';
+import '../../core/haptics.dart';
 import '../../core/theme.dart';
 import '../../core/ui_kit.dart';
 
@@ -910,8 +911,18 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                             color: _innerBg,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.music_note_rounded,
-                              color: ThalabTheme.foxOrange, size: 30),
+                          child: AnimatedBuilder(
+                            animation: _discController,
+                            builder: (_, child) => Transform.rotate(
+                              angle: -_discController.value * 2 * math.pi,
+                              child: child,
+                            ),
+                            child: FoxMascot(
+                              size: 56,
+                              mood: _isPlaying ? FoxMood.happy : FoxMood.idle,
+                              showBadge: false,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -1005,7 +1016,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     IconButton(
                       icon: Icon(
                         Icons.shuffle_rounded,
-                        color: _isShuffle ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+                        color: _isShuffle ? ThalabTheme.foxOrange : thalabMuted(context),
                       ),
                       onPressed: () {
                         setState(() => _isShuffle = !_isShuffle);
@@ -1031,6 +1042,7 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                     ),
                     GestureDetector(
                       onTap: () {
+                        Haptics.selectionClick();
                         _isPlaying ? _player.pause() : _player.play();
                         setSheetState(() {});
                       },
@@ -1041,10 +1053,15 @@ class _MusicStudioScreenState extends State<MusicStudioScreen>
                           color: ThalabTheme.foxOrange,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
-                          _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 40,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                          child: Icon(
+                            _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            key: ValueKey(_isPlaying),
+                            color: Colors.white,
+                            size: 40,
+                          ),
                         ),
                       ),
                     ),
