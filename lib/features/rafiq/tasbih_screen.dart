@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/haptics.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/fox_mascot.dart';
 import '../../core/theme.dart';
+import '../../core/ui_kit.dart';
 
 class _TasbihPhraseItem {
   final String text;
@@ -29,6 +32,8 @@ class _TasbihScreenState extends State<TasbihScreen>
   int _selectedPhraseIndex = 0;
   int _selectedStyleIndex = 0;
   bool _vibrationEnabled = true;
+  bool _celebrating = false;
+  Timer? _celebrateTimer;
 
   late AnimationController _beadAnimController;
   final List<_TasbihPhraseItem> _customPhrases = [];
@@ -69,6 +74,7 @@ class _TasbihScreenState extends State<TasbihScreen>
 
   @override
   void dispose() {
+    _celebrateTimer?.cancel();
     _beadAnimController.dispose();
     super.dispose();
   }
@@ -125,8 +131,13 @@ class _TasbihScreenState extends State<TasbihScreen>
       }
     });
 
-    if (roundJustCompleted && _vibrationEnabled) {
-      Haptics.heavyImpact();
+    if (roundJustCompleted) {
+      if (_vibrationEnabled) Haptics.heavyImpact();
+      _celebrateTimer?.cancel();
+      setState(() => _celebrating = true);
+      _celebrateTimer = Timer(const Duration(milliseconds: 3200), () {
+        if (mounted) setState(() => _celebrating = false);
+      });
     }
 
     await prefs.setInt('tasbih_current', _tasbihCount);
@@ -392,7 +403,7 @@ class _TasbihScreenState extends State<TasbihScreen>
             tooltip: _vibrationEnabled ? 'إيقاف الاهتزاز' : 'تفعيل الاهتزاز',
             icon: Icon(
               _vibrationEnabled ? Icons.vibration_rounded : Icons.smartphone_rounded,
-              color: _vibrationEnabled ? ThalabTheme.foxOrange : ThalabTheme.mutedSlate,
+              color: _vibrationEnabled ? ThalabTheme.foxOrange : thalabMuted(context),
             ),
             onPressed: () async {
               final prefs = await SharedPreferences.getInstance();
@@ -407,7 +418,9 @@ class _TasbihScreenState extends State<TasbihScreen>
           ),
         ],
       ),
-      body: Padding(
+      body: Stack(
+        children: [
+      Padding(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
         child: Column(
           children: [
@@ -474,6 +487,14 @@ class _TasbihScreenState extends State<TasbihScreen>
               ),
               child: Column(
                 children: [
+                  FoxMascot(
+                    size: 62,
+                    mood: _celebrating
+                        ? FoxMood.happy
+                        : (_completedRounds > 0 ? FoxMood.idle : FoxMood.praying),
+                    showBadge: false,
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     currentPhrase,
                     textAlign: TextAlign.center,
@@ -590,6 +611,9 @@ class _TasbihScreenState extends State<TasbihScreen>
             ),
           ],
         ),
+      ),
+        if (_celebrating) Positioned.fill(child: FoxConfetti()),
+        ],
       ),
     );
   }
